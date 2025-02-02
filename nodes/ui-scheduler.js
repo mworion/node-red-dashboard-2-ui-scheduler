@@ -2676,6 +2676,7 @@ module.exports = function (RED) {
                             }
 
                             // Helper function to determine payload and payloadType
+                            // eslint-disable-next-line no-inner-declarations
                             function getPayloadAndType (valueKey, defaultValue) {
                                 if (schedule?.payloadType === 'custom') {
                                     return {

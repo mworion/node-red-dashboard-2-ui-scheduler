@@ -680,18 +680,20 @@
                             <v-select
                                 v-model="customPayloadStart"
                                 :items="customPayloads"
-                                item-title="label"
+                                :item-title="getCustomPayloadTitle"
                                 item-value="id"
                                 :label="isTimespanSchedule ? 'Custom Output: Start' : 'Custom Output'"
+                                no-data-text="No custom payloads defined"
                             />
                         </v-col>
                         <v-col v-if="payloadType === 'custom' && isTimespanSchedule" cols="12" class="d-flex justify-center">
                             <v-select
                                 v-model="customPayloadEnd"
                                 :items="customPayloads"
-                                item-title="label"
+                                :item-title="getCustomPayloadTitle"
                                 item-value="id"
                                 label="Custom Output: End"
+                                no-data-text="No custom payloads defined"
                             />
                         </v-col>
                     </v-row>
@@ -1178,6 +1180,18 @@ export default {
                 : false
         },
 
+        getCustomPayloadTitle (item) {
+            if (!item) return ''
+            // Use item.value for the title if item.label is an empty string or null
+            let title = item.label ? item.label : (item.type === 'json' ? JSON.stringify(item.value) : item.value)
+            if (!title) return ''
+            // Truncate the title if it exceeds 30 characters
+            if (title.length > 30) {
+                title = title.slice(0, 30) + '...'
+            }
+            return title
+        },
+
         mapSolarEvent (event, toTitle = true) {
             const found = this.solarEvents.find(e => toTitle ? e.value === event : e.title === event)
             return found ? (toTitle ? found.title : found.value) : event
@@ -1534,10 +1548,13 @@ export default {
             this.payloadType = item.payloadType !== undefined ? item.payloadType : this.payloadType
             if (item.payloadType !== undefined && item.payloadType === 'custom') {
                 if (item.payloadValue !== undefined) {
-                    this.customPayloadStart = item.payloadValue
+                    const payload = this.props.customPayloads.find(payload => payload.id === item.payloadValue)
+                    this.customPayloadStart = payload || null
                 }
+
                 if (item.endPayloadValue !== undefined) {
-                    this.customPayloadEnd = item.endPayloadValue
+                    const payload = this.props.customPayloads.find(payload => payload.id === item.endPayloadValue)
+                    this.customPayloadEnd = payload || null
                 }
             }
 
