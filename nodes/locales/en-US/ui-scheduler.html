@@ -1,34 +1,91 @@
+<script type="text/javascript">
+    function _popoutSchedulerHelp (tag) {
+        const startTag = (name) => `<${name}>`
+        const endTag = (name) => `</${name}>`
+        const winHtml = `
+            ${startTag('html')}
+                ${startTag('head')}
+                    ${startTag('title')}ui-scheduler help${endTag('title')}
+                    ${startTag('style')}
+                    .fade-in {
+                        transition: opacity 1.5s ease-in-out;
+                    }
+                    .hidden {
+                        opacity: 0;
+                        visibility: hidden;
+                    }
+                    ${endTag('style')}
+                ${endTag('head')}
+                ${startTag('body')}
+                    ${startTag('script')}
+                        const styles = ${JSON.stringify([].map.call(document.querySelectorAll('[rel="stylesheet"]'), e => e.href))}
+                        const head = document.head || document.getElementsByTagName('head')[0]
+                        styles.forEach(href => {
+                            const el = document.createElement('link');
+                            el.rel="stylesheet"
+                            el.href = href
+                            head.appendChild(el);
+                        })
+                    ${endTag('script')}
+                    <div class="red-ui-editor help-content hidden" style="height: 100%">
+                        <div class="red-ui-sidebar-info">
+                            <div class="red-ui-sidebar-help-stack red-ui-panels" style="height: 100%;">
+                                <div class="red-ui-panel" style="overflow-y: auto;height: 100%;">
+                                    <div class="red-ui-help" style="padding: 6px;height: 100%;">
+                                        <h1 class="red-ui-help-title">ui-scheduler</h1>
+                                        <div class="red-ui-help">
+                                            <span class="red-ui-text-bidi-aware">
+                                                ${RED.nodes.getNodeHelp('ui-scheduler')}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    ${startTag('script')}
+                        if (navigator.clipboard) {
+                            document.querySelector('.ui-scheduler-link-button').classList.add('hidden')
+                            const content = document.querySelector('.help-content');
+                            content.classList.add('hidden')
+                            content.classList.remove('hidden')
+                            content.classList.add('fade-in')
+                            const copyButtonLabel = "Copy"
+                            const blocks = document.querySelectorAll("pre.ui-scheduler-code")
+                            blocks.forEach((block) => {
+                                const button = document.createElement("button")
+                                button.innerText = copyButtonLabel
+                                button.classList.add('ui-scheduler-copy-button')
+                                button.addEventListener("click", copyCode)
+                                block.appendChild(button)
+                            })
+                        }
+                        async function copyCode(event) {
+                            const button = event.srcElement
+                            const pre = button.parentElement
+                            const code = pre.querySelector("code")
+                            const text = code.innerText
+                            await navigator.clipboard.writeText(text)
+                        }
+                    ${endTag('script')}
+                ${endTag('body')}
+            ${endTag('html')}`
+
+        const BOM = new Uint8Array([0xEF, 0xBB, 0xBF])
+        const winUrl = URL.createObjectURL(
+            new Blob([BOM, winHtml], { encoding: 'UTF-8', type: 'text/html;charset=UTF-8' })
+        )
+        const win = window.open(
+            winUrl + (tag ? '#' + tag : ''),
+            'win',
+            'width=800,height=600'
+        )
+    }
+</script>
+
 <script type="text/html" data-help-name="ui-scheduler">
-    <style>
-        .ui-scheduler-link-button {
-            background: none!important;
-            border: none!important;
-            padding: 0!important;
-            cursor: pointer!important;
-            color: var(--red-ui-primary-text-color);
-        }
-        pre.ui-scheduler-code button.ui-scheduler-copy-button {
-            position: absolute;
-            padding: 2px;
-            background-color: var(--red-ui-primary-text-color);
-            color: var(--red-ui-primary-background);
-            border: ridge 1px var(--red-ui-secondary-text-color);
-            border-radius: 15px;
-            opacity: 0.35;
-            top: 0px;
-            right: 4px;
-            scale: 70%;
-            transform-origin: right;
-        }
-        pre.ui-scheduler-code button.ui-scheduler-copy-button:hover{
-            cursor: pointer;
-            opacity: 0.9;
-        }
-        .red-ui-help pre.ui-scheduler-code {
-            position: relative;
-        }
-    </style>
-    <p>Schedule the injection of a payload to start a flow <span style="float: right"><button class="ui-scheduler-link-button" onclick="_popoutui-schedulerHelp()">pop out <i class="fa fa-external-link"></i></button></span></p>
+    
+    <p>Schedule the injection of a payload to start a flow <span style="float: right"><button class="ui-scheduler-link-button" onclick="_popoutSchedulerHelp()">pop out <i class="fa fa-external-link"></i></button></span></p>
     <h3>Properties</h3>
     <dl class="message-properties">
         <h4>Timezone (optional)</h4>
@@ -524,5 +581,34 @@ msg.payload = "name"; //  name of the schedule</code></pre>
         </ul>   
 
     </dl>
-    
+
+    <style>
+        .ui-scheduler-link-button {
+            background: none!important;
+            border: none!important;
+            padding: 0!important;
+            cursor: pointer!important;
+            color: var(--red-ui-primary-text-color);
+        }
+        pre.ui-scheduler-code button.ui-scheduler-copy-button {
+            position: absolute;
+            padding: 2px;
+            background-color: var(--red-ui-primary-text-color);
+            color: var(--red-ui-primary-background);
+            border: ridge 1px var(--red-ui-secondary-text-color);
+            border-radius: 15px;
+            opacity: 0.35;
+            top: 0px;
+            right: 4px;
+            scale: 70%;
+            transform-origin: right;
+        }
+        pre.ui-scheduler-code button.ui-scheduler-copy-button:hover{
+            cursor: pointer;
+            opacity: 0.9;
+        }
+        .red-ui-help pre.ui-scheduler-code {
+            position: relative;
+        }
+    </style>
 </script>
