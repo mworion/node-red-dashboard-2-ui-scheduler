@@ -972,10 +972,29 @@ copies or substantial portions of the Software.
                 sendInactiveState: { value: true },
                 topics: { value: ['Topic 1'] },
                 customPayloads: {
-                    value: [{ value: '1', label: 'Custom 1', id: generateUniqueId() }],
+                    value: [{ value: '1', label: 'Custom 1', id: generateUniqueId(), type: 'str' }],
                     validate: function (v) {
+                        if (!v) {
+                            console.log('Validation failed: null or undefined values array')
+                            return false
+                        }
+
+                        const allNumValid = v.filter(o => o.type === 'num').every(o => o.value !== null && !isNaN(o.value))
+                        if (!allNumValid) {
+                            console.log('Validation failed: num type values cannot be null or NaN')
+                            return false
+                        }
+
+                        const allValid = v.every(o => o && (hasProperty(RED.validators, 'typedInput') ? RED.validators.typedInput(o.type) : true))
+                        console.log('allValid', allValid)
+                        console.log(v)
+
+                        if (!allValid) {
+                            return false
+                        }
+
                         const unique = new Set(v.map(o => o.value))
-                        return v.length === unique.size && v.every(o => o.value.trim() !== '')
+                        return v.length === unique.size
                     }
                 },
 
@@ -1070,8 +1089,7 @@ copies or substantial portions of the Software.
                     })
                 }
 
-                node.commandResponseMsgOutput = ['output1', 'output2', 'fanOut'].indexOf(node.commandResponseMsgOutput) >= 0 ? node.commandResponseMsgOutput : 'output1'
-
+                node.commandResponseMsgOutput = ['output1', 'output2', 'fanOut'].indexOf(node.commandResponseMsgOutput) >= 0 ? node.commandResponseMsgOutput : 'fanOut'
                 // eslint-disable-next-line no-undef
                 initMap()
 
@@ -1682,7 +1700,17 @@ copies or substantial portions of the Software.
                         nameInput.appendTo(row).typedInput({ default: 'str', types: ['str'] })
 
                         const finalspan = $('<span/>', { style: 'float: right;margin-top: 6px;' }).appendTo(row)
-                        finalspan.append(' &#8594; <span class="node-input-topic-index">' + (index + 2) + '</span> ')
+                        let outputIndex
+                        if (node.commandResponseMsgOutput === 'output1') {
+                            outputIndex = 1
+                        } else if (node.commandResponseMsgOutput === 'output2') {
+                            outputIndex = 2
+                        } else if (node.commandResponseMsgOutput === 'fanOut') {
+                            outputIndex = index + 2
+                        } else {
+                            outputIndex = index + 2 // Default case if none of the conditions match
+                        }
+                        finalspan.append(' &#8594; <span class="node-input-topic-index">' + outputIndex + '</span> ')
                     },
                     removeItem: function (opt) {
                         const topics = $('#node-input-topic-container').editableList('items')
@@ -1722,6 +1750,35 @@ copies or substantial portions of the Software.
                     }
                 }
 
+                function updateItems () {
+                    const topics = $('#node-input-topic-container').editableList('items')
+                    topics.each(function (index) {
+                        const current = node._('ui-scheduler.label.topic') + ' ' + (index + 1)
+                        $(this).find('.node-input-topic-label').html(' ' + current)
+
+                        let outputIndex
+                        if (node.commandResponseMsgOutput === 'output1') {
+                            outputIndex = 1
+                        } else if (node.commandResponseMsgOutput === 'output2') {
+                            outputIndex = 2
+                        } else if (node.commandResponseMsgOutput === 'fanOut') {
+                            outputIndex = index + 2
+                        } else {
+                            outputIndex = index + 2 // Default case if none of the conditions match
+                        }
+
+                        $(this).find('.node-input-topic-index').html(outputIndex)
+                    })
+                }
+
+                // Add an event listener to the select element to call updateItems on change
+                $('#node-input-commandResponseMsgOutput').change(function () {
+                    // Update the node's commandResponseMsgOutput value based on the selected option
+                    node.commandResponseMsgOutput = $(this).val()
+
+                    // Call the updateItems function to reevaluate outputIndex
+                    updateItems()
+                })
                 /**
              * Apply defaults to the cron schedule object
              * @param {integer} optionIndex An index number to use for defaults
@@ -2286,6 +2343,7 @@ copies or substantial portions of the Software.
 
                     // if shift key or middle mouse button or already full screen then toggle full screen
                     if (evt.shiftKey || evt.button === 1 /* middle button */ || document.fullscreenElement) {
+                        // eslint-disable-next-line n/handle-callback-err
                         toggleFullscreen(selector, function (err) {
                             updateEditorLayout()
                         })
@@ -2487,89 +2545,6 @@ copies or substantial portions of the Software.
         })
     })(jQuery)
 
-    function _popoutsSchedulerHelp (tag) {
-        const startTag = (name) => `<${name}>`
-        const endTag = (name) => `</${name}>`
-        const winHtml = `
-            ${startTag('html')}
-                ${startTag('head')}
-                    ${startTag('title')}ui-scheduler help${endTag('title')}
-                    ${startTag('style')}
-                    .fade-in {
-                        transition: opacity 1.5s ease-in-out;
-                    }
-                    .hidden {
-                        opacity: 0;
-                        visibility: hidden;
-                    }
-                    ${endTag('style')}
-                ${endTag('head')}
-                ${startTag('body')}
-                    ${startTag('script')}
-                        const styles = ${JSON.stringify([].map.call(document.querySelectorAll('[rel="stylesheet"]'), e => e.href))}
-                        const head = document.head || document.getElementsByTagName('head')[0]
-                        styles.forEach(href => {
-                            const el = document.createElement('link');
-                            el.rel="stylesheet"
-                            el.href = href
-                            head.appendChild(el);
-                        })
-                    ${endTag('script')}
-                    <div class="red-ui-editor help-content hidden" style="height: 100%">
-                        <div class="red-ui-sidebar-info">
-                            <div class="red-ui-sidebar-help-stack red-ui-panels" style="height: 100%;">
-                                <div class="red-ui-panel" style="overflow-y: auto;height: 100%;">
-                                    <div class="red-ui-help" style="padding: 6px;height: 100%;">
-                                        <h1 class="red-ui-help-title">ui-scheduler</h1>
-                                        <div class="red-ui-help">
-                                            <span class="red-ui-text-bidi-aware">
-                                                ${RED.nodes.getNodeHelp('ui-scheduler')}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    ${startTag('script')}
-                        if (navigator.clipboard) {
-                            document.querySelector('.ui-scheduler-link-button').classList.add('hidden')
-                            const content = document.querySelector('.help-content');
-                            content.classList.add('hidden')
-                            content.classList.remove('hidden')
-                            content.classList.add('fade-in')
-                            const copyButtonLabel = "Copy"
-                            const blocks = document.querySelectorAll("pre.ui-scheduler-code")
-                            blocks.forEach((block) => {
-                                const button = document.createElement("button")
-                                button.innerText = copyButtonLabel
-                                button.classList.add('ui-scheduler-copy-button')
-                                button.addEventListener("click", copyCode)
-                                block.appendChild(button)
-                            })
-                        }
-                        async function copyCode(event) {
-                            const button = event.srcElement
-                            const pre = button.parentElement
-                            const code = pre.querySelector("code")
-                            const text = code.innerText
-                            await navigator.clipboard.writeText(text)
-                        }
-                    ${endTag('script')}
-                ${endTag('body')}
-            ${endTag('html')}`
-
-        const BOM = new Uint8Array([0xEF, 0xBB, 0xBF])
-        const winUrl = URL.createObjectURL(
-            new Blob([BOM, winHtml], { encoding: 'UTF-8', type: 'text/html;charset=UTF-8' })
-        )
-        const win = window.open(
-            winUrl + (tag ? '#' + tag : ''),
-            'win',
-            'width=800,height=600'
-        )
-    }
-
     function onSchedulesExpandCompress () {
         const selector = '#node-ui-scheduler-tab-static-schedules'
         const el = $(selector)
@@ -2739,7 +2714,7 @@ copies or substantial portions of the Software.
         <div class="form-row ui-scheduler-form-row form-row-flex node-input-customPayload-container-row" style="margin-top: 20px; margin-bottom: 0px; width: 100%">
             <label for="node-input-customPayload-container-div"><i class="fa fa-list-alt"></i> Custom Payloads</label>
             <div id="node-input-customPayload-container-div" style="box-sizing:border-box; border-radius:5px; min-height:50px; height:auto; max-height: 200px; padding:5px; border:1px solid var(--red-ui-form-input-border-color, #ccc); overflow-y:auto; display:inline-block; width: 80%;">
-                <span id="valWarning" style="color: var(--red-ui-text-color-error, #910000)"><b>All Values must be unique.</b></span>
+                <span id="valWarning" style="color: var(--red-ui-text-color-error, #910000)"><b>All Values must be valid and unique.</b></span>
                 <ol id="node-input-customPayload-container" style="list-style-type:none; margin:0;"></ol>
             </div>
         </div>
