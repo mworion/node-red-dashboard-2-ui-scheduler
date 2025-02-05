@@ -1181,14 +1181,23 @@ export default {
         },
 
         getCustomPayloadTitle (item) {
-            if (!item) return ''
-            // Use item.value for the title if item.label is an empty string or null
-            let title = item.label ? item.label : (item.type === 'json' ? JSON.stringify(item.value) : item.value)
-            if (!title) return ''
+            if (!item) return '' // Return empty string if item is null or undefined
+
+            let title = item.label || (item.type === 'json' ? JSON.stringify(item.value) : item.value)
+
+            if (title === '' || title === null) {
+                return '' // Return empty string if title is empty or null
+            }
+
+            if (title === 0) {
+                return 0 // Return 0 if title is 0
+            }
+
             // Truncate the title if it exceeds 30 characters
-            if (title.length > 30) {
+            if (typeof title === 'string' && title.length > 30) {
                 title = title.slice(0, 30) + '...'
             }
+
             return title
         },
 
