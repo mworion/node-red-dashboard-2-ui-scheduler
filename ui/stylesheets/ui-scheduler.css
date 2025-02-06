@@ -64,3 +64,11 @@ border: none;
 .no-padding-start .v-list-group__items .v-list-item {
   padding-inline-start: 0px !important;
 }
+
+.v-btn--density-compact {
+  --widget-row-height: 32px;
+}
+
+.v-btn--density-comfortable {
+  --widget-row-height: 38px;
+}
