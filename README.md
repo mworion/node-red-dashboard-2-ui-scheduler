@@ -13,6 +13,7 @@ This node is still in beta and is not yet ready for production use. Any contribu
 - Use cron expressions and cron builder in UI to specify schedules.
 - Persistence of schedules to local file system or Node-RED context stores.
 - Supports timespans (e.g., "from 10:00 AM to 12:00 PM") or durations (e.g., "for 5 minutes").
+- Supports using Solar with Time schedules when adding a timespan schedule. (e.g., "from 5:00 AM to Sunrise")
 - Optionally send current state of timespan or duration schedules at a specified interval.
 - Supports custom payloads for schedules.
 
