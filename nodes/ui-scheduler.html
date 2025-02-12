@@ -1149,7 +1149,7 @@ copies or substantial portions of the Software.
                         'env'
                     ]
                 })
-                $('#node-input-defaultLocation').typedInput('type', node.defaultLocationType || 'default')
+                $('#node-input-defaultLocation').typedInput('type', node.defaultLocationType || 'fixed')
                 $('#node-input-defaultLocation').typedInput('value', node.defaultLocation || '')
                 $('#node-input-defaultLocation').on('change', function () {
                     const show = $('#node-input-defaultLocation').typedInput('type') === 'default' || !$('#node-input-defaultLocation').typedInput('type')
@@ -1199,7 +1199,7 @@ copies or substantial portions of the Software.
                         value: (customPayload.type === 'json') ? JSON.stringify(customPayload.value) : customPayload.value
                     }).appendTo(row).typedInput({
                         default: customPayload.type || 'str',
-                        types: ['str', 'num', 'json']
+                        types: ['str', 'num', 'bool', 'json']
                     })
 
                     // Label input
@@ -2656,7 +2656,7 @@ copies or substantial portions of the Software.
         </div>
         <div class="form-row ui-scheduler-form-row">
             <label for="node-input-defaultLocation"><i class="fa fa-map-marker"></i> Location</label>
-            <input type="text" id="node-input-defaultLocation" style="width: calc(100% - 130px)" placeholder="lat lng (optional)">
+            <input type="text" id="node-input-defaultLocation" style="width: calc(100% - 130px)" placeholder="lat lng - click to open map >">
         </div>
         <div class="form-row ui-scheduler-form-row">
             <label for="node-input-commandResponseMsgOutput"><i class="fa fa-dot-circle-o"></i> Outputs</label>

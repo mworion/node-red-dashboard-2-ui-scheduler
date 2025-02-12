@@ -11,7 +11,7 @@
 
 /* even rows color */
 .v-data-table tbody tr:nth-of-type(even) {
-  background-color: rgba(0, 0, 0, .03);
+  background-color: rgba(0, 0, 0, 0.03);
 }
 
 /* end column  */
@@ -27,17 +27,17 @@
 }
 
 .truncate-text {
-overflow: hidden !important;
-text-overflow: ellipsis !important;
-white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
 .bordered-card {
-border: 1px solid var(--v-theme-group-outline);
+  border: 1px solid var(--v-theme-group-outline);
 }
 
 .border-none {
-border: none;
+  border: none;
 }
 
 .text-green {
@@ -53,12 +53,12 @@ border: none;
 }
 
 .centered-subheader .v-list-subheader__text {
-  margin-left: auto!important;
-  margin-right: auto!important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 .prepend-icon-spacing .v-list-item__spacer {
-  width: 15px!important;
+  width: 15px !important;
 }
 
 .no-padding-start .v-list-group__items .v-list-item {
@@ -67,8 +67,15 @@ border: none;
 
 .v-btn--density-compact {
   --widget-row-height: 32px;
+  max-height: 32px;
 }
 
 .v-btn--density-comfortable {
   --widget-row-height: 38px;
+  max-height: 38px;
+}
+
+.v-btn--density-default {
+  --widget-row-height: 48px;
+  max-height: 48px;
 }
