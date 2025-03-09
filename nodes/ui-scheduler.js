@@ -2352,6 +2352,10 @@ module.exports = function (RED) {
                         })
                         .start()
                 }
+
+                // send initial status
+                sendTopicMsg(node, Date.now())
+
                 const data = { ...config }
                 data.schedules = getUiSchedules(node)
                 data.id = node.id
@@ -3682,7 +3686,6 @@ module.exports = function (RED) {
             return task
         }
         function requestSerialisation () {
-            console.log('requestSerialisation')
             if (node.serialisationRequestBusy || node.postponeSerialisation) {
                 return
             }
@@ -4509,6 +4512,7 @@ module.exports = function (RED) {
 
             const uiSchedules = updateUISchedules(node)
             emitUiUpdate(node, uiSchedules, 'remove')
+            sendTopicMsg(node, new Date())
         }
 
         /**
@@ -4534,7 +4538,7 @@ module.exports = function (RED) {
             } else if (msg?.payload?.name) {
                 handleTask(msg.payload.name, msg.payload.enabled)
             }
-
+            sendTopicMsg(node, new Date())
             requestSerialisation()
         }
 
