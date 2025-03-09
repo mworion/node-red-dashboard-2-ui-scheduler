@@ -288,7 +288,23 @@
                                                 </template>
                                                 <v-list-item-title>Duration</v-list-item-title>
                                                 <v-list-item-subtitle>{{ item.duration }} minutes</v-list-item-subtitle>
+                                            </v-list-item> -->
+                                            <v-list-item
+                                                v-if="item.calculatedDurationPretty"
+                                                class="prepend-icon-spacing"
+                                            >
+                                                <template #prepend>
+                                                    <v-icon>mdi-timer-sand</v-icon>
+                                                </template>
+                                                <v-list-item-title>Duration</v-list-item-title>
+                                                <v-list-item-subtitle>
+                                                    {{ item.calculatedDurationPretty
+                                                    }}
+                                                </v-list-item-subtitle>
                                             </v-list-item>
+                                            <v-divider
+                                                v-if="(item.scheduleType === 'solar' && item.timespan !== false) || item.solarDays"
+                                            />
                                             <v-list-subheader v-if="item.solarEvent">Solar</v-list-subheader>
                                             <v-list-item v-if="item.solarEvent" class="prepend-icon-spacing">
                                                 <template #prepend>
@@ -324,6 +340,19 @@
                                             </v-list-item>
                                             <v-divider />
                                             <v-list-subheader>Next</v-list-subheader>
+                                            <v-list-item
+                                                v-if="item.primaryTask?.nextDescription" lines="two"
+                                                class="prepend-icon-spacing" @click="requestStatus(item)"
+                                            >
+                                                <template #prepend>
+                                                    <v-icon>mdi-calendar-text</v-icon>
+                                                </template>
+                                                <v-list-item-title>Next Description</v-list-item-title>
+                                                <v-list-item-subtitle>
+                                                    {{ item.primaryTask?.nextDescription
+                                                    }}
+                                                </v-list-item-subtitle>
+                                            </v-list-item>
                                             <v-list-group>
                                                 <template #activator="{ isOpen, props }">
                                                     <v-list-item
@@ -335,29 +364,34 @@
                                                             <v-icon>mdi-calendar-arrow-right</v-icon>
                                                         </template>
                                                         <v-list-item-title>Next Date</v-list-item-title>
-                                                        <v-list-item-subtitle>{{ item.nextDate }}</v-list-item-subtitle>
+                                                        <v-list-item-subtitle>
+                                                            {{ item.primaryTask?.nextLocal
+                                                            }}
+                                                        </v-list-item-subtitle>
                                                     </v-list-item>
                                                 </template>
 
                                                 <v-list-item
-                                                    v-for="(date, index) in item.nextDates" :key="index"
-                                                    :class="{ 'no-padding-start': true }" lines="two"
+                                                    v-for="(date, index) in item.primaryTask?.nextDates"
+                                                    :key="index" :class="{ 'no-padding-start': true }" lines="two"
                                                 >
                                                     <v-list-item-subtitle>
                                                         <strong>{{ index + 1 }}.&nbsp;&nbsp;</strong>{{ date }}
                                                     </v-list-item-subtitle>
                                                 </v-list-item>
                                             </v-list-group>
-
                                             <v-list-item
-                                                v-if="item.nextDescription" lines="two"
-                                                class="prepend-icon-spacing" @click="requestStatus(item)"
+                                                v-if="item.endTask?.nextLocal" lines="two"
+                                                class="prepend-icon-spacing"
                                             >
                                                 <template #prepend>
-                                                    <v-icon>mdi-calendar-text</v-icon>
+                                                    <v-icon>mdi-calendar-arrow-right</v-icon>
                                                 </template>
-                                                <v-list-item-title>Next Description</v-list-item-title>
-                                                <v-list-item-subtitle>{{ item.nextDescription }}</v-list-item-subtitle>
+                                                <v-list-item-title>Next End Date</v-list-item-title>
+                                                <v-list-item-subtitle>
+                                                    {{ item.endTask?.nextLocal
+                                                    }}
+                                                </v-list-item-subtitle>
                                             </v-list-item>
                                         </v-list>
                                     </v-row>
@@ -1540,11 +1574,12 @@ export default {
             }
         },
         progressValue (item) {
-            const { nextEndUTC, currentStartTime } = item
+            // Destructure currentStartTime from item and nextEndUTC from item.endTask
+            const { currentStartTime, endTask: { nextDate: nextEndDate } = {} } = item
 
             // Ensure the dates are converted into timestamps
-            const nextEndMillis = new Date(nextEndUTC).getTime()
-            const currentStartMillis = new Date(currentStartTime).getTime()
+            const nextEndMillis = nextEndDate ? new Date(nextEndDate).getTime() : null
+            const currentStartMillis = currentStartTime ? new Date(currentStartTime).getTime() : null
 
             if (!nextEndMillis || !currentStartMillis) {
                 return 0
