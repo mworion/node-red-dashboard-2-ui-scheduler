@@ -1072,8 +1072,8 @@ export default {
                 'July', 'August', 'September', 'October', 'November', 'December'
             ],
             daysOfWeek: [
-                'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
-                'Saturday', 'Sunday'
+                'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+                'Saturday'
             ],
 
             // Solar events
@@ -1296,6 +1296,21 @@ export default {
         scheduleType (value) {
             if (value === 'cron') {
                 this.getCronDescription(this.cronValue)
+        dailyDays (value) {
+            if (value?.length && Array.isArray(value) && this.period === 'daily' && this.scheduleType === 'time') {
+                this.dailyDays = this.sortDaysOfWeek(value)
+            }
+        },
+        weeklyDays (value) {
+            if (value?.length && Array.isArray(value) && this.period === 'weekly' && this.scheduleType === 'time') {
+                this.weeklyDays = this.sortDaysOfWeek(value)
+            }
+        },
+        solarDays (value) {
+            if (value?.length && Array.isArray(value) && this.scheduleType === 'solar') {
+                this.solarDays = this.sortDaysOfWeek(value)
+            }
+        },
             }
         }
 
@@ -1738,6 +1753,9 @@ export default {
             }
             return []
         },
+        sortDaysOfWeek (days) {
+            return days.sort((a, b) => this.daysOfWeek.indexOf(a) - this.daysOfWeek.indexOf(b))
+        },
         getChipColor (day) {
             const colors = {
                 Sunday: 'red',
@@ -1871,7 +1889,7 @@ export default {
             this.enabled = true
             this.scheduleType = 'time'
             this.period = 'daily'
-            this.dailyDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            this.dailyDays = [...this.daysOfWeek]
             this.weeklyDays = ['Monday']
             this.monthlyDays = [1]
             this.yearlyDay = 1
