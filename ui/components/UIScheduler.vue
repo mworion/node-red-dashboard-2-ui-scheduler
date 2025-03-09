@@ -716,83 +716,6 @@
                             </v-expansion-panels>
                         </v-col>
                     </v-row>
-                    </v-row>
-
-                    <v-row
-                        v-if="((period === 'minutes' || period === 'hourly') || scheduleType === 'solar')"
-                        justify="center" no-gutters
-                    >
-                        <v-col cols="12" class="d-flex justify-center">
-                            <v-label>Timespan</v-label>
-                        </v-col>
-                        <v-col cols="12" class="d-flex justify-center mb-5">
-                            <v-btn-toggle
-                                v-model="timespan" mandatory divided variant="elevated" border="sm"
-                                rounded="xl"
-                            >
-                                <v-btn prepend-icon="mdi-circle-off-outline" :value="false">None</v-btn>
-                                <v-btn prepend-icon="mdi-timer-sand-complete" value="duration">Duration</v-btn>
-                                <v-btn
-                                    v-if="(scheduleType === 'solar')" prepend-icon="mdi-clock-time-four-outline"
-                                    :value="'time'"
-                                >
-                                    Time
-                                </v-btn>
-                            </v-btn-toggle>
-                        </v-col>
-                        <v-col v-if="timespan === 'time'" cols="12" class="d-flex justify-center">
-                            <v-radio-group v-model="solarEventStart" inline class="d-flex justify-center">
-                                <v-radio label="Start" color="green" :value="false" class="mx-6" />
-                                <v-radio label="End" color="red" :value="true" class="mx-6" />
-                            </v-radio-group>
-                        </v-col>
-
-                        <v-col
-                            v-if="((period === 'minutes' || period === 'hourly') || scheduleType === 'solar')"
-                            cols="12" class="d-flex justify-center"
-                        >
-                            <v-select
-                                v-if="timespan === 'duration'" v-model="duration" :items="durationItems"
-                                label="Duration (minutes)" :rules="[rules.required]"
-                            >
-                                <template #prepend-inner>
-                                    <v-icon>mdi-timer-sand-complete</v-icon>
-                                </template>
-                            </v-select>
-                            <v-col v-if="timespan === 'time'" class="d-flex justify-center">
-                                <v-text-field
-                                    v-if="props.useNewTimePicker" v-model="formattedSolarEventTimespanTime"
-                                    :active="modalTime" :focused="modalTime" readonly :rules="[rules.required]"
-                                    label="Time"
-                                >
-                                    <template #prepend-inner>
-                                        <v-icon
-                                            :color="solarEventStart ? 'red' : 'green'"
-                                            :icon="solarEventStart ? 'mdi-clock-end' : 'mdi-clock-start'"
-                                        />
-                                    </template>
-                                    <v-dialog v-model="modalTime" activator="parent" width="auto">
-                                        <v-time-picker
-                                            v-if="modalTime" v-model="solarEventTimespanTime"
-                                            :format="props.use24HourFormat ? '24hr' : 'ampm'"
-                                            :ampm-in-title="!props.use24HourFormat"
-                                        />
-                                    </v-dialog>
-                                </v-text-field>
-                                <v-text-field
-                                    v-else v-model="solarEventTimespanTime" label="Time" type="time"
-                                    :rules="[rules.required]"
-                                >
-                                    <template #prepend-inner>
-                                        <v-icon
-                                            :color="solarEventStart ? 'red' : 'green'"
-                                            :icon="solarEventStart ? 'mdi-clock-end' : 'mdi-clock-start'"
-                                        />
-                                    </template>
-                                </v-text-field>
-                            </v-col>
-                        </v-col>
-                    </v-row>
 
                     <v-row v-if="scheduleType === 'cron'" justify="center" no-gutters class="my-6">
                         <v-col cols="12" class="d-flex justify-center">
@@ -854,6 +777,82 @@
                                 v-model="cronValue" :fields="fields" :chipProps="{ color: 'primary' }"
                                 format="quartz"
                             />
+                        </v-col>
+                    </v-row>
+
+                    <v-row
+                        v-if="((period === 'minutes' || period === 'hourly') || scheduleType === 'solar' || scheduleType === 'cron')"
+                        justify="center" no-gutters
+                    >
+                        <v-col cols="12" class="d-flex justify-center">
+                            <v-label>Timespan</v-label>
+                        </v-col>
+                        <v-col cols="12" class="d-flex justify-center mb-5">
+                            <v-btn-toggle
+                                v-model="timespan" mandatory divided variant="elevated" border="sm"
+                                rounded="xl"
+                            >
+                                <v-btn prepend-icon="mdi-circle-off-outline" :value="false">None</v-btn>
+                                <v-btn prepend-icon="mdi-timer-sand-complete" value="duration">Duration</v-btn>
+                                <v-btn
+                                    v-if="(scheduleType === 'solar')" prepend-icon="mdi-clock-time-four-outline"
+                                    :value="'time'"
+                                >
+                                    Time
+                                </v-btn>
+                            </v-btn-toggle>
+                        </v-col>
+                        <v-col v-if="timespan === 'time'" cols="12" class="d-flex justify-center">
+                            <v-radio-group v-model="solarEventStart" inline class="d-flex justify-center">
+                                <v-radio label="Start" color="green" :value="false" class="mx-6" />
+                                <v-radio label="End" color="red" :value="true" class="mx-6" />
+                            </v-radio-group>
+                        </v-col>
+
+                        <v-col
+                            v-if="((period === 'minutes' || period === 'hourly') || scheduleType === 'solar' || scheduleType === 'cron')"
+                            cols="12" class="d-flex justify-center"
+                        >
+                            <v-select
+                                v-if="timespan === 'duration'" v-model="duration" :items="durationItems"
+                                label="Duration (minutes)" :rules="[rules.required]"
+                            >
+                                <template #prepend-inner>
+                                    <v-icon>mdi-timer-sand-complete</v-icon>
+                                </template>
+                            </v-select>
+                            <v-col v-if="timespan === 'time'" class="d-flex justify-center">
+                                <v-text-field
+                                    v-if="props.useNewTimePicker" v-model="formattedSolarEventTimespanTime"
+                                    :active="modalTime" :focused="modalTime" readonly :rules="[rules.required]"
+                                    label="Time"
+                                >
+                                    <template #prepend-inner>
+                                        <v-icon
+                                            :color="solarEventStart ? 'red' : 'green'"
+                                            :icon="solarEventStart ? 'mdi-clock-end' : 'mdi-clock-start'"
+                                        />
+                                    </template>
+                                    <v-dialog v-model="modalTime" activator="parent" width="auto">
+                                        <v-time-picker
+                                            v-if="modalTime" v-model="solarEventTimespanTime"
+                                            :format="props.use24HourFormat ? '24hr' : 'ampm'"
+                                            :ampm-in-title="!props.use24HourFormat"
+                                        />
+                                    </v-dialog>
+                                </v-text-field>
+                                <v-text-field
+                                    v-else v-model="solarEventTimespanTime" label="Time" type="time"
+                                    :rules="[rules.required]"
+                                >
+                                    <template #prepend-inner>
+                                        <v-icon
+                                            :color="solarEventStart ? 'red' : 'green'"
+                                            :icon="solarEventStart ? 'mdi-clock-end' : 'mdi-clock-start'"
+                                        />
+                                    </template>
+                                </v-text-field>
+                            </v-col>
                         </v-col>
                     </v-row>
 
