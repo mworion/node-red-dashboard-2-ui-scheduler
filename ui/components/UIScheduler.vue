@@ -21,6 +21,60 @@
             <v-btn @click="openDialog()">
                 <v-icon>mdi-plus</v-icon>
             </v-btn>
+            <v-menu>
+                <template #activator="{ props: menuProps }">
+                    <v-btn
+                        v-if="isUpdateAvailable"
+                        variant="plain"
+                        density="compact"
+                        v-bind="menuProps"
+                        max-width="20"
+                    >
+                        <v-badge
+                            color="red"
+                            floating
+                            dot
+                            density="compact"
+                        >
+                            <v-icon icon="mdi-dots-vertical" />
+                        </v-badge>
+                    </v-btn>
+                    <v-btn
+                        v-else
+                        variant="plain"
+                        density="compact"
+                        v-bind="menuProps"
+                        icon="mdi-dots-vertical"
+                    />
+                </template>
+
+                <v-list>
+                    <v-list-item
+                        v-for="(item, i) in [
+                            { value: 'reportIssue', label: 'Report An Issue', icon: 'mdi-bug', color: 'red-lighten-1' },
+                            { value: 'featureRequest', label: 'Feature Request', icon: 'mdi-lightbulb', color: 'yellow-darken-1' },
+                            { value: 'buyCoffee', label: 'Buy Me a Coffee', icon: 'mdi-coffee', color: 'white' },
+                            { value: 'updates', label: isUpdateAvailable ? 'Update Available' : 'Check for Updates', icon: 'mdi-update', color: 'blue' },
+                        ]"
+                        :key="i"
+                        :value="item.value"
+                        @click="handleMenuItemClick(item)"
+                    >
+                        <template #prepend>
+                            <v-badge
+                                v-if="item.value === 'updates' && isUpdateAvailable"
+                                color="red"
+                                dot
+                                floating
+                            >
+                                <v-icon :color="(item.value === 'updates' && isUpdateAvailable) ? 'orange' : item.color" :icon="item.icon" />
+                            </v-badge>
+                            <v-icon v-else :color="(item.value === 'updates' && isUpdateAvailable) ? 'orange' : item.color" :icon="item.icon" />
+                        </template>
+                        <v-list-item-title :color="(item.value === 'updates' && isUpdateAvailable) ? 'orange' : 'primary'">{{ item.label }}</v-list-item-title>
+                    </v-list-item>
+                </v-list>
+            </v-menu>
         </v-toolbar>
         <v-data-table
             v-model:expanded="expanded" :headers="filteredHeaders" :items="filteredSchedules"
@@ -1259,6 +1313,33 @@ export default {
         handleNextDatesExpand (isOpen) {
             if (!isOpen) {
                 // You can add any other actions you want to perform here
+            }
+        },
+
+        handleMenuItemClick (item) {
+            if (item) {
+                switch (item.value) {
+                case 'reportIssue':
+                    window.open('https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/issues/new?labels=bug', '_blank')
+                    break
+                case 'featureRequest':
+                    window.open('https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/issues/new?labels=enhancement', '_blank')
+                    break
+                case 'buyCoffee':
+                    window.open('https://www.buymeacoffee.com/cgjgh', '_blank')
+                    break
+                case 'updates':
+                    if (!this.isUpdateAvailable) {
+                        const msg = {
+                            action: 'checkUpdate'
+                        }
+                        this.$socket.emit('widget-action', this.id, msg)
+                    } else {
+                        window.open('https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/releases', '_blank')
+                    }
+                    break
+                default:
+                }
             }
         },
 
