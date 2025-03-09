@@ -95,10 +95,17 @@
             </template>
             <template #item.action="{ item }">
                 <div style="padding-right: 0; margin-right: 0; width: fit-content">
-                    <v-switch
-                        v-model="item.enabled" color="primary" hide-details :disabled="item.isStatic"
-                        @click.stop="toggleSchedule(item)"
-                    />
+                    <template v-if="item.isStatic">
+                        <v-icon :color="item.enabled ? 'green' : 'red'">
+                            {{ item.enabled ? 'mdi-check' : 'mdi-close' }}
+                        </v-icon>
+                    </template>
+                    <template v-else>
+                        <v-switch
+                            v-model="item.enabled" color="green" hide-details
+                            @click.stop="toggleSchedule(item)"
+                        />
+                    </template>
                 </div>
             </template>
             <template #expanded-row="{ columns, item }">
