@@ -176,7 +176,9 @@
                                                 </v-list-item-subtitle>
                                             </v-list-item>
                                             <v-divider />
-                                            <v-list-subheader v-if="item.period || item.solarEventTimespanTime">
+                                            <v-list-subheader
+                                                v-if="item.period || item.timespan !== false || item.solarDays"
+                                            >
                                                 Time
                                                 Details
                                             </v-list-subheader>
@@ -691,6 +693,29 @@
                                 </template>
                             </v-select>
                         </v-col>
+                        <v-col cols="12" class="d-flex justify-center">
+                            <v-expansion-panels v-model="solarShowMore" class="my-4" variant="popout">
+                                <v-expansion-panel title="More Options" value="moreOptions">
+                                    <v-expansion-panel-text>
+                                        <v-select
+                                            v-model="solarDays" :items="daysOfWeek" label="Select Days" multiple
+                                            required chips :rules="[rules.required]"
+                                        >
+                                            <template #prepend-inner>
+                                                <v-icon>mdi-calendar-range</v-icon>
+                                            </template>
+
+                                            <template #chip="{ item }">
+                                                <v-chip :color="getChipColor(item.value)" density="comfortable">
+                                                    <span>{{ item.value }}</span>
+                                                </v-chip>
+                                            </template>
+                                        </v-select>
+                                    </v-expansion-panel-text>
+                                </v-expansion-panel>
+                            </v-expansion-panels>
+                        </v-col>
+                    </v-row>
                     </v-row>
 
                     <v-row
@@ -1048,6 +1073,8 @@ export default {
             hourlyInterval: null,
             solarEvent: null,
             offset: null,
+            solarDays: [],
+            solarShowMore: [],
             solarEventStart: true,
             solarEventTimespanTime: null,
             payloadType: true,
@@ -1575,9 +1602,7 @@ export default {
                     newSchedule.timespan = this.timespan
                     newSchedule.duration = this.duration
                 }
-            }
-
-            if (this.scheduleType === 'solar') {
+            } else if (this.scheduleType === 'solar') {
                 newSchedule.solarEvent = this.mapSolarEvent(this.solarEvent, false)
                 newSchedule.offset = this.offset
                 newSchedule.timespan = this.timespan
@@ -1589,7 +1614,10 @@ export default {
                     newSchedule.solarEventTimespanTime = this.solarEventTimespanTime
                 }
 
-            if (this.scheduleType === 'cron') {
+                if (this.solarDays && this.solarDays.length > 0 && this.solarDays.length < 7) {
+                    newSchedule.solarDays = this.solarDays
+                }
+            } else if (this.scheduleType === 'cron') {
                 newSchedule.startCronExpression = this.cronValue
                 if (this.timespan === 'duration') {
                     newSchedule.timespan = this.timespan
@@ -1867,6 +1895,9 @@ export default {
             this.yearlyMonth = item.month || this.yearlyMonth
             this.endTime = item.endTime || this.endTime
             this.solarEvent = this.mapSolarEvent(item.solarEvent) || this.solarEvent
+            this.solarDays = item.solarDays || this.solarDays
+            const length = this.solarDays?.length
+            this.solarShowMore = length > 0 && length < 7 ? ['moreOptions'] : []
             this.offset = item.offset || this.offset
             this.solarEventTimespanTime = item.solarEventTimespanTime || this.solarEventTimespanTime
             this.solarEventStart = item.solarEventStart !== undefined ? item.solarEventStart : this.solarEventStart
@@ -1932,6 +1963,7 @@ export default {
             this.hourlyInterval = 1
             this.solarEvent = 'Sunrise'
             this.offset = 0
+            this.solarDays = [...this.daysOfWeek]
             this.solarEventStart = true
             this.solarEventTimespanTime = '00:00'
             this.cronValue = '*/5 * * * *'
