@@ -1101,8 +1101,7 @@ export default {
 
             // Validation rules
             rules: {
-                required: value => !!value || 'Required.',
-                endTimeRule: value => this.endTime > this.time || 'End time must be after start time'
+                required: value => !!value || 'Required.'
             },
 
             // cron expression
@@ -1657,12 +1656,6 @@ export default {
                             return {
                                 alert: true,
                                 message: 'End Time is required.'
-                            }
-                        }
-                        if (this.endTime <= this.time) {
-                            return {
-                                alert: true,
-                                message: 'End Time must be after Start Time.'
                             }
                         }
                     }
