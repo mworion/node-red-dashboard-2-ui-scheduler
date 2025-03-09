@@ -77,14 +77,17 @@ const controlTopics = [
     { command: 'export', payloadIsName: true },
     { command: 'stop', payloadIsName: true },
     { command: 'stop-all', payloadIsName: false },
+    { command: 'stop-topic', payloadIsName: false },
     { command: 'stop-all-dynamic', payloadIsName: false },
     { command: 'stop-all-static', payloadIsName: false },
     { command: 'pause', payloadIsName: true },
     { command: 'pause-all', payloadIsName: false },
+    { command: 'pause-topic', payloadIsName: false },
     { command: 'pause-all-dynamic', payloadIsName: false },
     { command: 'pause-all-static', payloadIsName: false },
     { command: 'start', payloadIsName: true },
     { command: 'start-all', payloadIsName: false },
+    { command: 'start-topic', payloadIsName: false },
     { command: 'start-all-dynamic', payloadIsName: false },
     { command: 'start-all-static', payloadIsName: false },
     { command: 'clear', payloadIsName: false },
@@ -95,6 +98,7 @@ const controlTopics = [
 ]
 const addExtendedControlTopics = function (baseCommand) {
     controlTopics.push({ command: `${baseCommand}-all`, payloadIsName: false })
+    controlTopics.push({ command: `${baseCommand}-topic`, payloadIsName: false })
     controlTopics.push({ command: `${baseCommand}-all-dynamic`, payloadIsName: false })
     controlTopics.push({ command: `${baseCommand}-all-static`, payloadIsName: false })
     controlTopics.push({ command: `${baseCommand}-active`, payloadIsName: false })
@@ -1525,7 +1529,8 @@ module.exports = function (RED) {
                     }
                 } else {
                     payload = {
-                        command: controlTopic.command
+                        command: controlTopic.command,
+                        ...payload
                     }
                 }
             }
@@ -1551,6 +1556,7 @@ module.exports = function (RED) {
                     const cmdAll = action.endsWith('-all')
                     const cmdAllStatic = action.endsWith('-all-static')
                     const cmdAllDynamic = action.endsWith('-all-dynamic')
+                    const cmdTopic = action.endsWith('-topic')
                     const cmdActive = action.endsWith('-active')
                     const cmdInactive = action.endsWith('-inactive')
                     const cmdActiveDynamic = action.includes('-active-dynamic')
@@ -1564,39 +1570,59 @@ module.exports = function (RED) {
                     if (actionParts.length > 1) mainAction += '-'
 
                     if (cmdAllDynamic) {
-                        cmdFilter = 'dynamic'
+                        cmdFilter = {}
+                        cmdFilter.type = 'dynamic'
                     } else if (cmdAllStatic) {
-                        cmdFilter = 'static'
+                        cmdFilter = {}
+                        cmdFilter.type = 'static'
+                    } else if (cmdTopic) {
+                        cmdFilter = {}
+                        cmdFilter.type = 'topic'
                     } else if (cmdActive) {
-                        cmdFilter = 'active'
+                        cmdFilter = {}
+                        cmdFilter.type = 'active'
                     } else if (cmdInactive) {
-                        cmdFilter = 'inactive'
+                        cmdFilter = {}
+                        cmdFilter.type = 'inactive'
                     } else if (cmdActiveDynamic) {
-                        cmdFilter = 'active-dynamic'
+                        cmdFilter = {}
+                        cmdFilter.type = 'active-dynamic'
                     } else if (cmdActiveStatic) {
-                        cmdFilter = 'active-static'
+                        cmdFilter = {}
+                        cmdFilter.type = 'active-static'
                     } else if (cmdInactiveDynamic) {
-                        cmdFilter = 'inactive-dynamic'
+                        cmdFilter = {}
+                        cmdFilter.type = 'inactive-dynamic'
                     } else if (cmdInactiveStatic) {
-                        cmdFilter = 'inactive-static'
+                        cmdFilter = {}
+                        cmdFilter.type = 'inactive-static'
+                    }
+                    if (cmd.topic && cmd.topic !== '') {
+                        if (!cmdFilter) cmdFilter = {}
+                        cmdFilter.topic = cmd.topic
                     }
 
                     switch (mainAction) {
                     case 'trigger': // single
                         {
-                            const tt = getTask(node, cmd.name)
-                            if (!tt) throw new Error(`Manual Trigger failed. Cannot find schedule named '${cmd.name}'`)
-                            sendMsg(node, tt, Date.now(), true)
+                            const schedule = getScheduleByName(node, cmd.name)
+                            if (!schedule) throw new Error(`Manual Trigger failed. Cannot find schedule named '${cmd.name}'`)
+                            const primaryTask = schedule?.primaryTask?.task
+                            if (primaryTask) {
+                                sendMsg(node, primaryTask, Date.now(), true)
+                            }
                         }
                         break
                     case 'trigger-': // multiple
-                        if (node.tasks) {
-                            for (let index = 0; index < node.tasks.length; index++) {
-                                const task = node.tasks[index]
-                                if (task && (cmdAll || taskFilterMatch(task, cmdFilter))) {
-                                    sendMsg(node, task, Date.now(), true)
+                        if (node.schedules) {
+                            node.schedules.forEach(schedule => {
+                                if (schedule && (cmdAll || scheduleFilterMatch(schedule, cmdFilter))) {
+                                    const primaryTask = schedule?.primaryTask?.task
+                                    if (primaryTask) {
+                                        sendMsg(node, primaryTask, Date.now(), true)
+                                    }
                                 }
-                            }
+                            })
                         }
                         break
                     case 'describe': // single
@@ -1609,10 +1635,10 @@ module.exports = function (RED) {
                         break
                     case 'status': // single
                         {
-                            const task = getTask(node, cmd.name)
-                            if (task) {
-                                newMsg.payload.result.config = exportTask(task, true)
-                                newMsg.payload.result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                            const schedule = getScheduleByName(node, cmd.name)
+                            if (schedule) {
+                                newMsg.payload.result.config = exportSchedule(schedule)
+                                newMsg.payload.result.status = getScheduleStatus(node, schedule, true)
                             } else {
                                 newMsg.error = `${cmd.name} not found`
                             }
@@ -1851,6 +1877,50 @@ module.exports = function (RED) {
             }
             return false
         }
+
+        /**
+         * Determines if a given schedule matches a specified filter criteria.
+         *
+         * @param {Object} schedule - The schedule object to be evaluated.
+         * @param {Object} filter - The filter criteria containing type and topic.
+         * @param {string} filter.type - The type of filter to apply (e.g., 'all', 'static', 'dynamic', 'topic', 'active', 'inactive', 'active-dynamic', 'active-static', 'inactive-dynamic', 'inactive-static').
+         * @param {string|null} filter.topic - The topic to match against the schedule's topic.
+         * @returns {boolean} - Returns true if the schedule matches the filter criteria, otherwise false.
+         */
+        function scheduleFilterMatch (schedule, filter) {
+            if (!schedule) return false
+            const { type, topic } = filter
+            const isActive = function (schedule) { return schedule.enabled === true }
+            const isInactive = function (schedule) { return schedule.enabled === false }
+            const isStatic = function (schedule) { return (schedule.isStatic === true || schedule.isDynamic === false) }
+            const isDynamic = function (schedule) { return (schedule.isDynamic === true || schedule.isStatic === false) }
+            const isTopicMatch = function (schedule, topic) { return (topic !== null && schedule.topic === topic) }
+
+            switch (type) {
+            case 'all':
+                return true
+            case 'static':
+                return isStatic(schedule)
+            case 'dynamic':
+                return isDynamic(schedule)
+            case 'topic':
+                return isTopicMatch(schedule, topic)
+            case 'active':
+                return isActive(schedule)
+            case 'inactive':
+                return isInactive(schedule)
+            case 'active-dynamic':
+                return isActive(schedule) && isDynamic(schedule)
+            case 'active-static':
+                return isActive(schedule) && isStatic(schedule)
+            case 'inactive-dynamic':
+                return isInactive(schedule) && isDynamic(schedule)
+            case 'inactive-static':
+                return isInactive(schedule) && isStatic(schedule)
+            }
+            return false
+        }
+
         function stopTask (node, name, resetCounter) {
             const task = getTask(node, name)
             if (task) {
