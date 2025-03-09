@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/valid-v-slot -->
 <!-- eslint-disable vuetify/no-deprecated-components -->
 <template class="px-0 py-2 main">
     <v-container class="pa-0 main" style="border: 1.5px solid grey; border-radius: 10px">
@@ -82,7 +83,7 @@
             :expand="expandedItem" items-per-page @click:row="handleRowClick"
         >
             <template #item.rowNumber="{ item }">
-                <v-chip :color="item.active === undefined ? 'gray' : (item.active ? 'green' : 'red')">
+                <v-chip :color="item.active === undefined ? 'gray' : (item.active ? 'green' : 'red')" density="compact">
                     {{ item.rowNumber }}
                 </v-chip>
             </template>
@@ -108,6 +109,7 @@
                     </template>
                 </div>
             </template>
+
             <template #expanded-row="{ columns, item }">
                 <v-slide-x-transition appear>
                     <tr v-if="item">
@@ -400,6 +402,17 @@
                                                     }}
                                                 </v-list-item-subtitle>
                                             </v-list-item>
+                                            <!-- <v-list-item
+                                                v-if="item" lines="two"
+                                                class="prepend-icon-spacing"
+                                                @click="copyToClipboard(item)"
+                                            >
+                                                <template #prepend>
+                                                    <v-icon>mdi-calendar-arrow-right</v-icon>
+                                                </template>
+                                                <v-list-item-title>Item</v-list-item-title>
+                                                <v-list-item-subtitle>{{ item }}</v-list-item-subtitle>
+                                            </v-list-item> -->
                                         </v-list>
                                     </v-row>
                                 </v-card-text>
@@ -995,6 +1008,7 @@
 <script setup>
 // eslint-disable-next-line no-unused-vars
 import { defaultItems, pad } from '@vue-js-cron/core'
+// eslint-disable-next-line no-unused-vars
 import { useDisplay } from 'vuetify'
 </script>
 <script>
@@ -1291,6 +1305,7 @@ export default {
         customPayloads () {
             return this.props.customPayloads || []
         }
+
     },
 
     watch: {
@@ -1321,7 +1336,7 @@ export default {
         yearlyMonth (newMonth) {
             const maxDays = this.getMaxDaysInMonth(newMonth)
             if (this.yearlyDay > maxDays) {
-                this.yearlyDay = null // Reset if the selected day is no longer valid
+                this.yearlyDay = maxDays // Reset if the selected day is no longer valid
             }
         },
         timespan (value) {
