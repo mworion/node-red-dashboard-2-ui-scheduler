@@ -151,7 +151,7 @@
                                                 <v-list-item-title>Output</v-list-item-title>
                                                 <v-list-item-subtitle class="pb-2">
                                                     <template
-                                                        v-if="(item.hasDuration || item.hasEndTime) && item.payloadType === 'true_false'"
+                                                        v-if="(item.timespan !== false) && item.payloadType === 'true_false'"
                                                     >
                                                         <v-chip density="compact" color="green">True</v-chip>
                                                         <span> on start,</span>
@@ -224,15 +224,20 @@
                                             </v-list-item>
                                             <v-list-item v-if="item.time" class="prepend-icon-spacing">
                                                 <template #prepend>
-                                                    <v-icon :icon="item.hasEndTime ? 'mdi-clock-start' : 'mdi-clock'" />
+                                                    <v-icon
+                                                        :icon="item.timespan === 'time' ? 'mdi-clock-start' : 'mdi-clock'"
+                                                    />
                                                 </template>
-                                                <v-list-item-title :class="{ 'text-green': item.hasEndTime }">
+                                                <v-list-item-title :class="{ 'text-green': item.timespan === 'time' }">
                                                     {{
-                                                        item.hasEndTime ? 'Start Time' : 'Time' }}
+                                                        item.timespan === 'time' ? 'Start Time' : 'Time' }}
                                                 </v-list-item-title>
                                                 <v-list-item-subtitle>{{ formatTime(item.time) }}</v-list-item-subtitle>
                                             </v-list-item>
-                                            <v-list-item v-if="item.hasEndTime" class="prepend-icon-spacing">
+                                            <v-list-item
+                                                v-if="item.timespan === 'time' && item.endTime"
+                                                class="prepend-icon-spacing"
+                                            >
                                                 <template #prepend>
                                                     <v-icon>mdi-clock-end</v-icon>
                                                 </template>
@@ -275,7 +280,7 @@
                                                 <v-list-item-title>Interval (hours)</v-list-item-title>
                                                 <v-list-item-subtitle>{{ item.hourlyInterval }}</v-list-item-subtitle>
                                             </v-list-item>
-                                            <v-list-item v-if="item.hasDuration === true" class="prepend-icon-spacing">
+                                            <!-- <v-list-item v-if="item.timespan === 'duration'" class="prepend-icon-spacing">
                                                 <template #prepend>
                                                     <v-icon>mdi-timer-sand</v-icon>
                                                 </template>
@@ -588,12 +593,12 @@
                                 <v-text-field
                                     v-if="props.useNewTimePicker" v-model="formattedTime" :active="modalTime"
                                     :focused="modalTime" readonly :rules="[rules.required]"
-                                    :label="hasEndTime ? 'Start Time' : 'Time'"
+                                    :label="timespan === 'time' ? 'Start Time' : 'Time'"
                                 >
                                     <template #prepend-inner>
                                         <v-icon
-                                            :color="hasEndTime ? 'green' : undefined"
-                                            :icon="hasEndTime ? 'mdi-clock-start' : 'mdi-clock-time-four-outline'"
+                                            :color="timespan === 'time' ? 'green' : undefined"
+                                            :icon="timespan === 'time' ? 'mdi-clock-start' : 'mdi-clock-time-four-outline'"
                                         />
                                     </template>
                                     <v-dialog v-model="modalTime" activator="parent" width="auto">
@@ -605,19 +610,19 @@
                                     </v-dialog>
                                 </v-text-field>
                                 <v-text-field
-                                    v-else v-model="time" :label="hasEndTime ? 'Start Time' : 'Time'"
+                                    v-else v-model="time" :label="timespan === 'time' ? 'Start Time' : 'Time'"
                                     type="time" :rules="[rules.required]"
                                 >
                                     <template #prepend-inner>
                                         <v-icon
-                                            :color="hasEndTime ? 'green' : undefined"
-                                            :icon="hasEndTime ? 'mdi-clock-start' : 'mdi-clock-time-four-outline'"
+                                            :color="timespan === 'time' ? 'green' : undefined"
+                                            :icon="timespan === 'time' ? 'mdi-clock-start' : 'mdi-clock-time-four-outline'"
                                         />
                                     </template>
                                 </v-text-field>
                             </v-col>
                             <v-col
-                                v-if="hasEndTime && period !== 'minutes' && period !== 'hourly'" cols="12"
+                                v-if="timespan === 'time' && period !== 'minutes' && period !== 'hourly'" cols="12"
                                 class="d-flex justify-center"
                             >
                                 <v-text-field
@@ -652,11 +657,11 @@
                             </v-col>
                             <v-col cols="12" class="d-flex justify-center">
                                 <v-btn-toggle
-                                    v-model="hasEndTime" mandatory divided variant="elevated" border="sm"
+                                    v-model="timespan" mandatory divided variant="elevated" border="sm"
                                     rounded="xl" @update:model-value="setEndTime"
                                 >
                                     <v-btn prepend-icon="mdi-circle-off-outline" :value="false">None</v-btn>
-                                    <v-btn prepend-icon="mdi-clock-end" :value="true">End Time</v-btn>
+                                    <v-btn prepend-icon="mdi-clock-end" value="time">End Time</v-btn>
                                 </v-btn-toggle>
                             </v-col>
                         </v-row>
@@ -697,11 +702,11 @@
                         </v-col>
                         <v-col cols="12" class="d-flex justify-center mb-5">
                             <v-btn-toggle
-                                v-model="hasDuration" mandatory divided variant="elevated" border="sm"
+                                v-model="timespan" mandatory divided variant="elevated" border="sm"
                                 rounded="xl"
                             >
                                 <v-btn prepend-icon="mdi-circle-off-outline" :value="false">None</v-btn>
-                                <v-btn prepend-icon="mdi-timer-sand-complete" :value="true">Duration</v-btn>
+                                <v-btn prepend-icon="mdi-timer-sand-complete" value="duration">Duration</v-btn>
                                 <v-btn
                                     v-if="(scheduleType === 'solar')" prepend-icon="mdi-clock-time-four-outline"
                                     :value="'time'"
@@ -710,7 +715,7 @@
                                 </v-btn>
                             </v-btn-toggle>
                         </v-col>
-                        <v-col v-if="hasDuration === 'time'" cols="12" class="d-flex justify-center">
+                        <v-col v-if="timespan === 'time'" cols="12" class="d-flex justify-center">
                             <v-radio-group v-model="solarEventStart" inline class="d-flex justify-center">
                                 <v-radio label="Start" color="green" :value="false" class="mx-6" />
                                 <v-radio label="End" color="red" :value="true" class="mx-6" />
@@ -722,14 +727,14 @@
                             cols="12" class="d-flex justify-center"
                         >
                             <v-select
-                                v-if="hasDuration === true" v-model="duration" :items="durationItems"
+                                v-if="timespan === 'duration'" v-model="duration" :items="durationItems"
                                 label="Duration (minutes)" :rules="[rules.required]"
                             >
                                 <template #prepend-inner>
                                     <v-icon>mdi-timer-sand-complete</v-icon>
                                 </template>
                             </v-select>
-                            <v-col v-if="hasDuration === 'time'" class="d-flex justify-center">
+                            <v-col v-if="timespan === 'time'" class="d-flex justify-center">
                                 <v-text-field
                                     v-if="props.useNewTimePicker" v-model="formattedSolarEventTimespanTime"
                                     :active="modalTime" :focused="modalTime" readonly :rules="[rules.required]"
@@ -861,12 +866,12 @@
                             <v-select
                                 v-model="customPayloadStart" :items="customPayloads"
                                 :item-title="getCustomPayloadTitle" item-value="id"
-                                :label="isTimespanSchedule ? hasDuration !== 'time' ? 'Custom Output: Start' : solarEventStart ? 'Custom Output: Solar Event' : 'Custom Output: Start Time ' : 'Custom Output'"
+                                :label="isTimespanSchedule ? timespan !== 'time' ? 'Custom Output: Start' : solarEventStart ? 'Custom Output: Solar Event' : 'Custom Output: Start Time ' : 'Custom Output'"
                                 no-data-text="No custom payloads defined"
                             >
                                 <template #prepend-inner>
                                     <v-icon
-                                        v-if="isTimespanSchedule && scheduleType === 'solar' && hasDuration === 'time'"
+                                        v-if="isTimespanSchedule && scheduleType === 'solar' && timespan === 'time'"
                                         color="green" :icon="solarEventStart ? 'mdi-weather-sunset' : 'mdi-clock'"
                                     />
                                     <v-icon
@@ -883,12 +888,12 @@
                             <v-select
                                 v-model="customPayloadEnd" :items="customPayloads"
                                 :item-title="getCustomPayloadTitle" item-value="id"
-                                :label="isTimespanSchedule && hasDuration !== 'time' ? 'Custom Output: End' : !solarEventStart ? 'Custom Output: Solar Event' : 'Custom Output: End Time '"
+                                :label="isTimespanSchedule && timespan !== 'time' ? 'Custom Output: End' : !solarEventStart ? 'Custom Output: Solar Event' : 'Custom Output: End Time '"
                                 no-data-text="No custom payloads defined"
                             >
                                 <template #prepend-inner>
                                     <v-icon
-                                        v-if="isTimespanSchedule && scheduleType === 'solar' && hasDuration === 'time'"
+                                        v-if="isTimespanSchedule && scheduleType === 'solar' && timespan === 'time'"
                                         color="red" :icon="!solarEventStart ? 'mdi-weather-sunset' : 'mdi-clock'"
                                     />
                                     <v-icon color="red" icon="mdi-arrow-collapse-right" />
@@ -1030,8 +1035,7 @@ export default {
             period: null,
             time: null,
             endTime: null,
-            hasEndTime: false,
-            hasDuration: false,
+            timespan: false,
             duration: null,
             dailyDays: [],
             dailyDaysOfWeek: [],
@@ -1207,8 +1211,10 @@ export default {
                 : this.headers
         },
         isTimespanSchedule () {
-            return (this.scheduleType === 'time' && (this.period === 'daily' || this.period === 'weekly' || this.period === 'monthly' || this.period === 'yearly') && this.hasEndTime) ||
-                (((this.scheduleType === 'time' && (this.period === 'minutes' || this.period === 'hourly')) || this.scheduleType === 'solar') && this.hasDuration)
+            return (this.scheduleType === 'time' && (this.period === 'daily' || this.period === 'weekly' || this.period === 'monthly' || this.period === 'yearly') && this.timespan === 'time') ||
+                (this.scheduleType === 'time' && (this.period === 'minutes' || this.period === 'hourly') && this.timespan === 'duration') ||
+                (this.scheduleType === 'solar' && (this.timespan === 'duration' || this.timespan === 'time')) ||
+                (this.scheduleType === 'cron' && this.timespan === 'duration')
         },
         customPayloads () {
             return this.props.customPayloads || []
@@ -1246,37 +1252,21 @@ export default {
                 this.yearlyDay = null // Reset if the selected day is no longer valid
             }
         },
-        hasDuration (value) {
+        timespan (value) {
             if (this.period === 'minutes') {
                 if (!this.durationItems.includes((this.minutesInterval ?? 0) - 1)) {
                     this.duration = null
-                    this.hasDuration = false
+                    this.timespan = false
                 }
             }
-            if (((this.scheduleType === 'time' && ['minutes', 'hours'].includes(this.period)) || this.scheduleType === 'solar')) {
-                if (value === true) {
-                    if (this.payloadType !== 'custom') {
-                        this.payloadType = 'true_false'
-                    }
-                } else if (value === 'time') {
+
+            if (this.isTimespanSchedule) {
+                if (this.payloadType !== 'custom') {
                     this.payloadType = 'true_false'
-                } else {
-                    if (this.payloadType !== 'custom') {
-                        this.payloadType = false
-                    }
                 }
-            }
-        },
-        hasEndTime (value) {
-            if (this.scheduleType === 'time' && ['daily', 'weekly', 'monthly', 'yearly'].includes(this.period)) {
-                if (value === true) {
-                    if (this.payloadType !== 'custom') {
-                        this.payloadType = 'true_false'
-                    }
-                } else {
-                    if (this.payloadType !== 'custom') {
-                        this.payloadType = false
-                    }
+            } else {
+                if (this.payloadType !== 'custom') {
+                    this.payloadType = true
                 }
             }
         },
@@ -1284,7 +1274,7 @@ export default {
             if (this.period === 'minutes') {
                 if (!this.durationItems.includes(value - 1)) {
                     this.duration = null
-                    this.hasDuration = false
+                    this.timespan = false
                 }
             }
         },
@@ -1296,6 +1286,21 @@ export default {
         scheduleType (value) {
             if (value === 'cron') {
                 this.getCronDescription(this.cronValue)
+                if (this.timespan === 'time') {
+                    this.timespan = false
+                }
+            } else if (value === 'time') {
+                if (['daily', 'weekly', 'monthly', 'yearly'].includes(this.period)) {
+                    if (this.timespan === 'duration') {
+                        this.timespan = false
+                    }
+                } else if (['minutes', 'hourly'].includes(this.period)) {
+                    if (this.timespan === 'time') {
+                        this.timespan = false
+                    }
+                }
+            }
+        },
         dailyDays (value) {
             if (value?.length && Array.isArray(value) && this.period === 'daily' && this.scheduleType === 'time') {
                 this.dailyDays = this.sortDaysOfWeek(value)
@@ -1311,6 +1316,16 @@ export default {
                 this.solarDays = this.sortDaysOfWeek(value)
             }
         },
+        period (value) {
+            if (this.scheduleType === 'time' && ['daily', 'weekly', 'monthly', 'yearly'].includes(this.period)) {
+                if (this.timespan === 'duration') {
+                    this.timespan = false
+                }
+            }
+            if (this.scheduleType === 'time' && ['minutes', 'hourly'].includes(this.period)) {
+                if (this.timespan === 'time') {
+                    this.timespan = false
+                }
             }
         }
 
@@ -1540,8 +1555,8 @@ export default {
                 if (['daily', 'weekly', 'monthly', 'yearly'].includes(this.period)) {
                     newSchedule.time = this.time
                     newSchedule.days = this.getSelectedDays()
-                    newSchedule.hasEndTime = this.hasEndTime
-                    newSchedule.endTime = this.hasEndTime ? this.endTime : null
+                    newSchedule.timespan = this.timespan
+                    newSchedule.endTime = this.timespan === 'time' ? this.endTime : null
                 }
 
                 if (this.period === 'yearly') {
@@ -1550,13 +1565,13 @@ export default {
 
                 if (this.period === 'minutes') {
                     newSchedule.minutesInterval = this.minutesInterval
-                    newSchedule.hasDuration = this.hasDuration
+                    newSchedule.timespan = this.timespan
                     newSchedule.duration = this.duration
                 }
 
                 if (this.period === 'hourly') {
                     newSchedule.hourlyInterval = this.hourlyInterval
-                    newSchedule.hasDuration = this.hasDuration
+                    newSchedule.timespan = this.timespan
                     newSchedule.duration = this.duration
                 }
             }
@@ -1564,24 +1579,22 @@ export default {
             if (this.scheduleType === 'solar') {
                 newSchedule.solarEvent = this.mapSolarEvent(this.solarEvent, false)
                 newSchedule.offset = this.offset
+                newSchedule.timespan = this.timespan
 
-                if (this.hasDuration === true) {
-                    newSchedule.hasDuration = this.hasDuration
+                if (this.timespan === 'duration') {
                     newSchedule.duration = this.duration
-                }
-
-                if (this.hasDuration === 'time') {
-                    newSchedule.hasDuration = this.hasDuration
+                } else if (this.timespan === 'time') {
                     newSchedule.solarEventStart = this.solarEventStart
                     newSchedule.solarEventTimespanTime = this.solarEventTimespanTime
                 }
-            }
 
             if (this.scheduleType === 'cron') {
                 newSchedule.startCronExpression = this.cronValue
-                if (this.hasDuration) {
-                    newSchedule.hasDuration = this.hasDuration
+                if (this.timespan === 'duration') {
+                    newSchedule.timespan = this.timespan
                     newSchedule.duration = this.duration
+                } else {
+                    newSchedule.timespan = false
                 }
             }
 
@@ -1637,7 +1650,7 @@ export default {
                     if (!this.time) {
                         return { alert: true, message: 'Start Time is required.' }
                     }
-                    if (this.hasEndTime) {
+                    if (this.timespan === 'time') {
                         if (!this.endTime) {
                             return {
                                 alert: true,
@@ -1662,7 +1675,7 @@ export default {
                     if (!this.minutesInterval) {
                         return { alert: true, message: 'Interval is required for Minutes period.' }
                     }
-                    if (this.hasDuration && !this.duration) {
+                    if (this.timespan === 'duration' && !this.duration) {
                         return {
                             alert: true,
                             message: 'Duration is required when Duration is enabled for Minutes period.'
@@ -1672,7 +1685,7 @@ export default {
                     if (!this.hourlyInterval) {
                         return { alert: true, message: 'Interval is required for Hourly period.' }
                     }
-                    if (this.hasDuration && !this.duration) {
+                    if (this.timespan === 'duration' && !this.duration) {
                         return {
                             alert: true,
                             message: 'Duration is required when Duration is enabled for Hourly period.'
@@ -1689,13 +1702,13 @@ export default {
                 if (!this.offset && this.offset !== 0) {
                     return { alert: true, message: 'Offset is required for Solar schedule type.' }
                 }
-                if (this.hasDuration === true && !this.duration) {
+                if (this.timespan === 'duration' && !this.duration) {
                     return {
                         alert: true,
                         message: 'Duration is required when Duration is enabled for Solar schedule type.'
                     }
                 }
-                if (this.hasDuration === 'time') {
+                if (this.timespan === 'time') {
                     if (this.solarEventStart === null) {
                         return {
                             alert: true,
@@ -1828,12 +1841,10 @@ export default {
             }
             this.time = item.time || this.time
             this.minutesInterval = item.minutesInterval || this.minutesInterval
-            this.hasDuration = item.hasDuration !== undefined ? item.hasDuration : this.hasDuration
+            this.timespan = item.timespan !== undefined ? item.timespan : this.timespan
             this.duration = item.duration || this.duration
             this.hourlyInterval = item.hourlyInterval || this.hourlyInterval
-
             this.yearlyMonth = item.month || this.yearlyMonth
-            this.hasEndTime = item.hasEndTime !== undefined ? item.hasEndTime : this.hasEndTime
             this.endTime = item.endTime || this.endTime
             this.solarEvent = this.mapSolarEvent(item.solarEvent) || this.solarEvent
             this.offset = item.offset || this.offset
@@ -1895,7 +1906,6 @@ export default {
             this.yearlyDay = 1
             this.yearlyMonth = 'January'
             this.time = '00:00'
-            this.hasEndTime = false
             this.endTime = '00:05'
             this.minutesInterval = 10
             this.hourlyInterval = 1
@@ -1904,7 +1914,7 @@ export default {
             this.solarEventStart = true
             this.solarEventTimespanTime = '00:00'
             this.cronValue = '*/5 * * * *'
-            this.hasDuration = false
+            this.timespan = false
             this.duration = 1
             this.payloadValue = true
             this.payloadType = true
@@ -1912,7 +1922,7 @@ export default {
             this.customPayloadEnd = null
         },
         setEndTime () {
-            if (!this.hasEndTime) {
+            if (this.timespan !== 'time') {
                 this.endTime = null
             } else {
                 if (!this.time) {
