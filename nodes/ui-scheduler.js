@@ -1397,7 +1397,58 @@ module.exports = function (RED) {
             }
         }
 
+        /**
+         * Sends messages for active or inactive tasks based on the provided topics and node schedules.
+         *
+         * @param {Object} node - The node object containing schedules and configuration for message sending.
+         * @param {number} timestamp - The timestamp to include in the message.
+         * @param {Array} [topics=[]] - An optional array of topics to filter which tasks to process.
+         *
+         * Iterates through the node's schedules to determine active and inactive tasks for the specified topics.
+         * Sends messages for tasks that are currently running and match the active state configuration of the node.
+         */
+        function sendTopicMsg (node, timestamp, topics = []) {
+            const schedules = node.schedules || []
+            const topicTasks = {}
+
+            // Iterate through schedules to collect topics and tasks
+            schedules.forEach((schedule) => {
+                if (schedule && (schedule.timespan !== false)) {
+                    const isActive = schedule.active
+                    let task = null
+
+                    if (topics.includes(schedule.topic) || topics.length === 0) {
+                        if (isActive && (!topicTasks[schedule.topic] || !topicTasks[schedule.topic].active)) {
+                            task = schedule.primaryTask?.task
+                            if (task && task.isRunning) {
+                                topicTasks[schedule.topic] = { task, active: true }
+                            }
+                        } else if (!isActive && !topicTasks[schedule.topic]) {
+                            task = schedule.endTask?.task
+                            if (task && task.isRunning) {
+                                topicTasks[schedule.topic] = { task, active: false }
+                            }
+                        }
+                    }
+                }
+            })
+
+            // Iterate through topics to send messages
+            Object.keys(topicTasks).forEach((topic) => {
+                const taskData = topicTasks[topic]
+                if (taskData) {
+                    const { task, active } = taskData
+                    if (active && node.sendActiveState) {
+                        sendMsg(node, task, timestamp, false, true)
+                    } else if (!active && node.sendInactiveState) {
+                        sendMsg(node, task, timestamp, false, true)
+                    }
+                }
+            })
+        }
+
         (async function () {
+            let sendStateTask = null
             try {
                 node.status({})
                 node.nextDate = null
@@ -1429,52 +1480,9 @@ module.exports = function (RED) {
                         _deleteTask(sendStateTask)
                     }
                     sendStateTask = new cronosjs.CronosTask(expression)
-                    sendStateTask.name = 'sendStateTask'
                     sendStateTask
                         .on('run', (timestamp) => {
-                            const schedules = base.stores.state.getProperty(node.id, 'schedules') || []
-                            const topicTasks = {}
-
-                            // Iterate through schedules to collect topics and tasks
-                            schedules.forEach((schedule) => {
-                                if (schedule && (schedule.hasEndTime || schedule.hasDuration)) {
-                                    const isActive = schedule.active
-                                    let task = null
-
-                                    if (isActive && (!topicTasks[schedule.topic] || !topicTasks[schedule.topic].active)) {
-                                        let scheduleName = schedule.name
-                                        if (schedule.solarEventStart === false) {
-                                            scheduleName = `${schedule.name}_end_sched_type`
-                                        }
-                                        task = getTask(node, scheduleName)
-                                        if (task && task.isRunning) {
-                                            topicTasks[schedule.topic] = { task, active: true }
-                                        }
-                                    } else if (!isActive && !topicTasks[schedule.topic]) {
-                                        let scheduleName = `${schedule.name}_end_sched_type`
-                                        if (schedule.solarEventStart === false) {
-                                            scheduleName = schedule.name
-                                        }
-                                        task = getTask(node, scheduleName)
-                                        if (task && task.isRunning) {
-                                            topicTasks[schedule.topic] = { task, active: false }
-                                        }
-                                    }
-                                }
-                            })
-
-                            // Iterate through topics to send messages
-                            Object.keys(topicTasks).forEach((topic) => {
-                                const taskData = topicTasks[topic]
-                                if (taskData) {
-                                    const { task, active } = taskData
-                                    if (active && node.sendActiveState) {
-                                        sendMsg(node, task, timestamp, false, true)
-                                    } else if (!active && node.sendInactiveState) {
-                                        sendMsg(node, task, timestamp, false, true)
-                                    }
-                                }
-                            })
+                            sendTopicMsg(node, timestamp)
                         })
                         .start()
                 }
