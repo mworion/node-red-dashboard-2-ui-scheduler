@@ -1187,7 +1187,12 @@ export default {
             cronExpValid: true,
             cronLoading: false,
             cronNextDates: null,
-            cronNextTime: null
+            cronNextTime: null,
+
+            // Update check
+            isUpdateAvailable: false,
+            currentVersion: null,
+            latestVersion: null
         }
     },
 
@@ -1431,6 +1436,25 @@ export default {
                 this.cronNextDates = msg.payload?.cronExpression.nextDates || null
                 this.cronNextTime = msg.payload?.cronExpression.prettyNext || null
                 this.cronLoading = false
+            }
+            if (msg.payload?.updateResult) {
+                const update = msg.payload.updateResult
+                if (update.isUpdateAvailable) {
+                    this.isUpdateAvailable = update.isUpdateAvailable
+                }
+                if (update.currentVersion) {
+                    this.currentVersion = update.currentVersion
+                }
+                if (update.latestVersion) {
+                    this.latestVersion = update.latestVersion
+                }
+                if (msg.event === 'updateCheck') {
+                    if (this.isUpdateAvailable) {
+                        alert(`Update Available. Current Version: ${update.currentVersion}, Latest Version: ${update.latestVersion}`)
+                    } else {
+                        alert(`No Update Available. Current Version: ${update.currentVersion}, Latest Version: ${update.latestVersion}`)
+                    }
+                }
             }
         },
         onDynamicProperties (msg) {
