@@ -187,15 +187,39 @@
                                                 <v-list-item-title>Month</v-list-item-title>
                                                 <v-list-item-subtitle>{{ item.yearlyMonth }}</v-list-item-subtitle>
                                             </v-list-item>
-                                            <v-list-item v-if="item.days" lines="two" class="prepend-icon-spacing">
+                                            <v-list-item v-if="item.days" lines="3" class="prepend-icon-spacing">
+                                                <template #prepend>
+                                                    <v-icon>mdi-calendar-range</v-icon>
+                                                </template>
+                                                <v-list-item-title>Days</v-list-item-title>
+                                                <v-list-item-subtitle class="pb-2">
+                                                    <template
+                                                        v-if="item.period === 'monthly' || item.period === 'yearly'"
+                                                    >
+                                                        {{ item.days.join(', ') }}
+                                                    </template>
+
+                                                    <v-chip
+                                                        v-for="(day, index) in item.days"
+                                                        v-else :key="index"
+                                                        :color="getChipColor(day)" density="compact"
+                                                    >
+                                                        <span>{{ day.slice(0, 3) }}</span>
+                                                    </v-chip>
+                                                </v-list-item-subtitle>
+                                            </v-list-item>
+                                            <v-list-item v-if="item.solarDays" lines="two" class="prepend-icon-spacing">
                                                 <template #prepend>
                                                     <v-icon>mdi-calendar-range</v-icon>
                                                 </template>
                                                 <v-list-item-title>Days</v-list-item-title>
                                                 <v-list-item-subtitle>
-                                                    {{ item.period === 'monthly' || item.period ===
-                                                        'yearly' ? item.days.join(', ') :
-                                                            item.days.map((day) => day.slice(0, 3)).join(', ') }}
+                                                    <v-chip
+                                                        v-for="(day, index) in item.solarDays" :key="index"
+                                                        :color="getChipColor(day)" density="compact"
+                                                    >
+                                                        <span>{{ day.slice(0, 3) }}</span>
+                                                    </v-chip>
                                                 </v-list-item-subtitle>
                                             </v-list-item>
                                             <v-list-item v-if="item.time" class="prepend-icon-spacing">
@@ -472,30 +496,48 @@
                             <v-col v-if="period === 'daily'" cols="12" class="d-flex justify-center">
                                 <v-select
                                     v-model="dailyDays" :items="daysOfWeek" label="Select Days" multiple required
-                                    :rules="[rules.required]"
+                                    chips :rules="[rules.required]"
                                 >
                                     <template #prepend-inner>
                                         <v-icon>mdi-calendar-range</v-icon>
+                                    </template>
+
+                                    <template #chip="{ item }">
+                                        <v-chip :color="getChipColor(item.value)" density="comfortable">
+                                            <span>{{ item.value }}</span>
+                                        </v-chip>
                                     </template>
                                 </v-select>
                             </v-col>
                             <v-col v-if="period === 'weekly'" cols="12" class="d-flex justify-center">
                                 <v-select
                                     v-model="weeklyDays" :items="daysOfWeek" label="Select Days" multiple required
-                                    :rules="[rules.required]"
+                                    chips :rules="[rules.required]"
                                 >
                                     <template #prepend-inner>
                                         <v-icon>mdi-calendar-weekend</v-icon>
+                                    </template>
+
+                                    <template #chip="{ item }">
+                                        <v-chip :color="getChipColor(item.value)" density="comfortable">
+                                            <span>{{ item.value }}</span>
+                                        </v-chip>
                                     </template>
                                 </v-select>
                             </v-col>
                             <v-col v-if="period === 'monthly'" cols="12" class="d-flex justify-center">
                                 <v-select
-                                    v-model="monthlyDays" :items="daysOfMonth" label="Select Days" multiple
+                                    v-model="monthlyDays" :items="daysOfMonth" label="Select Days" multiple chips
                                     required :rules="[rules.required]"
                                 >
                                     <template #prepend-inner>
                                         <v-icon>mdi-calendar-month-outline</v-icon>
+                                    </template>
+
+                                    <template #chip="{ item }">
+                                        <v-chip :color="getChipColor(item.value)" density="comfortable">
+                                            <span>{{ item.value }}</span>
+                                        </v-chip>
                                     </template>
                                 </v-select>
                             </v-col>
@@ -1695,6 +1737,19 @@ export default {
                 return [this.yearlyDay]
             }
             return []
+        },
+        getChipColor (day) {
+            const colors = {
+                Sunday: 'red',
+                Monday: 'yellow-darken-2',
+                Tuesday: 'orange-darken-1',
+                Wednesday: 'green',
+                Thursday: 'purple-lighten-1',
+                Friday: 'blue',
+                Saturday: 'pink'
+            }
+
+            return colors[day]
         },
         toggleSchedule (item) {
             const enabled = !item.enabled
