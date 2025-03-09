@@ -1028,6 +1028,7 @@ export default {
             },
 
             // Scheduling options
+            scheduleId: null,
             name: null,
             enabled: false,
             topic: null,
@@ -1543,6 +1544,7 @@ export default {
                 return
             }
             const newSchedule = {
+                id: this.scheduleId,
                 name: this.name,
                 enabled: this.enabled,
                 topic: this.topic,
@@ -1784,7 +1786,13 @@ export default {
         },
         toggleSchedule (item) {
             const enabled = !item.enabled
-            if (item.name) {
+            if (item.id) {
+                this.$socket.emit('widget-action', this.id, {
+                    action: 'setEnabled',
+                    payload: { name: item.id, enabled },
+                    topic: item.topics
+                })
+            } else if (item.name) { // remove later
                 this.$socket.emit('widget-action', this.id, {
                     action: 'setEnabled',
                     payload: { name: item.name, enabled },
@@ -1794,19 +1802,37 @@ export default {
         },
         toggleAllSchedules () {
             const enabled = !this.anyScheduleEnabled
-            const names = this.filteredSchedules.map(schedule => schedule.name).filter(name => name)
 
-            if (names.length > 0) {
+            const ids = this.filteredSchedules.map(schedule => schedule.id).filter(id => id)
+
+            if (ids.length > 0) {
                 this.$socket.emit('widget-action', this.id, {
                     action: 'setEnabled',
-                    payload: { names, enabled, all: true },
+                    payload: { ids, enabled, all: true },
                     topic: this.selectedTopic
                 })
+            } else {
+                const names = this.filteredSchedules.map(schedule => schedule.name).filter(name => name)
+
+                if (names.length > 0) {
+                    this.$socket.emit('widget-action', this.id, {
+                        action: 'setEnabled',
+                        payload: { names, enabled, all: true },
+                        topic: this.selectedTopic
+                    })
+                }
             }
         },
 
         requestStatus (item) {
-            if (item.name) {
+            if (item.id) {
+                this.$socket.emit('widget-action', this.id, {
+                    action: 'requestStatus',
+                    payload: {
+                        id: item.id
+                    }
+                })
+            } else if (item.name) { // remove later
                 this.$socket.emit('widget-action', this.id, {
                     action: 'requestStatus',
                     payload: {
@@ -1825,6 +1851,7 @@ export default {
             this.currentSchedule = item
             this.isEditing = true
 
+            this.scheduleId = item.id || this.scheduleId
             this.name = item.name || this.name
             this.enabled = item.enabled !== undefined ? item.enabled : this.enabled
             this.topic = item.topic || this.topic
@@ -1876,6 +1903,7 @@ export default {
         },
 
         resetForm () {
+            this.scheduleId = null
             const baseName = 'Schedule'
             let newName = baseName
             let index = 2
@@ -1956,17 +1984,38 @@ export default {
         },
         deleteConfirm () {
             if (this.currentSchedule) {
-                const index = this.schedules.findIndex(schedule => schedule.name === this.currentSchedule.name)
-                if (index > -1) {
-                    this.schedules.splice(index, 1)
-                    this.$socket.emit('widget-action', this.id, {
-                        action: 'remove',
-                        payload: { name: this.currentSchedule.name }
-                    })
+                if (this.currentSchedule.id) {
+                    const index = this.schedules.findIndex(schedule => schedule.id === this.currentSchedule.id)
+                    if (index > -1) {
+                        this.schedules.splice(index, 1)
+                        this.$socket.emit('widget-action', this.id, {
+                            action: 'remove',
+                            payload: { id: this.currentSchedule.id }
+                        })
+                    }
+                } else { // remove later
+                    const index = this.schedules.findIndex(schedule => schedule.name === this.currentSchedule.name)
+                    if (index > -1) {
+                        this.schedules.splice(index, 1)
+                        this.$socket.emit('widget-action', this.id, {
+                            action: 'remove',
+                            payload: { name: this.currentSchedule.name }
+                        })
+                    }
                 }
                 this.closeDialog()
             }
             this.dialogDelete = false
+        },
+
+        copyToClipboard (item) {
+            const el = document.createElement('textarea')
+            el.value = JSON.stringify(item)
+            document.body.appendChild(el)
+            el.select()
+            document.execCommand('copy')
+            document.body.removeChild(el)
+            alert('Copied to clipboard!')
         }
     }
 }
