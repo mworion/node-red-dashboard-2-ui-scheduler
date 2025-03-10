@@ -14,6 +14,7 @@ This node is still in beta and is not yet ready for production use. Any contribu
 - Persistence of schedules to local file system or Node-RED context stores.
 - Supports timespans (e.g., "from 10:00 AM to 12:00 PM") or durations (e.g., "for 5 minutes").
 - Supports using Solar with Time schedules when adding a timespan schedule. (e.g., "from 5:00 AM to Sunrise")
+- Supports wrap-around schedules (e.g., "from 9:00 PM to 7:00 AM")
 - Optionally send current state of timespan or duration schedules at a specified interval.
 - Supports custom payloads for schedules.
 
@@ -31,6 +32,10 @@ You can install this node directly from the "Manage Palette" menu in the Node-RE
 Alternatively, run the following command in your Node-RED user directory - typically `~/.node-red` on Linux or `%HOMEPATH%\.nodered` on Windows:
 
     npm install @cgjgh/node-red-dashboard-2-ui-scheduler
+
+## Support my Node-RED Dashboard development
+Finding this useful? By supporting my Node-RED Dashboard development, you’ll help drive new features, enhancements, and updates. Your encouragement means everything—thank you for considering!
+<a href="https://www.buymeacoffee.com/cgjgh" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/arial-blue.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
 ## Usage
 
