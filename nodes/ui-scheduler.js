@@ -1,4 +1,4 @@
-const version = '3.0.0-beta.1'
+const version = '3.0.1'
 const packageName = '@cgjgh/node-red-dashboard-2-ui-scheduler'
 /* eslint-disable no-unused-vars */
 
@@ -3357,7 +3357,7 @@ module.exports = function (RED) {
                             schedule.currentStartTime = now
                         }
                     } else {
-                        const nextStartDate = schedule?.primaryTask?.nextDate
+                        const nextStartDate = schedule?.primaryTask?.nextDate || new Date()
 
                         // handle solar timespan schedules where solar event is end time
                         if (task.node_expressionType === 'cron' && schedule.scheduleType === 'solar') {
