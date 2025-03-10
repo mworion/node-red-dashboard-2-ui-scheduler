@@ -1,28 +1,24 @@
+const version = '3.0.1'
+const packageName = '@cgjgh/node-red-dashboard-2-ui-scheduler'
+/* eslint-disable no-unused-vars */
+
 /* eslint-disable no-case-declarations */
 /* eslint-disable no-console */
-/*
-MIT License
 
-Copyright (c) 2019, 2020, 2021, 2022 Steve-Mcl
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-*/
-
+const { exec } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 
+const { TZDate } = require('@date-fns/tz')
 const coordParser = require('coord-parser')
 const cronosjs = require('cronosjs-extended')
 const cronstrue = require('cronstrue')
+const { addMinutes, addHours, startOfYear, formatDistanceStrict } = require('date-fns')
+
+const analytics = require('node-debug-analytics')
 const prettyMs = require('pretty-ms')
+const semver = require('semver')
+
 const SunCalc = require('suncalc2')
 
 SunCalc.addTime(-18, 'nightEnd', 'nightStart')
@@ -68,6 +64,18 @@ const solarEvents = [
     { title: 'Nadir', value: 'nadir' }
 ]
 
+const dayMapping = {
+    Sunday: 'Sun',
+    Monday: 'Mon',
+    Tuesday: 'Tue',
+    Wednesday: 'Wed',
+    Thursday: 'Thu',
+    Friday: 'Fri',
+    Saturday: 'Sat'
+}
+
+const allDaysOfWeek = Object.keys(dayMapping)
+
 // accepted commands using topic as the command & (in compatible cases, the payload is the schedule name)
 // commands not supported by topic are : add/update & describe
 const controlTopics = [
@@ -77,14 +85,17 @@ const controlTopics = [
     { command: 'export', payloadIsName: true },
     { command: 'stop', payloadIsName: true },
     { command: 'stop-all', payloadIsName: false },
+    { command: 'stop-topic', payloadIsName: false },
     { command: 'stop-all-dynamic', payloadIsName: false },
     { command: 'stop-all-static', payloadIsName: false },
     { command: 'pause', payloadIsName: true },
     { command: 'pause-all', payloadIsName: false },
+    { command: 'pause-topic', payloadIsName: false },
     { command: 'pause-all-dynamic', payloadIsName: false },
     { command: 'pause-all-static', payloadIsName: false },
     { command: 'start', payloadIsName: true },
     { command: 'start-all', payloadIsName: false },
+    { command: 'start-topic', payloadIsName: false },
     { command: 'start-all-dynamic', payloadIsName: false },
     { command: 'start-all-static', payloadIsName: false },
     { command: 'clear', payloadIsName: false },
@@ -95,6 +106,7 @@ const controlTopics = [
 ]
 const addExtendedControlTopics = function (baseCommand) {
     controlTopics.push({ command: `${baseCommand}-all`, payloadIsName: false })
+    controlTopics.push({ command: `${baseCommand}-topic`, payloadIsName: false })
     controlTopics.push({ command: `${baseCommand}-all-dynamic`, payloadIsName: false })
     controlTopics.push({ command: `${baseCommand}-all-static`, payloadIsName: false })
     controlTopics.push({ command: `${baseCommand}-active`, payloadIsName: false })
@@ -113,6 +125,35 @@ addExtendedControlTopics('delete')
 addExtendedControlTopics('debug')
 
 /**
+ * Checks for updates of a specified npm package by comparing the current version
+ * with the latest version available on the npm registry.
+ *
+ * @param {string} currentVersion - The current version of the package.
+ * @param {string} packageName - The name of the package to check for updates.
+ * @param {function} callback - A callback function that receives an object containing
+ *                              the update status, current version, and latest version.
+ */
+function checkForUpdate (currentVersion, packageName, callback) {
+    exec(`npm view ${packageName} version`, (error, stdout) => {
+        if (error) {
+            console.error('Error fetching version:', error)
+            callback(null)
+            return
+        }
+
+        const latestVersion = stdout.trim()
+
+        const isUpdateAvailable = semver.lt(currentVersion, latestVersion)
+
+        callback({
+            isUpdateAvailable,
+            currentVersion,
+            latestVersion
+        })
+    })
+}
+
+/**
  * Humanize a cron express
  * @param {string} expression the CRON expression to humanize
  * @returns {string}
@@ -128,6 +169,14 @@ const humanizeCron = function (expression, locale, use24HourFormat = true) {
     }
 }
 
+/**
+ * Maps a solar event identifier to its corresponding title or vice versa.
+ *
+ * @param {string} event - The solar event identifier or title to map.
+ * @param {boolean} [toTitle=true] - Determines the mapping direction. If true, maps from identifier to title;
+ *                                   if false, maps from title to identifier.
+ * @returns {string} - The mapped solar event title or identifier. Returns the input if no match is found.
+ */
 function mapSolarEvent (event, toTitle = true) {
     const found = solarEvents.find(e => toTitle ? e.value === event : e.title === event)
     return found ? (toTitle ? found.title : found.value) : event
@@ -143,8 +192,8 @@ function validateOpt (opt, permitDefaults = true) {
     if (!opt) {
         throw new Error('Schedule options are undefined')
     }
-    if (!opt.name) {
-        throw new Error('Schedule name property missing')
+    if (!opt.id) {
+        throw new Error('Schedule id property missing')
     }
     if (!opt.expressionType || opt.expressionType === 'cron' || opt.expressionType === 'dates') { // cron
         if (!opt.expression) {
@@ -239,14 +288,44 @@ function isDateSequence (data) {
     return false
 }
 
-async function executeWithTimeLimit (action, timeLimit) {
-    const timeoutPromise = new Promise((resolve, reject) => {
-        setTimeout(() => {
-            reject(new Error('Async action timed out'))
-        }, timeLimit)
-    })
+/**
+ * Adjusts the time of a given Date object to match a specified timezone,
+ * considering daylight saving time transitions, and returns the updated Date object.
+ *
+ * @param {Date} inputDateTime - The original Date object to be adjusted.
+ * @param {string} timezone - The IANA timezone identifier to adjust the time to.
+ * @param {Array<number>} timeArray - An array containing the hour, minute, and second to set.
+ * @returns {TZDate} - The adjusted Date object with the time set according to the specified timezone.
+ */
+function setTimeForTZ (inputDateTime, timezone, timeArray) {
+    const inputHour = timeArray[0] || 0
+    const inputMinute = timeArray[1] || 0
+    const inputSecond = timeArray[2] || 0
 
-    return Promise.race([action(), timeoutPromise])
+    // Create a TZDate instance in the given timezone
+    const tzDate = new TZDate(
+        inputDateTime.getUTCFullYear(),
+        inputDateTime.getUTCMonth(),
+        inputDateTime.getUTCDate(),
+        inputHour,
+        inputMinute,
+        inputSecond,
+        timezone
+    )
+
+    return tzDate
+}
+
+function getCurrentTimezone (node) {
+    let tz = node.timeZone
+    let localTZ = ''
+    if (!tz) {
+        try {
+            localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone
+            tz = localTZ
+        } catch (error) { return 'UTC' }
+    }
+    return tz
 }
 
 /**
@@ -282,20 +361,23 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             location: expression,
             offset: offset || 0,
             name: 'dummy',
+            id: 'dummy',
             solarType,
             solarEvents,
+            solarDays: opts.solarDays,
             payloadType: 'default',
             payload: ''
         }
-
         if (validateOpt(opt)) {
             const pos = coordParser(opt.location)
             const offset = isNumber(opt.offset) ? parseInt(opt.offset) : 0
             const nowOffset = new Date(now.getTime() - offset * 60000)
-            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset)
+            const daysOfWeek = opt?.solarDays || null
+
+            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset, daysOfWeek)
             // eslint-disable-next-line eqeqeq
             if (opts.includeSolarStateOffset && offset != 0) {
-                const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0)
+                const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0, daysOfWeek)
                 result.solarStateOffset = ssOffset.solarState
             }
             result.offset = offset
@@ -326,17 +408,24 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
         const task = ds.task
         const dates = ds.dates
         const dsFutureDates = dates.filter(d => d >= now)
+        const dsLastDates = dates.filter(d => d <= now)
         const count = dsFutureDates ? dsFutureDates.length : 0
         result.description = 'Date sequence with fixed dates'
+
         if (task && task._sequence && count) {
             result.nextDate = dsFutureDates[0]
+            result.previousDate = dsLastDates[dsLastDates.length - 1]
             const ms = result.nextDate.valueOf() - now.valueOf()
+            const msLast = result.previousDate ? now.valueOf() - result.previousDate.valueOf() : 0
             result.prettyNext = (result.nextEvent ? result.nextEvent + ' ' : '') + `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
+            result.prettyPrevious = msLast > 0 ? (result.lastEvent ? result.lastEvent + ' ' : '') + prettyMs(msLast, { secondsDecimalDigits: 0, verbose: true }).replace(/-/g, ' ') + ' ago' : 'Never'
             if (expressionType === 'solar') {
                 if (solarType === 'all') {
                     result.description = 'All Solar Events'
                 } else {
-                    result.description = "Solar Events: '" + solarEvents.split(',').join(', ') + "'"
+                    const solarEventsArray = solarEvents.split(',')
+                    const events = solarEventsArray.map(event => mapSolarEvent(event)).join(', ')
+                    result.description = events + ((opts.solarDays && opts.solarDays.length) ? ' only on ' + opts.solarDays.map(day => day.substring(0, 3)).join(',') : '')
                 }
             } else {
                 if (count === 1) {
@@ -345,6 +434,7 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
                     result.description = count + ' Date Sequences starting at ' + formatShortDateTimeWithTZ(result.nextDate, timeZone, use24HourFormat)
                 }
                 result.nextDates = dsFutureDates.slice(0, 5)
+                result.prevDates = dsLastDates.slice(-5)
             }
         }
     }
@@ -352,6 +442,7 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
     if (exOk) {
         const ex = cronosjs.CronosExpression.parse(expression, cronOpts)
         const next = ex.nextDate()
+        const previous = ex.previousDate()
         if (next) {
             const ms = next.valueOf() - now.valueOf()
             result.prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
@@ -365,8 +456,22 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             result.valid = false
             return result
         }
+        if (previous) {
+            const ms = now.valueOf() - previous.valueOf()
+            result.prettyPrevious = prettyMs(ms, { secondsDecimalDigits: 0, verbose: true }) + ' ago'
+            try {
+                result.prevDates = ex.previousNDates(now, 5)
+            } catch (error) {
+                console.debug(error)
+            }
+        } else {
+            // result.description = 'Invalid expression'
+            // result.valid = false
+            // return result
+        }
         result.description = humanizeCron(expression, null, use24HourFormat)
         result.nextDate = next
+        result.previousDate = previous
     }
     return result
 }
@@ -394,20 +499,23 @@ async function _asyncDescribeExpression (expression, expressionType, timeZone, o
             location: expression,
             offset: offset || 0,
             name: 'dummy',
+            id: 'dummy',
             solarType,
             solarEvents,
+            solarDays: opts.solarDays,
             payloadType: 'default',
             payload: ''
         }
-
         if (validateOpt(opt)) {
             const pos = coordParser(opt.location)
             const offset = isNumber(opt.offset) ? parseInt(opt.offset) : 0
             const nowOffset = new Date(now.getTime() - offset * 60000)
-            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset)
+            const daysOfWeek = opt?.solarDays || null
+
+            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset, daysOfWeek)
             // eslint-disable-next-line eqeqeq
             if (opts.includeSolarStateOffset && offset != 0) {
-                const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0)
+                const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0, daysOfWeek)
                 result.solarStateOffset = ssOffset.solarState
             }
             result.offset = offset
@@ -440,6 +548,7 @@ async function _asyncDescribeExpression (expression, expressionType, timeZone, o
         const dsFutureDates = dates.filter(d => d >= now)
         const count = dsFutureDates ? dsFutureDates.length : 0
         result.description = 'Date sequence with fixed dates'
+
         if (task && task._sequence && count) {
             result.nextDate = dsFutureDates[0]
             const ms = result.nextDate.valueOf() - now.valueOf()
@@ -448,7 +557,9 @@ async function _asyncDescribeExpression (expression, expressionType, timeZone, o
                 if (solarType === 'all') {
                     result.description = 'All Solar Events'
                 } else {
-                    result.description = "Solar Events: '" + solarEvents.split(',').join(', ') + "'"
+                    const solarEventsArray = solarEvents.split(',')
+                    const events = solarEventsArray.map(event => mapSolarEvent(event)).join(', ')
+                    result.description = events + ((opts.solarDays && opts.solarDays.length) ? ' only on ' + opts.solarDays.map(day => day.substring(0, 3)).join(',') : '')
                 }
             } else {
                 if (count === 1) {
@@ -463,38 +574,37 @@ async function _asyncDescribeExpression (expression, expressionType, timeZone, o
 
     if (exOk) {
         const ex = cronosjs.CronosExpression.parse(expression, cronOpts)
-
-        // eslint-disable-next-line no-inner-declarations
-        function getNext () {
-            return new Promise((resolve, reject) => {
-                const next = ex.nextDate()
-                resolve(next)
-            })
-        }
-
-        const next = await executeWithTimeLimit(getNext, 3000)
-            .then((result) => {
-                return result
-            })
-            .catch((error) => {
-                console.error(error) // Handle timeout or other errors
-                return null
-            })
-
-        if (next && next instanceof Date) {
+        const next = ex.nextDate()
+        const previous = ex.previousDate()
+        if (next) {
             const ms = next.valueOf() - now.valueOf()
             result.prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
             try {
                 result.nextDates = ex.nextNDates(now, 5)
             } catch (error) {
+                console.debug(error)
             }
         } else {
             result.description = 'Invalid expression'
             result.valid = false
             return result
         }
+        if (previous) {
+            const ms = previous.valueOf() - now.valueOf()
+            result.prettyPrevious = prettyMs(ms, { secondsDecimalDigits: 0, verbose: true }).replace(/-/g, ' ') + ' ago'
+            try {
+                result.prevDates = ex.previousNDates(now, 5)
+            } catch (error) {
+                console.debug(error)
+            }
+        } else {
+            // result.description = 'Invalid expression'
+            // result.valid = false
+            // return result
+        }
         result.description = humanizeCron(expression, null, use24HourFormat)
         result.nextDate = next
+        result.previousDate = previous
     }
     return result
 }
@@ -602,7 +712,7 @@ function applyOptionDefaults (node, option, optionIndex) {
             option.expressionType = 'cron'
         }
     }
-    option.name = option.name || 'schedule' + (optionIndex + 1)
+    // option.name = option.name || 'schedule' + (optionIndex + 1)
     option.topic = option.topic || option.name
     option.payloadType = option.payloadType || option.type
     if (option.payloadType == null && typeof option.payload === 'string' && option.payload.length) {
@@ -618,6 +728,273 @@ function applyOptionDefaults (node, option, optionIndex) {
         option.locationType = node.defaultLocationType || 'fixed'
     }
 }
+/**
+ * Calculates the next occurrence of a specified weekday from a given start date.
+ *
+ * @param {string[]} weekdays - An array of weekday names to search for the next occurrence.
+ * @param {Date} [startDate=new Date()] - The date from which to start the search. Defaults to the current date.
+ * @returns {Date} The date of the next occurrence of one of the specified weekdays.
+ */
+function getNextWeekday (weekdays, startDate = new Date()) {
+    const start = new Date(startDate)
+    const startIndex = start.getDay()
+    let minDays = 7 // initialize with maximum days in a week
+    const now = new Date()
+    weekdays.forEach(day => {
+        const dayIndex = allDaysOfWeek.indexOf(day)
+        if (dayIndex === -1) {
+            //
+        }
+
+        const daysUntilNext = (dayIndex - startIndex + 7) % 7
+        if (daysUntilNext < minDays) {
+            minDays = daysUntilNext
+        }
+    })
+    // Calculate the next occurring weekday date
+    const nextDate = new Date(start.getTime() + minDays * 24 * 60 * 60 * 1000)
+    // Check if the nextDate at 00:00 is still greater than now UTC
+
+    const tempNextDate = new Date(nextDate)
+    tempNextDate.setHours(0, 0, 0, 0)
+
+    if (tempNextDate > now) {
+        return tempNextDate
+    }
+    return new Date(nextDate)
+}
+
+/**
+ * Calculates the most recent occurrence of a specified weekday before a given start date.
+ *
+ * @param {string[]} weekdays - An array of weekday names to consider. If empty or not provided, all days of the week are considered.
+ * @param {Date} [startDate=new Date()] - The date from which to start the search. Defaults to the current date.
+ * @returns {Date} The date of the last occurrence of one of the specified weekdays.
+ */
+function getLastWeekday (weekdays, startDate = new Date()) {
+    if (!weekdays || weekdays.length === 0) {
+        weekdays = allDaysOfWeek
+    }
+    const start = new Date(startDate)
+    const startIndex = start.getDay()
+    let minDays = 7 // initialize with maximum days in a week
+
+    weekdays.forEach(day => {
+        const dayIndex = allDaysOfWeek.indexOf(day)
+        if (dayIndex === -1) {
+            //
+        }
+
+        const daysUntilLast = (startIndex - dayIndex + 7) % 7
+
+        if (daysUntilLast !== 0 && daysUntilLast < minDays) {
+            minDays = daysUntilLast
+        }
+    })
+
+    // Calculate the last occurring weekday date
+    const lastDate = new Date(start.getTime() - minDays * 24 * 60 * 60 * 1000)
+
+    // Check if the lastDate at 00:00 is still less than now UTC
+    const tempLastDate = new Date(lastDate)
+    tempLastDate.setHours(0, 0, 0, 0)
+
+    if (tempLastDate < new Date()) {
+        return tempLastDate
+    }
+    return new Date(lastDate)
+}
+
+/**
+ * Retrieves the most recent event from a list of events that matches a specified
+ * solar event and occurred before or at the current time.
+ *
+ * @param {Array} events - An array of event objects, each containing an 'event' and 'timeOffset'.
+ * @param {Array} solarEventsArr - An array of solar event names to match against.
+ * @param {Date} now - The current date and time used to compare event occurrences.
+ * @returns {Object|null} The most recent matching event object, or null if no match is found.
+ */
+function getLastOccurredEvent (events, solarEventsArr, now) {
+    for (let i = events.length - 1; i >= 0; i--) {
+        const item = events[i]
+        if (solarEventsArr.includes(item.event) && new Date(item.timeOffset) <= now) {
+            return item
+        }
+    }
+    return null // If no matching event is found
+}
+
+/**
+ * Calculates the next occurrence of a specified time on or after a given start date.
+ *
+ * @param {Date} startDate - The starting date from which to calculate the next occurrence.
+ * @param {string} timeString - The time in 'HH:MM' format to find the next occurrence of.
+ * @returns {Date} A Date object representing the next occurrence of the specified time.
+ */
+function getNextTimeOccurrence (node, startDate, timeString) {
+    if (!startDate) startDate = new Date()
+    if (!timeString) timeString = '00:00'
+
+    // Parse the input time string
+    const timeArray = timeString.split(':').map(Number)
+
+    const date = new Date(startDate)
+    const tz = getCurrentTimezone(node)
+    const adjustedDate = setTimeForTZ(date, tz, timeArray)
+
+    // If the time has already passed for the current day, add one day
+    if (adjustedDate < new Date(startDate)) {
+        adjustedDate.setDate(adjustedDate.getDate() + 1)
+    }
+
+    return adjustedDate
+}
+
+/**
+ * Calculates the next occurrences of a time interval from the start of the year.
+ *
+ * @param {number} interval - The interval between occurrences, must be a positive number.
+ * @param {string} unit - The unit of time for the interval, either 'minute' or 'hour'.
+ * @param {number} [count=1] - The number of occurrences to calculate.
+ * @returns {Date[]} An array of Date objects representing the next occurrences.
+ * @throws {Error} Throws an error if the interval is not positive or if the unit is invalid.
+ */
+function getNextIntervalOccurrences (interval, unit, count = 1) {
+    const now = new Date()
+    const anchor = startOfYear(now) // Anchor: January 1st, 00:00
+
+    if (interval <= 0) {
+        throw new Error('Interval must be a positive number.')
+    }
+
+    const occurrences = []
+    if (unit === 'minute') {
+        const totalMinutesSinceAnchor = Math.ceil((now - anchor) / (1000 * 60)) // Minutes since Jan 1st
+        const nextOccurrenceInMinutes = Math.ceil(totalMinutesSinceAnchor / interval) * interval
+
+        for (let i = 0; i < count; i++) {
+            occurrences.push(addMinutes(anchor, nextOccurrenceInMinutes + i * interval)) // Add intervals
+        }
+    } else if (unit === 'hour') {
+        const totalHoursSinceAnchor = Math.ceil((now - anchor) / (1000 * 60 * 60)) // Hours since Jan 1st
+        const nextOccurrenceInHours = Math.ceil(totalHoursSinceAnchor / interval) * interval
+
+        for (let i = 0; i < count; i++) {
+            occurrences.push(addHours(anchor, nextOccurrenceInHours + i * interval)) // Add intervals
+        }
+    } else {
+        throw new Error('Unit must be either "minute" or "hour".')
+    }
+
+    return occurrences
+}
+
+/**
+ * Generates a sequence of past date occurrences based on a specified interval and unit.
+ *
+ * @param {number} interval - The interval between occurrences, must be a positive number.
+ * @param {string} unit - The unit of time for the interval, either 'minute' or 'hour'.
+ * @param {number} [count=1] - The number of past occurrences to generate, must be a positive number.
+ * @returns {Date[]} An array of Date objects representing the past occurrences.
+ * @throws {Error} If the interval is not a positive number or if the unit is invalid.
+ */
+function getPreviousIntervalOccurrences (interval, unit, count = 1) {
+    const now = new Date()
+    const anchor = startOfYear(now) // Anchor: January 1st, 00:00
+
+    if (interval <= 0) {
+        throw new Error('Interval must be a positive number.')
+    }
+
+    const occurrences = []
+    if (unit === 'minute') {
+        const totalMinutesSinceAnchor = Math.floor((now - anchor) / (1000 * 60)) // Minutes since Jan 1st
+        const lastOccurrenceInMinutes = Math.floor(totalMinutesSinceAnchor / interval) * interval
+        for (let i = count - 1; i >= 0; i--) { // Reverse the loop
+            occurrences.push(addMinutes(anchor, lastOccurrenceInMinutes - i * interval))
+        }
+    } else if (unit === 'hour') {
+        const totalHoursSinceAnchor = Math.floor((now - anchor) / (1000 * 60 * 60)) // Hours since Jan 1st
+        const lastOccurrenceInHours = Math.floor(totalHoursSinceAnchor / interval) * interval
+        for (let i = count - 1; i >= 0; i--) { // Reverse the loop
+            occurrences.push(addHours(anchor, lastOccurrenceInHours - i * interval))
+        }
+    } else {
+        throw new Error('Unit must be either "minute" or "hour".')
+    }
+
+    return occurrences
+}
+
+/**
+ * Determines if a given interval is compatible with cron scheduling
+ * based on the specified type ('minute' or 'hour').
+ *
+ * @param {number} interval - The interval to check for compatibility.
+ * @param {string} type - The type of interval, either 'minute' or 'hour'.
+ * @returns {boolean} True if the interval is compatible with cron scheduling; otherwise, false.
+ * @throws {Error} Throws an error if the type is not 'minute' or 'hour'.
+ */
+function isCronCompatible (interval, type) {
+    if (type === 'minute') {
+        return 60 % interval === 0
+    } else if (type === 'hour') {
+        return 24 % interval === 0
+    } else {
+        throw new Error("Invalid type. Use 'minute' or 'hour'.")
+    }
+}
+
+/**
+ * Generates a sequence of date occurrences based on a specified interval and unit.
+ *
+ * @param {number} interval - The interval between occurrences, must be a positive number.
+ * @param {string} unit - The unit of time for the interval, either 'minute' or 'hour'.
+ * @param {string} [type='both'] - The type of occurrences to generate: 'past', 'future', or 'both'.
+ * @param {number} [count=1] - The number of occurrences to generate for each type, must be a positive number.
+ * @returns {string} A comma-separated string of ISO formatted date occurrences.
+ * @throws {Error} If the interval or count is not a positive number, or if the unit is invalid.
+ */
+function generateDateSequence (interval, unit, type = 'both', count = 1) {
+    if (interval <= 0 || count <= 0) {
+        throw new Error('Interval and count must be positive numbers.')
+    }
+
+    let pastOccurrences = []
+    let futureOccurrences = []
+
+    // Get past and/or future occurrences based on the type
+    if (type === 'past' || type === 'both') {
+        pastOccurrences = getPreviousIntervalOccurrences(interval, unit, type === 'both' ? 5 : count)
+    }
+    if (type === 'future' || type === 'both') {
+        futureOccurrences = getNextIntervalOccurrences(interval, unit, count)
+    }
+
+    // Combine past and future occurrences (past first)
+    const allOccurrences = [...pastOccurrences, ...futureOccurrences]
+
+    // Format the occurrences into a comma-separated ISO string
+    return allOccurrences.map((date) => date.toISOString()).join(', ')
+}
+
+/**
+ * Parses a given expression to determine if it represents a valid date sequence.
+ *
+ * The function checks if the input expression is a string and splits it by commas.
+ * Each element is trimmed and checked if it resembles a cron-like expression.
+ * If any element is cron-like, the function returns early with a result indicating
+ * failure. Otherwise, it attempts to convert each element into a Date object.
+ *
+ * If the resulting dates can form a valid CronosTask sequence, the function
+ * updates the result to indicate success and includes the sequence details.
+ *
+ * @param {string|Array} expression - The expression to parse, which can be a string
+ *                                    of comma-separated values or an array.
+ * @returns {Object} An object containing the parsing result, including whether
+ *                   the expression is a valid date sequence, the original expression,
+ *                   and the parsed dates if successful.
+ */
 function parseDateSequence (expression) {
     const result = { isDateSequence: false, expression }
     let dates = expression
@@ -646,211 +1023,318 @@ function parseDateSequence (expression) {
     return result
 }
 
+/**
+ * Parses solar times based on the provided options and returns a task object
+ * containing solar event times and a date sequence.
+ *
+ * @param {Object} opt - Options for parsing solar times.
+ * @param {string} [opt.location='0.0,0.0'] - The location coordinates in 'lat,lon' format.
+ * @param {number} [opt.offset=0] - The time offset in minutes.
+ * @param {string|Date} [opt.date=new Date()] - The date for which to calculate solar times.
+ * @param {Array<string>} [opt.solarDays=null] - Days of the week to consider for solar events.
+ * @param {string|Array<string>} [opt.solarEvents] - Specific solar events to consider.
+ * @param {string} [opt.solarType] - Type of solar events to consider, 'all' for all permitted events.
+ * @returns {Object} A task object containing solar event times and a date sequence.
+ */
 function parseSolarTimes (opt) {
     // opt.location = location || ''
     const pos = coordParser(opt.location || '0.0,0.0')
     const offset = opt.offset ? parseInt(opt.offset) : 0
     const date = opt.date ? new Date(opt.date) : new Date()
+    const daysOfWeek = opt.solarDays || null
     const events = opt.solarType === 'all' ? PERMITTED_SOLAR_EVENTS : opt.solarEvents
-    const result = getSolarTimes(pos.lat, pos.lon, 0, events, date, offset)
+    const result = getSolarTimes(pos.lat, pos.lon, 0, events, date, offset, daysOfWeek)
     const task = parseDateSequence(result.eventTimes.map((o) => o.timeOffset))
     task.solarEventTimes = result
     return task
 }
 
-function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offset = 0) {
+/**
+ * Calculates solar event times for a given location and date range.
+ *
+ * @param {number} lat - Latitude of the location.
+ * @param {number} lng - Longitude of the location.
+ * @param {number} elevation - Elevation of the location (currently unused).
+ * @param {string|string[]} solarEvents - Comma-separated string or array of solar events to consider.
+ * @param {Date|null} [startDate=null] - Starting date for calculations. Defaults to current date if not provided.
+ * @param {number} [offset=0] - Time offset in minutes to apply to event times.
+ * @param {string[]|null} [daysOfWeek=null] - Array of weekdays to consider for event calculations.
+ * @returns {Object} An object containing solar state, next and last event details, and event times.
+ * @throws {Error} Throws an error if solarEvents is not a string or array.
+ */
+function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offset = 0, daysOfWeek = null) {
     // performance.mark('Start');
-    const solarEventsPast = [...PERMITTED_SOLAR_EVENTS]
-    const solarEventsFuture = [...PERMITTED_SOLAR_EVENTS]
-    const solarEventsArr = []
 
-    // get list of usable solar events into solarEventsArr
-    let solarEventsArrTemp = []
-    if (typeof solarEvents === 'string') {
-        solarEventsArrTemp = solarEvents.split(',')
-    } else if (Array.isArray(solarEvents)) {
-        solarEventsArrTemp = [...solarEvents]
-    } else {
-        throw new Error('solarEvents must be a CSV or Array')
-    }
-    for (let index = 0; index < solarEventsArrTemp.length; index++) {
-        const se = solarEventsArrTemp[index].trim()
-        if (PERMITTED_SOLAR_EVENTS.includes(se)) {
-            solarEventsArr.push(se)
-        }
-    }
+    let getNextWeek = false
+    let initialStartDate
+    let nextType
+    let nextTime
+    let nextTimeOffset
+    let lastType
+    let lastTime
+    let lastTimeOffset
+    const now = new Date()
 
     offset = isNumber(offset) ? parseInt(offset) : 0
     elevation = isNumber(elevation) ? parseInt(elevation) : 0// not used for now
     startDate = startDate ? new Date(startDate) : new Date()
+    for (let retries = 0; retries < 2; retries++) {
+        const solarEventsPast = [...PERMITTED_SOLAR_EVENTS]
+        const solarEventsFuture = [...PERMITTED_SOLAR_EVENTS]
+        const solarEventsArr = []
 
-    let scanDate = new Date(startDate.toDateString()) // new Date(startDate); //scanDate = new Date(startDate.toDateString())
-    scanDate.setDate(scanDate.getDate() + 1)// fwd one day to catch times behind of scan day
-    let loopMonitor = 0
-    const result = []
-
-    // performance.mark('initEnd')
-    // performance.measure('Start to Now', 'Start', 'initEnd')
-    // performance.mark('FirstScanStart');
-
-    // first scan backwards to get prior solar events
-    while (loopMonitor < 3 && solarEventsPast.length) {
-        loopMonitor++
-        const timesIteration1 = SunCalc.getTimes(scanDate, lat, lng)
-        // timesIteration1 = new SolarCalc(scanDate,lat,lng);
-
-        for (let index = 0; index < solarEventsPast.length; index++) {
-            const se = solarEventsPast[index]
-            const seTime = timesIteration1[se]
-            const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
-            if (isValidDateObject(seTimeOffset) && seTimeOffset <= startDate) {
-                result.push({ event: se, time: seTime, timeOffset: seTimeOffset })
-                solarEventsPast.splice(index, 1)// remove that item
-                index--
-            }
-        }
-        scanDate.setDate(scanDate.getDate() - 1)
-    }
-
-    scanDate = new Date(startDate.toDateString())
-    scanDate.setDate(scanDate.getDate() - 1)// back one day to catch times ahead of current day
-    loopMonitor = 0
-    // now scan forwards to get future events
-    while (loopMonitor < 183 && solarEventsFuture.length) {
-        loopMonitor++
-        const timesIteration2 = SunCalc.getTimes(scanDate, lat, lng)
-        // timesIteration2 = new SolarCalc(scanDate,lat,lng);
-        for (let index = 0; index < solarEventsFuture.length; index++) {
-            const se = solarEventsFuture[index]
-            const seTime = timesIteration2[se]
-            const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
-            if (isValidDateObject(seTimeOffset) && seTimeOffset > startDate) {
-                result.push({ event: se, time: seTime, timeOffset: seTimeOffset })
-                solarEventsFuture.splice(index, 1)// remove that item
-                index--
-            }
-        }
-        scanDate.setDate(scanDate.getDate() + 1)
-    }
-    // performance.mark('SecondScanEnd');
-    // performance.measure('FirstScanEnd to SecondScanEnd', 'FirstScanEnd', 'SecondScanEnd');
-
-    // sort the results to get a timeline
-    const sorted = result.sort((a, b) => {
-        if (a.time < b.time) {
-            return -1
-        } else if (a.time > b.time) {
-            return 1
+        // get list of usable solar events into solarEventsArr
+        let solarEventsArrTemp = []
+        if (typeof solarEvents === 'string') {
+            solarEventsArrTemp = solarEvents.split(',')
+        } else if (Array.isArray(solarEvents)) {
+            solarEventsArrTemp = [...solarEvents]
         } else {
-            return 0
+            throw new Error('solarEvents must be a CSV or Array')
         }
-    })
+        for (let index = 0; index < solarEventsArrTemp.length; index++) {
+            const se = solarEventsArrTemp[index].trim()
+            if (PERMITTED_SOLAR_EVENTS.includes(se)) {
+                solarEventsArr.push(se)
+            }
+        }
 
-    // now scan through sorted solar events to determine day/night/twilight etc
-    let state = ''; const solarState = {}
-    for (let index = 0; index < sorted.length; index++) {
-        const event = sorted[index]
-        if (event.time < startDate) {
-            switch (event.event) {
-            case 'nightEnd':
-                state = 'Astronomical Twilight'// todo: i18n
-                updateSolarState(solarState, state, 'rise', false, false, true, false, false, false, false)
-                break
-                // case "astronomicalDawn":
-                //     state = "Astronomical Twilight";//todo: i18n
-                //     updateSolarState(solarState,state,"rise",false,false,true,false,false,false,false);
-                //     break;
-            case 'nauticalDawn':
-                state = 'Nautical Twilight'
-                updateSolarState(solarState, state, 'rise', false, false, false, true, false, false, false)
-                break
-            case 'civilDawn':
-                state = 'Civil Twilight'
-                updateSolarState(solarState, state, 'rise', false, false, false, false, true, true, false)
-                break
-                // case "morningGoldenHourStart":
-                //     updateSolarState(solarState,null,"rise",false,false,false,false,true,true,false);
-                //     break;
-            case 'sunrise':
-                state = 'Civil Twilight'
-                updateSolarState(solarState, state, 'rise', false, false, false, false, true, true, false)
-                break
-            case 'sunriseEnd':
-                state = 'Day'
-                updateSolarState(solarState, state, 'rise', true, false, false, false, false, true, false)
-                break
-            case 'morningGoldenHourEnd':
-                state = 'Day'
-                updateSolarState(solarState, state, 'rise', true, false, false, false, false, false, false)
-                break
-            case 'solarNoon':
-                updateSolarState(solarState, null, 'fall')
-                break
-            case 'eveningGoldenHourStart':
-                state = 'Day'
-                updateSolarState(solarState, state, 'fall', true, false, false, false, false, false, true)
-                break
-            case 'sunsetStart':
-                state = 'Day'
-                updateSolarState(solarState, state, 'fall', true, false, false, false, false, false, true)
-                break
-            case 'sunset':
-                state = 'Civil Twilight'
-                updateSolarState(solarState, state, 'fall', false, false, false, false, true, false, true)
-                break
-                // case "eveningGoldenHourEnd":
-                //     state = "Nautical Twilight";
-                //     updateSolarState(solarState,state,"fall",false,false,false,false,true,false,false);
-                //     break;
-            case 'civilDusk':
-                state = 'Nautical Twilight'
-                updateSolarState(solarState, state, 'fall', false, false, false, true, false, false, false)
-                break
-            case 'nauticalDusk':
-                state = 'Astronomical Twilight'
-                updateSolarState(solarState, state, 'fall', false, false, true, false, false, false, false)
-                break
-                // case "astronomicalDusk":
-            case 'night':
-            case 'nightStart':
-                state = 'Night'
-                updateSolarState(solarState, state, 'fall', false, true, false, false, false, false, false)
-                break
-            case 'nadir':
-                updateSolarState(solarState, null, 'rise')
+        if (daysOfWeek && daysOfWeek.length > 0) {
+            startDate = getNextWeekday(daysOfWeek, startDate)
+        }
+        if (!getNextWeek) {
+            initialStartDate = startDate
+        }
+
+        const sorted = getSolarEvents(startDate, solarEventsPast, solarEventsFuture)
+
+        // now scan through sorted solar events to determine day/night/twilight etc
+        let state = ''; const solarState = {}
+        for (let index = 0; index < sorted.length; index++) {
+            const event = sorted[index]
+            if (event.time < startDate) {
+                switch (event.event) {
+                case 'nightEnd':
+                    state = 'Astronomical Twilight'// todo: i18n
+                    updateSolarState(solarState, state, 'rise', false, false, true, false, false, false, false)
+                    break
+                    // case "astronomicalDawn":
+                    //     state = "Astronomical Twilight";//todo: i18n
+                    //     updateSolarState(solarState,state,"rise",false,false,true,false,false,false,false);
+                    //     break;
+                case 'nauticalDawn':
+                    state = 'Nautical Twilight'
+                    updateSolarState(solarState, state, 'rise', false, false, false, true, false, false, false)
+                    break
+                case 'civilDawn':
+                    state = 'Civil Twilight'
+                    updateSolarState(solarState, state, 'rise', false, false, false, false, true, true, false)
+                    break
+                    // case "morningGoldenHourStart":
+                    //     updateSolarState(solarState,null,"rise",false,false,false,false,true,true,false);
+                    //     break;
+                case 'sunrise':
+                    state = 'Civil Twilight'
+                    updateSolarState(solarState, state, 'rise', false, false, false, false, true, true, false)
+                    break
+                case 'sunriseEnd':
+                    state = 'Day'
+                    updateSolarState(solarState, state, 'rise', true, false, false, false, false, true, false)
+                    break
+                case 'morningGoldenHourEnd':
+                    state = 'Day'
+                    updateSolarState(solarState, state, 'rise', true, false, false, false, false, false, false)
+                    break
+                case 'solarNoon':
+                    updateSolarState(solarState, null, 'fall')
+                    break
+                case 'eveningGoldenHourStart':
+                    state = 'Day'
+                    updateSolarState(solarState, state, 'fall', true, false, false, false, false, false, true)
+                    break
+                case 'sunsetStart':
+                    state = 'Day'
+                    updateSolarState(solarState, state, 'fall', true, false, false, false, false, false, true)
+                    break
+                case 'sunset':
+                    state = 'Civil Twilight'
+                    updateSolarState(solarState, state, 'fall', false, false, false, false, true, false, true)
+                    break
+                    // case "eveningGoldenHourEnd":
+                    //     state = "Nautical Twilight";
+                    //     updateSolarState(solarState,state,"fall",false,false,false,false,true,false,false);
+                    //     break;
+                case 'civilDusk':
+                    state = 'Nautical Twilight'
+                    updateSolarState(solarState, state, 'fall', false, false, false, true, false, false, false)
+                    break
+                case 'nauticalDusk':
+                    state = 'Astronomical Twilight'
+                    updateSolarState(solarState, state, 'fall', false, false, true, false, false, false, false)
+                    break
+                    // case "astronomicalDusk":
+                case 'night':
+                case 'nightStart':
+                    state = 'Night'
+                    updateSolarState(solarState, state, 'fall', false, true, false, false, false, false, false)
+                    break
+                case 'nadir':
+                    updateSolarState(solarState, null, 'rise')
+                    break
+                }
+            } else {
                 break
             }
-        } else {
-            break
         }
-    }
-    // update final states
-    updateSolarState(solarState)// only sending `stateObject` makes updateSolarState() compute dawn/dusk etc
+        // update final states
+        updateSolarState(solarState)// only sending `stateObject` makes updateSolarState() compute dawn/dusk etc
+        let lastOccurredEvent
 
-    // now filter to only events of interest
-    const futureEvents = sorted.filter((e) => e && e.timeOffset >= startDate)
-    const wantedFutureEvents = []
-    for (let index = 0; index < futureEvents.length; index++) {
-        const fe = futureEvents[index]
-        if (solarEventsArr.includes(fe.event)) {
-            wantedFutureEvents.push(fe)
+        // get last occured event if included
+        if ((Math.abs(now - startDate)) <= 60000) {
+            lastOccurredEvent = getLastOccurredEvent(sorted, solarEventsArr, now)
+        }
+
+        if (lastOccurredEvent) {
+            lastType = lastOccurredEvent.event
+            lastTime = lastOccurredEvent.time
+            lastTimeOffset = lastOccurredEvent.timeOffset
+        } else {
+            const lastWeekday = getLastWeekday(daysOfWeek, now)
+            const sorted = getSolarEvents(lastWeekday, [...PERMITTED_SOLAR_EVENTS], [])
+            const lastOccurredEvent = getLastOccurredEvent(sorted, solarEventsArr, now)
+            if (lastOccurredEvent) {
+                lastType = lastOccurredEvent.event
+                lastTime = lastOccurredEvent.time
+                lastTimeOffset = lastOccurredEvent.timeOffset
+            }
+        }
+        // now filter to only future events of interest
+        const futureEvents = !getNextWeek ? sorted.filter((e) => e && e.timeOffset >= startDate) : sorted.filter((e) => e && e.timeOffset >= initialStartDate)
+        const wantedFutureEvents = []
+        const dayOfWeekNames = Object.keys(dayMapping)
+        for (let index = 0; index < futureEvents.length; index++) {
+            const fe = futureEvents[index]
+            const eventDay = fe.timeOffset.getUTCDay()
+            const eventDayName = dayOfWeekNames[eventDay]
+
+            if (solarEventsArr.includes(fe.event) && (!daysOfWeek || daysOfWeek.includes(eventDayName))) {
+                wantedFutureEvents.push(fe)
+            }
+        }
+
+        if (wantedFutureEvents[0] === undefined) {
+            startDate = new Date(startDate.getTime() + 1 * 24 * 60 * 60 * 1000)
+            getNextWeek = true
+        } else if (wantedFutureEvents[0] !== undefined) {
+            nextType = wantedFutureEvents[0].event
+            nextTime = wantedFutureEvents[0].time
+            nextTimeOffset = wantedFutureEvents[0].timeOffset
+            return {
+                solarState,
+                nextEvent: nextType,
+                nextEventTime: nextTime,
+                nextEventTimeOffset: nextTimeOffset,
+                eventTimes: wantedFutureEvents,
+                lastEvent: lastType,
+                lastEventTime: lastTime,
+                lastEventTimeOffset: lastTimeOffset
+                // allTimes: sorted,
+                // eventTimesByType: resultCategories
+            }
+        } else {
+            return {
+                solarState: {},
+                nextEvent: 'N.A.',
+                nextEventTime: 'N.A.',
+                nextEventTimeOffset: 'N.A.',
+                eventTimes: [],
+                lastEvent: lastType || 'N.A.',
+                lastEventTime: lastTime || 'N.A.',
+                lastEventTimeOffset: lastTimeOffset || 'N.A.'
+                // allTimes: sorted,
+                // eventTimesByType: resultCategories
+            }
         }
     }
-    const nextType = wantedFutureEvents[0].event
-    const nextTime = wantedFutureEvents[0].time
-    const nextTimeOffset = wantedFutureEvents[0].timeOffset
+    console.log('failed getting solar times')
+    return {
+        solarState: {},
+        nextEvent: 'N.A.',
+        nextEventTime: 'N.A.',
+        nextEventTimeOffset: 'N.A.',
+        eventTimes: []
+        // allTimes: sorted,
+        // eventTimesByType: resultCategories
+    }
     // performance.mark('End')
     // performance.measure('SecondScanEnd to End', 'SecondScanEnd', 'End')
     // performance.measure('Start to End', 'Start', 'End')
 
-    return {
-        solarState,
-        nextEvent: nextType,
-        nextEventTime: nextTime,
-        nextEventTimeOffset: nextTimeOffset,
-        eventTimes: wantedFutureEvents
-        // allTimes: sorted,
-        // eventTimesByType: resultCategories
+    function getSolarEvents (startDate, solarEventsPast, solarEventsFuture) {
+        let scanDate = new Date(startDate.toDateString()) // new Date(startDate); //scanDate = new Date(startDate.toDateString())
+        scanDate.setDate(scanDate.getDate() + 1)// fwd one day to catch times behind of scan day
+        let loopMonitor = 0
+        const result = []
+        // performance.mark('initEnd')
+        // performance.measure('Start to Now', 'Start', 'initEnd')
+        // performance.mark('FirstScanStart');
+
+        // first scan backwards to get prior solar events
+        while (loopMonitor < 3 && solarEventsPast.length) {
+            loopMonitor++
+            const timesIteration1 = SunCalc.getTimes(scanDate, lat, lng)
+            // timesIteration1 = new SolarCalc(scanDate,lat,lng);
+
+            for (let index = 0; index < solarEventsPast.length; index++) {
+                const se = solarEventsPast[index]
+                const seTime = timesIteration1[se]
+                const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
+                const localTime = formatShortDateTimeWithTZ(seTimeOffset, 'CST', false)
+                if (isValidDateObject(seTimeOffset) && seTimeOffset <= startDate) {
+                    result.push({ event: se, time: seTime, timeOffset: seTimeOffset, localTimeOffset: localTime })
+                    solarEventsPast.splice(index, 1)// remove that item
+                    index--
+                }
+            }
+            scanDate.setDate(scanDate.getDate() - 1)
+        }
+
+        scanDate = new Date(startDate.toDateString())
+        scanDate.setDate(scanDate.getDate() - 1)// back one day to catch times ahead of current day
+        loopMonitor = 0
+        // now scan forwards to get future events
+        while (loopMonitor < 183 && solarEventsFuture.length) {
+            loopMonitor++
+            const timesIteration2 = SunCalc.getTimes(scanDate, lat, lng)
+            // timesIteration2 = new SolarCalc(scanDate,lat,lng);
+            for (let index = 0; index < solarEventsFuture.length; index++) {
+                const se = solarEventsFuture[index]
+                const seTime = timesIteration2[se]
+                const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
+                const localTime = formatShortDateTimeWithTZ(seTimeOffset, 'CST', false)
+                if (isValidDateObject(seTimeOffset) && seTimeOffset > startDate) {
+                    result.push({ event: se, time: seTime, timeOffset: seTimeOffset, localTimeOffset: localTime })
+                    solarEventsFuture.splice(index, 1)// remove that item
+                    index--
+                }
+            }
+            scanDate.setDate(scanDate.getDate() + 1)
+        }
+
+        // performance.mark('SecondScanEnd');
+        // performance.measure('FirstScanEnd to SecondScanEnd', 'FirstScanEnd', 'SecondScanEnd');
+
+        // sort the results to get a timeline
+        return result.sort((a, b) => {
+            if (a.time < b.time) {
+                return -1
+            } else if (a.time > b.time) {
+                return 1
+            } else {
+                return 0
+            }
+        })
     }
 
     function updateSolarState (stateObject, state, direction, day, night,
@@ -879,11 +1363,107 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
     }
 }
 
+/**
+ * Exports a schedule object by filtering out undefined properties.
+ *
+ * @param {Object} schedule - The schedule object containing various properties.
+ * @param {string} schedule.id - The unique identifier for the schedule.
+ * @param {string} schedule.name - The name of the schedule.
+ * @param {string} schedule.topic - The topic associated with the schedule.
+ * @param {boolean} schedule.enabled - Indicates if the schedule is enabled.
+ * @param {string} schedule.scheduleType - The type of schedule.
+ * @param {string} schedule.period - The period of the schedule.
+ * @param {string} schedule.time - The time for the schedule.
+ * @param {string} schedule.endTime - The end time for the schedule.
+ * @param {number} schedule.duration - The duration of the schedule.
+ * @param {number} schedule.minutesInterval - The interval in minutes.
+ * @param {number} schedule.hourlyInterval - The interval in hours.
+ * @param {Array} schedule.days - The days the schedule is active.
+ * @param {string} schedule.month - The month the schedule is active.
+ * @param {string} schedule.solarEvent - The solar event associated with the schedule.
+ * @param {number} schedule.offset - The offset for the solar event.
+ * @param {string} schedule.solarEventStart - The start of the solar event.
+ * @param {string} schedule.solarEventTimespanTime - The timespan for the solar event.
+ * @param {string} schedule.startCronExpression - The cron expression for the start.
+ * @param {string} schedule.primaryTaskId - The primary task identifier.
+ * @param {string} schedule.endTaskId - The end task identifier.
+ * @param {string} schedule.payloadType - The type of payload.
+ * @param {string} schedule.payloadValue - The value of the payload.
+ * @param {string} schedule.endPayloadValue - The value of the end payload.
+ * @param {boolean} schedule.isDynamic - Indicates if the schedule is dynamic.
+ * @param {boolean} schedule.isStatic - Indicates if the schedule is static.
+ * @returns {Object} A new object containing only the defined properties of the schedule.
+ */
 function exportSchedule (schedule) {
-    const { active, nextDate, nextDescription, nextUTC, nextEndDate, nextEndDescription, nextEndUTC, currentStartTime, nextDates, ...rest } = schedule
-    return { ...rest }
+    const {
+        id,
+        name,
+        topic,
+        enabled,
+        scheduleType,
+        period,
+        time,
+        endTime,
+        duration,
+        timespan,
+        minutesInterval,
+        hourlyInterval,
+        days,
+        month,
+        solarEvent,
+        offset,
+        solarEventStart,
+        solarEventTimespanTime,
+        startCronExpression,
+        primaryTaskId,
+        endTaskId,
+        payloadType,
+        payloadValue,
+        endPayloadValue,
+        isDynamic,
+        isStatic
+    } = schedule
+
+    // Create the result object and filter out undefined properties
+    return Object.fromEntries(
+        Object.entries({
+            id,
+            name,
+            topic,
+            enabled,
+            scheduleType,
+            period,
+            time,
+            endTime,
+            duration,
+            timespan,
+            minutesInterval,
+            hourlyInterval,
+            days,
+            month,
+            solarEvent,
+            offset,
+            solarEventStart,
+            solarEventTimespanTime,
+            startCronExpression,
+            primaryTaskId,
+            endTaskId,
+            payloadType,
+            payloadValue,
+            endPayloadValue,
+            isDynamic,
+            isStatic
+        }).filter(([_, value]) => value !== undefined)
+    )
 }
 
+/**
+ * Exports a task object with selected properties and optional status information.
+ *
+ * @param {Object} task - The task object containing various properties.
+ * @param {boolean} includeStatus - Flag indicating whether to include status-related properties.
+ * @returns {Object} An object containing the exported task properties.
+ */
 function exportTask (task, includeStatus) {
     const o = {
         topic: task.node_topic || task.name,
@@ -905,6 +1485,9 @@ function exportTask (task, includeStatus) {
         o.solarEvents = task.node_solarEvents
         o.location = task.node_location
         o.offset = task.node_offset
+        if (task.node_opt?.solarDays) {
+            o.solarDays = task.node_opt.solarDays
+        }
     } else {
         o.expression = task.node_expression
     }
@@ -924,21 +1507,35 @@ function isTaskFinished (_task) {
     return _task.node_limit ? _task.node_count >= _task.node_limit : false
 }
 
+/**
+ * Retrieves the status of a given task, including its scheduling details and execution state.
+ *
+ * @param {Object} node - The node object containing default location and time zone settings.
+ * @param {Object} task - The task object with scheduling expressions and options.
+ * @param {Object} opts - Additional options for task evaluation.
+ * @param {boolean} [getNextDates=false] - Flag to determine if future dates should be included in the result.
+ * @returns {Object} An object containing task status, including descriptions, dates, time zones, and solar event details if applicable.
+ */
 function getTaskStatus (node, task, opts, getNextDates = false) {
     opts = opts || {}
     opts.locationType = node.defaultLocationType
     opts.defaultLocation = node.defaultLocation
     opts.defaultLocationType = node.defaultLocationType
+    opts.solarDays = task.node_opt?.solarDays || null
     const sol = task.node_expressionType === 'solar'
     const exp = sol ? task.node_location : task.node_expression
     const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, null, opts, node.use24HourFormat)
     let nextDescription = null
     let nextDate = null
+    let lastDescription = null
+    let lastDate = null
     const running = !isTaskFinished(task)
     if (running) {
         // nextDescription = h.nextDescription;
         nextDescription = h.prettyNext
         nextDate = sol ? h.nextEventTimeOffset : h.nextDate
+        lastDescription = h.prettyPrevious
+        lastDate = sol ? h.lastEventTimeOffset : h.previousDate
     }
     let tz = node.timeZone
     let localTZ = ''
@@ -955,8 +1552,11 @@ function getTaskStatus (node, task, opts, getNextDates = false) {
         count: task.node_count,
         limit: task.node_limit,
         nextDescription,
+        lastDescription,
         nextDate: running ? nextDate : null,
         nextDateTZ: running ? formatShortDateTimeWithTZ(nextDate, tz, node.use24HourFormat) : null,
+        lastDate,
+        lastDateTZ: lastDate ? formatShortDateTimeWithTZ(lastDate, tz, node.use24HourFormat) : null,
         timeZone: tz,
         serverTime: new Date(),
         serverTimeZone: localTZ,
@@ -964,6 +1564,12 @@ function getTaskStatus (node, task, opts, getNextDates = false) {
     }
     if (getNextDates && h.nextDates && h.nextDates.length) {
         r.nextDates = h.nextDates.map(dateString => {
+            const date = new Date(dateString)
+            return formatShortDateTimeWithTZ(date, node.timeZone, node.use24HourFormat)
+        })
+    }
+    if (getNextDates && h.prevDates && h.prevDates.length) {
+        r.lastDates = h.prevDates.map(dateString => {
             const date = new Date(dateString)
             return formatShortDateTimeWithTZ(date, node.timeZone, node.use24HourFormat)
         })
@@ -977,40 +1583,175 @@ function getTaskStatus (node, task, opts, getNextDates = false) {
     return r
 }
 
-function getNextStatus (node, task, getNextDates = false) {
-    if (task && task.isRunning) {
-        const status = getTaskStatus(node, task, { includeSolarStateOffset: true }, getNextDates)
-        const nextDate = status.nextDateTZ
-        const nextUTC = status.nextDate
-        let nextDescription = status.nextDescription
-        const nextDates = status.nextDates
-
-        if (!nextDescription) {
-            const result = { nextDate, nextDescription: 'Never', nextUTC, nextDates }
-            return result
+/**
+ * Updates the schedule's next status by evaluating the tasks' current state and calculating
+ * the duration between primary and end tasks if applicable. It processes solar events and
+ * formats descriptions for tasks based on their expression type. If the schedule is disabled,
+ * it resets the task status to default values.
+ *
+ * @param {Object} node - The node object containing default settings and configurations.
+ * @param {Object} schedule - The schedule object containing tasks and their statuses.
+ * @param {boolean} [getNextDates=true] - Flag to determine if next dates should be retrieved.
+ * @returns {Object} The updated schedule with recalculated task statuses and durations.
+ */
+function updateScheduleNextStatus (node, schedule, getNextDates = true) {
+    const calculateDuration = (start, end) => {
+        if (start && end) {
+            return new Date(end) - new Date(start) // duration in milliseconds
         }
+        return 0
+    }
+
+    const updateTaskStatus = (taskObj) => {
+        const task = taskObj.task
+        const status = getTaskStatus(node, task, { includeSolarStateOffset: true }, getNextDates)
+        const { nextDateTZ: nextLocal, nextDate, lastDateTZ: lastLocal, lastDate, nextDescription, nextDates, lastDescription, lastDates, description } = status
+
+        let finalNextDescription = nextDescription || 'Never'
+        let finalLastDescription = lastDescription || 'Never'
 
         if (task.node_expressionType === 'solar') {
-            const words = nextDescription.split(' ')
+            const mapDescription = (description) => description.split(' ').map(word => PERMITTED_SOLAR_EVENTS.includes(word) ? mapSolarEvent(word) : word).join(' ')
 
-            for (let i = 0; i < words.length; i++) {
-                if (PERMITTED_SOLAR_EVENTS.includes(words[i])) {
-                    words[i] = mapSolarEvent(words[i])
-                }
-            }
-
-            nextDescription = words.join(' ')
+            finalNextDescription = mapDescription(finalNextDescription)
+            finalLastDescription = mapDescription(finalLastDescription)
         }
 
-        const result = { nextDate, nextDescription, nextUTC, nextDates }
-        return result
-    } else {
-        const result = { nextDate: 'Never', nextDescription: 'Never', nextUTC: null, nextDates: [] }
-        return result
+        return { task, description, nextLocal, nextDescription: finalNextDescription, nextDate, nextDates, lastLocal, lastDescription: finalLastDescription, lastDate, lastDates }
     }
+
+    if (schedule && schedule.enabled) {
+        const primaryTaskStatus = schedule.primaryTask?.task ? updateTaskStatus(schedule.primaryTask) : null
+        const endTaskStatus = schedule.endTask?.task ? updateTaskStatus(schedule.endTask) : null
+        let calculatedDuration = null
+        let calculatedDurationPretty = null
+
+        if (primaryTaskStatus && endTaskStatus) {
+            const startUTC = (new Date(primaryTaskStatus.nextDate) >= new Date(endTaskStatus.nextDate))
+                ? primaryTaskStatus.lastDate
+                : primaryTaskStatus.nextDate
+
+            calculatedDuration = calculateDuration(startUTC, endTaskStatus.nextDate)
+            calculatedDurationPretty = prettyMs(calculatedDuration, { secondsDecimalDigits: 0, verbose: true })
+            schedule.calculatedDuration = calculatedDuration
+            schedule.calculatedDurationPretty = calculatedDurationPretty
+        }
+
+        if (primaryTaskStatus) {
+            schedule.primaryTask = { ...schedule.primaryTask, ...primaryTaskStatus }
+        }
+
+        if (endTaskStatus) {
+            schedule.endTask = { ...schedule.endTask, ...endTaskStatus }
+        }
+    } else {
+        const resetTask = (task) => ({
+            ...task,
+            nextLocal: null,
+            nextDescription: 'Never',
+            nextDate: null,
+            nextDates: [],
+            lastLocal: null,
+            lastDate: null,
+            lastDescription: 'Never',
+            lastDates: []
+        })
+
+        schedule.primaryTask = resetTask(schedule.primaryTask)
+        schedule.endTask = resetTask(schedule.endTask)
+    }
+
+    return schedule
 }
 
-let sendStateTask
+function getScheduleStatus (node, schedule, getNextDates = true) {
+    const calculateDuration = (start, end) => {
+        if (start && end) {
+            return new Date(end) - new Date(start) // duration in milliseconds
+        }
+        return 0
+    }
+
+    const updateTaskStatus = (taskObj) => {
+        const task = taskObj.task
+        const status = getTaskStatus(node, task, { includeSolarStateOffset: true }, getNextDates)
+        const { nextDateTZ: nextLocal, nextDate, lastDateTZ: lastLocal, lastDate, nextDescription, nextDates, lastDescription, lastDates, description } = status
+
+        let finalNextDescription = nextDescription || 'Never'
+        let finalLastDescription = lastDescription || 'Never'
+
+        if (task.node_expressionType === 'solar') {
+            const mapDescription = (description) => description.split(' ').map(word => PERMITTED_SOLAR_EVENTS.includes(word) ? mapSolarEvent(word) : word).join(' ')
+
+            finalNextDescription = mapDescription(finalNextDescription)
+            finalLastDescription = mapDescription(finalLastDescription)
+        }
+
+        return { description, nextLocal, nextDescription: finalNextDescription, nextDate, nextDates, lastLocal, lastDescription: finalLastDescription, lastDate, lastDates }
+    }
+
+    const resetTask = (task) => ({
+        description: '',
+        nextLocal: null,
+        nextDescription: 'Never',
+        nextDate: null,
+        nextDates: [],
+        lastLocal: null,
+        lastDescription: 'Never',
+        lastDate: null,
+        lastDates: []
+    })
+
+    if (schedule && schedule.enabled) {
+        const primaryTaskStatus = schedule.primaryTask?.task ? updateTaskStatus(schedule.primaryTask) : resetTask(schedule.primaryTask)
+        const endTaskStatus = schedule.endTask?.task ? updateTaskStatus(schedule.endTask) : resetTask(schedule.endTask)
+        let calculatedDuration = null
+        let calculatedDurationPretty = null
+
+        if (primaryTaskStatus && endTaskStatus && primaryTaskStatus.nextDate && endTaskStatus.nextDate) {
+            const startUTC = (new Date(primaryTaskStatus.nextDate) >= new Date(endTaskStatus.nextDate))
+                ? primaryTaskStatus.lastDate
+                : primaryTaskStatus.nextDate
+
+            calculatedDuration = calculateDuration(startUTC, endTaskStatus.nextDate)
+            calculatedDurationPretty = prettyMs(calculatedDuration, { secondsDecimalDigits: 0, verbose: true })
+        }
+
+        return {
+            name: schedule.name,
+            enabled: schedule.enabled,
+            primaryTask: primaryTaskStatus,
+            endTask: endTaskStatus,
+            ...(calculatedDuration !== null && { calculatedDuration }),
+            ...(calculatedDurationPretty !== null && { calculatedDurationPretty }),
+            description: schedule.description,
+            ...(schedule.active !== null && { active: schedule.active }),
+            ...(schedule.currentStartTime !== null && { currentStartTime: schedule.currentStartTime }),
+            count: 0,
+            limit: 0,
+            timeZone: node.timeZone || 'UTC',
+            serverTime: new Date(),
+            serverTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+        }
+    }
+
+    return {
+        name: schedule.name,
+        enabled: false,
+        primaryTask: resetTask(schedule.primaryTask),
+        endTask: resetTask(schedule.endTask),
+        calculatedDuration: null,
+        calculatedDurationPretty: null,
+        description: schedule.description,
+        active: false,
+        currentStartTime: null,
+        count: 0,
+        limit: 0,
+        timeZone: node.timeZone || 'UTC',
+        serverTime: new Date(),
+        serverTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    }
+}
 
 let userDir = ''
 let persistPath = ''
@@ -1071,6 +1812,14 @@ module.exports = function (RED) {
         node.queuedSerialisationRequest = null
         node.serialisationRequestBusy = null
         node.postponeSerialisation = true
+        checkForUpdate(version, packageName, (result) => {
+            if (result) {
+                const m = { payload: { updateResult: { ...result } } }
+                base.emit('msg-input:' + node.id, m, node)
+            } else {
+                console.log('Failed to check for updates.')
+            }
+        })
 
         setInterval(async function () {
             if (node.serialisationRequestBusy) return
@@ -1131,16 +1880,12 @@ module.exports = function (RED) {
             set(msg, field, value)
         }
         const updateNodeNextInfo = (node, now) => {
-            const t = getNextTask(node.tasks)
-            if (t) {
-                const indicator = t.isDynamic ? 'ring' : 'dot'
-                const nx = (t._expression || t._sequence)
-                node.nextDate = nx.nextDate(now)
-                node.nextEvent = t.name
+            const { schedule, type } = getNextScheduleTask(node)
+            if (schedule && type) {
+                const indicator = schedule?.isStatic ? 'ring' : 'dot'
+                node.nextDate = type === 'primary' ? schedule?.primaryTask?.nextDate : schedule?.endTask?.nextDate
+                node.nextEvent = `${schedule.name}-${type === 'primary' ? 'Start' : 'End'}`
                 node.nextIndicator = indicator
-                if (t.node_solarEventTimes && t.node_solarEventTimes.nextEvent) {
-                    node.nextEvent = t.node_solarEventTimes.nextEvent
-                }
             } else {
                 node.nextDate = null
                 node.nextEvent = ''
@@ -1153,17 +1898,59 @@ module.exports = function (RED) {
             const description = _describeExpression(
                 cmd.location, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset,
                 cmd.solarType, cmd.solarEvents, cmd.time, cmd, node.use24HourFormat
-            ).description
-            const words = description.replace(/['"]/g, '').replace(',', '').split(' ')
-            for (let i = 0; i < words.length; i++) {
-                if (PERMITTED_SOLAR_EVENTS.includes(words[i])) {
-                    words[i] = mapSolarEvent(words[i])
-                    if (i < words.length - 1) {
-                        words[i] += ', '
-                    }
-                }
+            )
+
+            return description
+        }
+
+        function generateDescription (node, cmd) {
+            // applyOptionDefaults(node, cmd) // Ensuring defaults are applied
+            const description = _describeExpression(
+                cmd.expression,
+                cmd.expressionType,
+                cmd.timeZone || node.timeZone,
+                cmd.offset,
+                cmd.solarType,
+                cmd.solarEvents,
+                cmd.time,
+                cmd,
+                node.use24HourFormat
+            )
+
+            return description
+        }
+
+        /**
+         * Generates a description of a time interval in minutes or hours.
+         *
+         * This function calculates a grammatically correct phrase representing
+         * the interval from the current time to a future time, based on the
+         * specified interval and unit. It uses the `formatDistanceStrict` function
+         * from the date-fns library to ensure accuracy.
+         *
+         * @param {number} interval - The positive number of units to add to the current time.
+         * @param {string} unit - The unit of time, either 'minute' or 'hour'.
+         * @returns {string} A string describing the interval, e.g., "Every 5 minutes".
+         * @throws {Error} Throws an error if the interval is not positive or if the unit is invalid.
+         */
+        function generateIntervalDescription (interval, unit) {
+            if (interval <= 0) {
+                throw new Error('Interval must be a positive number.')
             }
-            return words.join('')
+            if (unit !== 'minute' && unit !== 'hour') {
+                throw new Error('Unit must be either "minute" or "hour".')
+            }
+
+            // Use date-fns to compute a grammatically correct phrase
+            const now = new Date()
+            const futureDate = unit === 'minute'
+                ? new Date(now.getTime() + interval * 60 * 1000) // Add minutes
+                : new Date(now.getTime() + interval * 60 * 60 * 1000) // Add hours
+
+            const description = formatDistanceStrict(now, futureDate, { unit, addSuffix: false })
+
+            // Return the interval description
+            return `Every ${description}`
         }
 
         // Need to improve this to handle more schedule types
@@ -1305,12 +2092,59 @@ module.exports = function (RED) {
                     scheduleType: 'solar',
                     solarEvent: task.node_solarEvents,
                     offset: task.node_offset,
-                    description: generateSolarDescription(node, task.node_opt),
+                    description: generateSolarDescription(node, task.node_opt).description,
                     ...(task.isStatic && { isStatic: true }) // Conditionally add isStatic
                 }
                 return schedule
             }
             return null
+        }
+
+        function generateScheduleObjectFromNodeOption (node, opt) {
+            const convertStringBoolean = (value) => {
+                if (value === 'true' || value === true) {
+                    return true
+                } else if (value === 'false' || value === false) {
+                    return false
+                }
+                return value
+            }
+            const commonSchedule = {
+                id: opt.id || RED.util.generateId(),
+                name: opt.name,
+                enabled: opt.enabled !== undefined ? opt.enabled : true,
+                topic: opt.topic,
+                payloadValue: convertStringBoolean(opt.payload),
+                payloadType: opt.payloadType,
+                isStatic: true
+            }
+
+            switch (opt.expressionType) {
+            case 'cron':
+                return {
+                    ...commonSchedule,
+                    scheduleType: 'cron',
+                    startCronExpression: opt.expression,
+                    description: generateDescription(node, opt).description
+                }
+            case 'solar':
+                return {
+                    ...commonSchedule,
+                    scheduleType: 'solar',
+                    solarEvent: opt.solarEvents,
+                    offset: opt.offset,
+                    description: generateSolarDescription(node, opt).description
+                }
+            case 'dates':
+                return {
+                    ...commonSchedule,
+                    scheduleType: 'dates',
+                    expression: opt.expression,
+                    description: generateDescription(node, opt).description
+                }
+            default:
+                return null
+            }
         }
 
         const updateDoneStatus = (node, task) => {
@@ -1333,24 +2167,24 @@ module.exports = function (RED) {
             }
         }
         const sendMsg = async (node, task, cronTimestamp, manualTrigger, intervalTrigger = false) => {
+            const schedule = getScheduleById(node, task.scheduleId)
             const msg = { scheduler: {} }
-            msg.topic = task.node_topic
+            msg.topic = schedule.topic || task.node_topic
             msg.scheduler.triggerTimestamp = cronTimestamp
             const se = task.node_expressionType === 'solar' ? node.nextEvent : ''
-            msg.scheduler.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
+            msg.scheduler.status = getScheduleStatus(node, schedule, true)
             if (se) msg.scheduler.status.solarEvent = se
-            msg.scheduler.config = exportTask(task)
+            msg.scheduler.config = exportSchedule(schedule)
             if (manualTrigger) msg.manualTrigger = true
             if (intervalTrigger) msg.intervalTrigger = true
             msg.scheduledEvent = !msg.manualTrigger
             const taskType = task.isDynamic ? 'dynamic' : 'static'
 
-            // const index = task.node_index || 0
-            const index = node.topics.findIndex(topic => topic === task.node_topic)
+            const index = node.topics.findIndex(topic => topic === schedule.topic || task.node_topic)
 
             if (index === -1) {
                 // Handle the case where the topic is not found
-                node.error(`Topic "${task.node_topic}" not found for ${task.name}`)
+                node.error(`Topic "${schedule.topic || task.node_topic}" not found for ${schedule.name || task.name}`)
             }
 
             if (!intervalTrigger) {
@@ -1393,7 +2227,58 @@ module.exports = function (RED) {
             }
         }
 
+        /**
+         * Sends messages for active or inactive tasks based on the provided topics and node schedules.
+         *
+         * @param {Object} node - The node object containing schedules and configuration for message sending.
+         * @param {number} timestamp - The timestamp to include in the message.
+         * @param {Array} [topics=[]] - An optional array of topics to filter which tasks to process.
+         *
+         * Iterates through the node's schedules to determine active and inactive tasks for the specified topics.
+         * Sends messages for tasks that are currently running and match the active state configuration of the node.
+         */
+        function sendTopicMsg (node, timestamp, topics = []) {
+            const schedules = node.schedules || []
+            const topicTasks = {}
+
+            // Iterate through schedules to collect topics and tasks
+            schedules.forEach((schedule) => {
+                if (schedule && (schedule.timespan !== false)) {
+                    const isActive = schedule.active
+                    let task = null
+
+                    if (topics.includes(schedule.topic) || topics.length === 0) {
+                        if (isActive && (!topicTasks[schedule.topic] || !topicTasks[schedule.topic].active)) {
+                            task = schedule.primaryTask?.task
+                            if (task && task.isRunning) {
+                                topicTasks[schedule.topic] = { task, active: true }
+                            }
+                        } else if (!isActive && !topicTasks[schedule.topic]) {
+                            task = schedule.endTask?.task
+                            if (task && task.isRunning) {
+                                topicTasks[schedule.topic] = { task, active: false }
+                            }
+                        }
+                    }
+                }
+            })
+
+            // Iterate through topics to send messages
+            Object.keys(topicTasks).forEach((topic) => {
+                const taskData = topicTasks[topic]
+                if (taskData) {
+                    const { task, active } = taskData
+                    if (active && node.sendActiveState) {
+                        sendMsg(node, task, timestamp, false, true)
+                    } else if (!active && node.sendInactiveState) {
+                        sendMsg(node, task, timestamp, false, true)
+                    }
+                }
+            })
+        }
+
         (async function () {
+            let sendStateTask = null
             try {
                 node.status({})
                 node.nextDate = null
@@ -1404,12 +2289,48 @@ module.exports = function (RED) {
                 }
 
                 node.tasks = []
+                node.schedules = []
+                const schedules = node.schedules
                 base.stores.state.set(base, node, null, 'schedules', [])
+                const cmds = []
                 for (let iOpt = 0; iOpt < node.options.length; iOpt++) {
                     const opt = node.options[iOpt]
-                    opt.name = opt.name || opt.topic
-                    node.statusUpdatePending = true// prevent unnecessary status updates while loading
-                    await createTask(node, opt, iOpt, true)
+                    const schedule = generateScheduleObjectFromNodeOption(node, opt)
+                    schedule.timespan = false
+                    const cmd = generateTaskCmd(schedule)
+                    if (cmd) {
+                        if (cmd.primary) {
+                            schedule.primaryTaskId = cmd.id
+                        }
+                        cmds.push(cmd)
+                    }
+
+                    const nodeSchedule = getSchedule(node, schedule.id)
+                    if (nodeSchedule) {
+                        node.schedules[node.schedules.indexOf(nodeSchedule)] = schedule
+                    } else {
+                        node.schedules.push(schedule)
+                    }
+                    node.statusUpdatePending = true
+                }
+
+                if (cmds.length > 0) {
+                    try {
+                        await updateTask(node, cmds, null)
+
+                        // get status
+                        schedules.forEach(msgSchedule => {
+                            let schedule = getSchedule(node, msgSchedule.id)
+
+                            if (schedule) {
+                                schedule = updateScheduleNextStatus(node, schedule, false)
+                            } else {
+                                console.log('Schedule not found in schedules')
+                            }
+                        })
+                    } catch (error) {
+                        console.error(error)
+                    }
                 }
 
                 // now load dynamic schedules from file
@@ -1425,59 +2346,27 @@ module.exports = function (RED) {
                         _deleteTask(sendStateTask)
                     }
                     sendStateTask = new cronosjs.CronosTask(expression)
-                    sendStateTask.name = 'sendStateTask'
                     sendStateTask
                         .on('run', (timestamp) => {
-                            const schedules = base.stores.state.getProperty(node.id, 'schedules') || []
-                            const topicTasks = {}
-
-                            // Iterate through schedules to collect topics and tasks
-                            schedules.forEach((schedule) => {
-                                if (schedule && (schedule.hasEndTime || schedule.hasDuration)) {
-                                    const isActive = schedule.active
-                                    let task = null
-
-                                    if (isActive && (!topicTasks[schedule.topic] || !topicTasks[schedule.topic].active)) {
-                                        let scheduleName = schedule.name
-                                        if (schedule.solarEventStart === false) {
-                                            scheduleName = `${schedule.name}_end_sched_type`
-                                        }
-                                        task = getTask(node, scheduleName)
-                                        if (task && task.isRunning) {
-                                            topicTasks[schedule.topic] = { task, active: true }
-                                        }
-                                    } else if (!isActive && !topicTasks[schedule.topic]) {
-                                        let scheduleName = `${schedule.name}_end_sched_type`
-                                        if (schedule.solarEventStart === false) {
-                                            scheduleName = schedule.name
-                                        }
-                                        task = getTask(node, scheduleName)
-                                        if (task && task.isRunning) {
-                                            topicTasks[schedule.topic] = { task, active: false }
-                                        }
-                                    }
-                                }
-                            })
-
-                            // Iterate through topics to send messages
-                            Object.keys(topicTasks).forEach((topic) => {
-                                const taskData = topicTasks[topic]
-                                if (taskData) {
-                                    const { task, active } = taskData
-                                    if (active && node.sendActiveState) {
-                                        sendMsg(node, task, timestamp, false, true)
-                                    } else if (!active && node.sendInactiveState) {
-                                        sendMsg(node, task, timestamp, false, true)
-                                    }
-                                }
-                            })
+                            sendTopicMsg(node, timestamp)
                         })
                         .start()
                 }
+
+                // send initial status
+                sendTopicMsg(node, Date.now())
+
+                const data = { ...config }
+                data.schedules = getUiSchedules(node)
+                data.id = node.id
+                data.version = version
+                data.timeZone = config.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone
+                analytics(data, 'AKfycbyl1LXSmMQlJRXZ9cDt9PeeUUS34QeYHD2MdGDaw_X-4aXOlH3UCeYMXeBzO0HKN8wt')
                 node.postponeSerialisation = false
             } catch (err) {
-                if (node.tasks) {
-                    node.tasks.forEach(task => task.stop())
+                if (node.schedules) {
+                    const tasks = getTasks(node)
+                    tasks.forEach(task => task.stop())
                 }
                 node.status({ fill: 'red', shape: 'dot', text: 'Error creating schedule' })
                 node.error(err)
@@ -1485,13 +2374,13 @@ module.exports = function (RED) {
         })()
 
         node.on('close', async function (done) {
-            try {
-                await serialise()
-            } catch (error) {
-                node.error(error)
-            }
+            // try {
+            //     await serialise()
+            // } catch (error) {
+            //     node.error(error)
+            // }
             node.postponeSerialisation = true
-            deleteAllTasks(this)
+            deleteAllTasksFromSchedules(this)
             if (clockMonitor) clearInterval(clockMonitor)
             if (done && typeof done === 'function') done()
         })
@@ -1505,9 +2394,9 @@ module.exports = function (RED) {
             }
             // is this an button press?...
             if (!msg.payload && !msg.topic) { // TODO: better method of differentiating between bad input and button press
-                await sendMsg(node, node.tasks[0], Date.now(), true)
-                done()
-                return
+                // await sendMsg(node, node.tasks[0], Date.now(), true)
+                // done()
+                // return
             }
 
             const controlTopic = controlTopics.find(ct => ct.command === msg.topic)
@@ -1525,7 +2414,8 @@ module.exports = function (RED) {
                     }
                 } else {
                     payload = {
-                        command: controlTopic.command
+                        command: controlTopic.command,
+                        ...payload
                     }
                 }
             }
@@ -1551,6 +2441,7 @@ module.exports = function (RED) {
                     const cmdAll = action.endsWith('-all')
                     const cmdAllStatic = action.endsWith('-all-static')
                     const cmdAllDynamic = action.endsWith('-all-dynamic')
+                    const cmdTopic = action.endsWith('-topic')
                     const cmdActive = action.endsWith('-active')
                     const cmdInactive = action.endsWith('-inactive')
                     const cmdActiveDynamic = action.includes('-active-dynamic')
@@ -1564,39 +2455,59 @@ module.exports = function (RED) {
                     if (actionParts.length > 1) mainAction += '-'
 
                     if (cmdAllDynamic) {
-                        cmdFilter = 'dynamic'
+                        cmdFilter = {}
+                        cmdFilter.type = 'dynamic'
                     } else if (cmdAllStatic) {
-                        cmdFilter = 'static'
+                        cmdFilter = {}
+                        cmdFilter.type = 'static'
+                    } else if (cmdTopic) {
+                        cmdFilter = {}
+                        cmdFilter.type = 'topic'
                     } else if (cmdActive) {
-                        cmdFilter = 'active'
+                        cmdFilter = {}
+                        cmdFilter.type = 'active'
                     } else if (cmdInactive) {
-                        cmdFilter = 'inactive'
+                        cmdFilter = {}
+                        cmdFilter.type = 'inactive'
                     } else if (cmdActiveDynamic) {
-                        cmdFilter = 'active-dynamic'
+                        cmdFilter = {}
+                        cmdFilter.type = 'active-dynamic'
                     } else if (cmdActiveStatic) {
-                        cmdFilter = 'active-static'
+                        cmdFilter = {}
+                        cmdFilter.type = 'active-static'
                     } else if (cmdInactiveDynamic) {
-                        cmdFilter = 'inactive-dynamic'
+                        cmdFilter = {}
+                        cmdFilter.type = 'inactive-dynamic'
                     } else if (cmdInactiveStatic) {
-                        cmdFilter = 'inactive-static'
+                        cmdFilter = {}
+                        cmdFilter.type = 'inactive-static'
+                    }
+                    if (cmd.topic && cmd.topic !== '') {
+                        if (!cmdFilter) cmdFilter = {}
+                        cmdFilter.topic = cmd.topic
                     }
 
                     switch (mainAction) {
                     case 'trigger': // single
                         {
-                            const tt = getTask(node, cmd.name)
-                            if (!tt) throw new Error(`Manual Trigger failed. Cannot find schedule named '${cmd.name}'`)
-                            sendMsg(node, tt, Date.now(), true)
+                            const schedule = getScheduleByName(node, cmd.name)
+                            if (!schedule) throw new Error(`Manual Trigger failed. Cannot find schedule named '${cmd.name}'`)
+                            const primaryTask = schedule?.primaryTask?.task
+                            if (primaryTask) {
+                                sendMsg(node, primaryTask, Date.now(), true)
+                            }
                         }
                         break
                     case 'trigger-': // multiple
-                        if (node.tasks) {
-                            for (let index = 0; index < node.tasks.length; index++) {
-                                const task = node.tasks[index]
-                                if (task && (cmdAll || taskFilterMatch(task, cmdFilter))) {
-                                    sendMsg(node, task, Date.now(), true)
+                        if (node.schedules) {
+                            node.schedules.forEach(schedule => {
+                                if (schedule && (cmdAll || scheduleFilterMatch(schedule, cmdFilter))) {
+                                    const primaryTask = schedule?.primaryTask?.task
+                                    if (primaryTask) {
+                                        sendMsg(node, primaryTask, Date.now(), true)
+                                    }
                                 }
-                            }
+                            })
                         }
                         break
                     case 'describe': // single
@@ -1609,10 +2520,10 @@ module.exports = function (RED) {
                         break
                     case 'status': // single
                         {
-                            const task = getTask(node, cmd.name)
-                            if (task) {
-                                newMsg.payload.result.config = exportTask(task, true)
-                                newMsg.payload.result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                            const schedule = getScheduleByName(node, cmd.name)
+                            if (schedule) {
+                                newMsg.payload.result.config = exportSchedule(schedule)
+                                newMsg.payload.result.status = getScheduleStatus(node, schedule, true)
                             } else {
                                 newMsg.error = `${cmd.name} not found`
                             }
@@ -1622,29 +2533,31 @@ module.exports = function (RED) {
                         break
                     case 'export': // single
                         {
-                            const task = getTask(node, cmd.name)
-                            if (task) {
-                                newMsg.payload.result = exportTask(task, false)
+                            const schedule = getScheduleByName(node, cmd.name)
+                            if (schedule) {
+                                newMsg.payload.result.config = exportSchedule(schedule)
                             } else {
                                 newMsg.error = `${cmd.name} not found`
                             }
                             sendCommandResponse(newMsg)
                         }
                         break
+                    case 'refresh':
+                        await refreshTasks(node)
+                        break
                     case 'list-': // multiple
                     case 'status-': // multiple
                         {
                             const results = []
-                            if (node.tasks) {
-                                for (let index = 0; index < node.tasks.length; index++) {
-                                    const task = node.tasks[index]
-                                    if (task && (cmdAll || taskFilterMatch(task, cmdFilter))) {
+                            if (node.schedules) {
+                                node.schedules.forEach(schedule => {
+                                    if (schedule && (cmdAll || scheduleFilterMatch(schedule, cmdFilter))) {
                                         const result = {}
-                                        result.config = exportTask(task, true)
-                                        result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                                        result.config = exportSchedule(schedule)
+                                        result.status = getScheduleStatus(node, schedule, true)
                                         results.push(result)
                                     }
-                                }
+                                })
                             }
                             newMsg.payload.result = results
                             sendCommandResponse(newMsg)
@@ -1653,13 +2566,12 @@ module.exports = function (RED) {
                     case 'export-': // multiple
                         {
                             const results = []
-                            if (node.tasks) {
-                                for (let index = 0; index < node.tasks.length; index++) {
-                                    const task = node.tasks[index]
-                                    if (cmdAll || taskFilterMatch(task, cmdFilter)) {
-                                        results.push(exportTask(task, false))
+                            if (node.schedules) {
+                                node.schedules.forEach(schedule => {
+                                    if (schedule && (cmdAll || scheduleFilterMatch(schedule, cmdFilter))) {
+                                        results.push(exportSchedule(schedule))
                                     }
-                                }
+                                })
                             }
                             newMsg.payload.result = results
                             sendCommandResponse(newMsg)
@@ -1674,105 +2586,137 @@ module.exports = function (RED) {
                     case 'clear':
                     case 'remove-': // multiple
                     case 'delete-': // multiple
-                        deleteAllTasks(node, cmdFilter)
+                        deleteAllSchedules(node, cmdFilter)
                         updateNextStatus(node, true)
                         requestSerialisation()// update persistence
                         break
                     case 'remove': // single
                     case 'delete': // single
-                        deleteTask(node, cmd.name)
+                        deleteSchedule(node, cmd.name)
                         updateNextStatus(node, true)
                         requestSerialisation()// update persistence
                         break
                     case 'start': // single
-                        startTask(node, cmd.name)
+                        startSchedule(node, getScheduleId(node, cmd.name))
                         updateNextStatus(node, true)
                         requestSerialisation()// update persistence
                         break
                     case 'start-': // multiple
-                        startAllTasks(node, cmdFilter)
+                        startAllSchedules(node, cmdFilter)
                         updateNextStatus(node, true)
                         requestSerialisation()// update persistence
                         break
                     case 'stop': // single
                     case 'pause': // single
-                        stopTask(node, cmd.name, cmd.command === 'stop')
+                        stopSchedule(node, getScheduleId(node, cmd.name), cmd.command === 'stop')
                         updateNextStatus(node, true)
                         requestSerialisation()// update persistence
                         break
                     case 'stop-': // multiple
                     case 'pause-': {
                         const resetCounter = cmd.command.startsWith('stop-')
-                        stopAllTasks(node, resetCounter, cmdFilter)
+                        stopAllSchedules(node, resetCounter, cmdFilter)
                         updateNextStatus(node, true)
                         requestSerialisation()// update persistence
                     }
                         break
                     case 'next':
-                        if (node.tasks && node.tasks.length) {
-                            // gather statuses
-                            const statuses = []
-                            for (let index = 0; index < node.tasks.length; index++) {
-                                const task = node.tasks[index]
-                                const result = {}
-                                result.config = exportTask(task, true)
-                                result.status = getTaskStatus(node, task, { includeSolarStateOffset: true })
-                                statuses.push(result)
-                            }
-                            const next = statuses.length && statuses.reduce((a, b) => a.status.nextDate < b.status.nextDate ? a : b)
-                            if (next) {
-                                newMsg.payload = {
-                                    name: next.config.name,
-                                    topic: next.config.topic,
-                                    next: next.status.nextDate,
-                                    nextLocal: next.status.nextDateTZ,
-                                    timeZone: next.status.serverTimeZone,
-                                    when: next.status.description,
-                                    msUntil: next.status.nextDate.valueOf() - next.status.serverTime.valueOf(),
-                                    description: next.status.nextDescription
+                        newMsg.payload = null
+                        if (node.schedules && node.schedules.length) {
+                            const nextTask = getNextScheduleTask(node)
+                            if (nextTask) {
+                                const primary = nextTask.type === 'primary'
+                                const schedule = nextTask.schedule
+                                const status = getScheduleStatus(node, schedule, false)
+                                if (status) {
+                                    newMsg.payload = {
+                                        name: schedule.name,
+                                        topic: schedule.topic,
+                                        next: primary ? schedule.primaryTask?.nextDate : schedule.endTask?.nextDate,
+                                        nextLocal: new Date(primary ? schedule.primaryTask?.nextDate : schedule.endTask?.nextDate).toLocaleString(),
+                                        timeZone: status.serverTimeZone,
+                                        when: primary ? schedule.primaryTask?.nextDescription : schedule.endTask?.nextDescription,
+                                        msUntil: new Date(primary ? schedule.primaryTask?.nextDate : schedule.endTask?.nextDate).valueOf() - new Date().valueOf(),
+                                        description: primary ? schedule.primaryTask?.description : schedule.endTask?.description
+                                    }
                                 }
-                            } else {
-                                newMsg.payload = {}
                             }
-                        } else {
+                        }
+                        if (!newMsg.payload) {
                             newMsg.payload = {}
                         }
                         sendCommandResponse(newMsg)
                         break
                     case 'debug': {
-                        const task = getTask(node, cmd.name)
-                        const thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true })
-                        thisDebug.name = task.name
-                        thisDebug.topic = task.node_topic
-                        thisDebug.expressionType = task.node_expressionType
-                        thisDebug.expression = task.node_expression
-                        thisDebug.location = task.node_location
-                        thisDebug.offset = task.node_offset
-                        thisDebug.solarType = task.node_solarType
-                        thisDebug.solarEvents = task.node_solarEvents
-                        newMsg.payload = thisDebug
-                        sendCommandResponse(newMsg)
+                        const schedule = getScheduleByName(node, cmd.name)
+                        const result = {}
+
+                        if (schedule) {
+                            const { primaryTask, endTask, name, enabled, topic } = schedule
+                            result.name = name
+                            result.enabled = enabled
+                            result.topic = topic
+
+                            const processTask = (task, key) => {
+                                if (task) {
+                                    const thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true })
+                                    Object.assign(thisDebug, {
+                                        name: task.name,
+                                        topic: task.node_topic,
+                                        expressionType: task.node_expressionType,
+                                        expression: task.node_expression,
+                                        location: task.node_location,
+                                        offset: task.node_offset,
+                                        solarType: task.node_solarType,
+                                        solarEvents: task.node_solarEvents
+                                    })
+                                    result[key] = thisDebug
+                                }
+                            }
+
+                            processTask(primaryTask?.task, 'primary')
+                            processTask(endTask?.task, 'end')
+
+                            newMsg.payload = result
+                            sendCommandResponse(newMsg)
+                        }
                     }
                         break
                     case 'debug-': { // multiple
                         const results = []
-                        if (node.tasks) {
-                            for (let index = 0; index < node.tasks.length; index++) {
-                                const task = node.tasks[index]
-                                if (cmdAll || taskFilterMatch(task, cmdFilter)) {
+                        const schedules = node.schedules || []
+
+                        schedules.forEach(schedule => {
+                            const result = {}
+                            const { primaryTask, endTask, name, enabled, topic } = schedule
+                            result.name = name
+                            result.enabled = enabled
+                            result.topic = topic
+
+                            const processTask = (task, key) => {
+                                if (task) {
                                     const thisDebug = getTaskStatus(node, task, { includeSolarStateOffset: true })
-                                    thisDebug.name = task.name
-                                    thisDebug.topic = task.node_topic
-                                    thisDebug.expressionType = task.node_expressionType
-                                    thisDebug.expression = task.node_expression
-                                    thisDebug.location = task.node_location
-                                    thisDebug.offset = task.node_offset
-                                    thisDebug.solarType = task.node_solarType
-                                    thisDebug.solarEvents = task.node_solarEvents
-                                    results.push(thisDebug)
+                                    Object.assign(thisDebug, {
+                                        name: task.name,
+                                        topic: task.node_topic,
+                                        expressionType: task.node_expressionType,
+                                        expression: task.node_expression,
+                                        location: task.node_location,
+                                        offset: task.node_offset,
+                                        solarType: task.node_solarType,
+                                        solarEvents: task.node_solarEvents
+                                    })
+                                    result[key] = thisDebug
                                 }
                             }
-                        }
+
+                            processTask(primaryTask?.task, 'primary')
+                            processTask(endTask?.task, 'end')
+
+                            results.push(result)
+                        })
+
+                        // Example of how you might use 'results' array
                         newMsg.payload = results
                         sendCommandResponse(newMsg)
                     }
@@ -1785,32 +2729,103 @@ module.exports = function (RED) {
             }
         })
 
-        function getTask (node, name) {
-            const task = node.tasks.find(function (task) {
-                return task.name === name
+        function getTask (node, id) {
+            const schedule = node.schedules.find(function (schedule) {
+                return schedule?.primaryTask?.task?.id === id || schedule?.endTask?.task?.id === id
             })
-            return task
+
+            if (schedule?.primaryTask?.task?.id === id) {
+                return schedule.primaryTask.task
+            } else if (schedule?.endTask?.task?.id === id) {
+                return schedule.endTask.task
+            }
+
+            return null // Return null if no matching task is found
         }
+
+        /**
+         * Retrieves a schedule object for a given schedule ID from a node's schedules.
+         *
+         * @param {Object} node - The node containing the schedules array.
+         * @param {string|number} id - The unique identifier of the schedule to retrieve.
+         * @returns {Object|undefined} The schedule object with the matching ID, or undefined if not found.
+         */
+        function getSchedule (node, id) {
+            const schedule = node.schedules.find(function (schedule) {
+                return schedule.id === id
+            })
+            return schedule
+        }
+
+        /**
+         * Retrieves a schedule object for a given schedule name from a node's schedules.
+         *
+         * @param {Object} node - The node object containing the schedules array.
+         * @param {string} name - The name of the schedule to retrieve.
+         * @returns {Object|undefined} The schedule object with the matching name, or undefined if not found.
+         */
+        function getScheduleByName (node, name) {
+            const schedule = node.schedules.find(function (schedule) {
+                return schedule.name === name
+            })
+            return schedule
+        }
+
+        /**
+         * Retrieves the schedule ID for a given schedule name from a node's schedules.
+         *
+         * @param {Object} node - The node containing the schedules.
+         * @param {string} name - The name of the schedule to find.
+         * @returns {string|null} The ID of the schedule if found, otherwise null.
+         */
+        function getScheduleId (node, name) {
+            const schedule = node.schedules.find(function (schedule) {
+                return schedule.name === name
+            })
+            return schedule.id || null
+        }
+
+        /**
+         * Determines if a schedule is enabled for a given node and schedule ID.
+         *
+         * @param {Object} node - The node object containing schedules.
+         * @param {string} id - The ID of the schedule to check.
+         * @returns {boolean|null} - Returns true if the schedule is enabled, false if disabled, or null if not found.
+         */
+        function isScheduleEnabled (node, id) {
+            const schedule = node.schedules.find(function (schedule) {
+                return schedule.id === id
+            })
+            return schedule.enabled || null
+        }
+
         async function refreshTasks (node) {
-            const tasks = node.tasks
-            node.debug('Refreshing running schedules')
+            const tasks = getTasks(node)
             if (tasks) {
                 try {
                     // let now = new Date();
                     if (!tasks || !tasks.length) { return null }
+
                     const tasksToRefresh = tasks.filter(function (task) {
-                        return task._sequence || (task.isRunning && task._expression && !isTaskFinished(task))
+                        return task._sequence || (isScheduleEnabled(task.scheduleId) && task._expression && !isTaskFinished(task))
                     })
                     if (!tasksToRefresh || !tasksToRefresh.length) {
                         return null
                     }
-                    for (let index = 0; index < node.tasks.length; index++) {
-                        const task = node.tasks[index]
+                    for (let index = 0; index < tasks.length; index++) {
+                        const task = tasks[index]
                         if (task.node_expressionType === 'cron') {
                             task.stop()
                             task.start()
                         } else {
-                            await updateTask(node, task.node_opt, null)
+                            let cmd = null
+                            if (task?.selfRenew) {
+                                const schedule = getScheduleById(node, task.scheduleId)
+                                if (schedule) {
+                                    cmd = generateTaskCmd(schedule)
+                                }
+                            }
+                            await updateTask(node, cmd || task.node_opt, null)
                         }
                         // task.runScheduledTasks();
                         // index--;
@@ -1851,6 +2866,50 @@ module.exports = function (RED) {
             }
             return false
         }
+
+        /**
+         * Determines if a given schedule matches a specified filter criteria.
+         *
+         * @param {Object} schedule - The schedule object to be evaluated.
+         * @param {Object} filter - The filter criteria containing type and topic.
+         * @param {string} filter.type - The type of filter to apply (e.g., 'all', 'static', 'dynamic', 'topic', 'active', 'inactive', 'active-dynamic', 'active-static', 'inactive-dynamic', 'inactive-static').
+         * @param {string|null} filter.topic - The topic to match against the schedule's topic.
+         * @returns {boolean} - Returns true if the schedule matches the filter criteria, otherwise false.
+         */
+        function scheduleFilterMatch (schedule, filter) {
+            if (!schedule) return false
+            const { type, topic } = filter
+            const isActive = function (schedule) { return schedule.enabled === true }
+            const isInactive = function (schedule) { return schedule.enabled === false }
+            const isStatic = function (schedule) { return (schedule.isStatic === true || schedule.isDynamic === false) }
+            const isDynamic = function (schedule) { return (schedule.isDynamic === true || schedule.isStatic === false) }
+            const isTopicMatch = function (schedule, topic) { return (topic !== null && schedule.topic === topic) }
+
+            switch (type) {
+            case 'all':
+                return true
+            case 'static':
+                return isStatic(schedule)
+            case 'dynamic':
+                return isDynamic(schedule)
+            case 'topic':
+                return isTopicMatch(schedule, topic)
+            case 'active':
+                return isActive(schedule)
+            case 'inactive':
+                return isInactive(schedule)
+            case 'active-dynamic':
+                return isActive(schedule) && isDynamic(schedule)
+            case 'active-static':
+                return isActive(schedule) && isStatic(schedule)
+            case 'inactive-dynamic':
+                return isInactive(schedule) && isDynamic(schedule)
+            case 'inactive-static':
+                return isInactive(schedule) && isStatic(schedule)
+            }
+            return false
+        }
+
         function stopTask (node, name, resetCounter) {
             const task = getTask(node, name)
             if (task) {
@@ -1859,6 +2918,7 @@ module.exports = function (RED) {
             }
             return task
         }
+
         function stopAllTasks (node, resetCounter, filter) {
             if (node.tasks) {
                 for (let index = 0; index < node.tasks.length; index++) {
@@ -1874,6 +2934,22 @@ module.exports = function (RED) {
                 }
             }
         }
+
+        function stopAllSchedules (node, resetCounter, filter) {
+            if (node.schedules) {
+                node.schedules.forEach(schedule => {
+                    let skip = false
+                    if (filter) skip = (scheduleFilterMatch(schedule, filter) === false)
+                    if (!skip && schedule) {
+                        // if (isTaskFinished(schedule)) {
+                        //     schedule.node_count = 0
+                        // }
+                        stopSchedule(node, schedule.id, resetCounter)
+                    }
+                })
+            }
+        }
+
         function startTask (node, name) {
             const task = getTask(node, name)
             if (task) {
@@ -1885,22 +2961,85 @@ module.exports = function (RED) {
             }
             return task
         }
-        function startAllTasks (node, filter) {
-            if (node.tasks) {
-                for (let index = 0; index < node.tasks.length; index++) {
-                    const task = node.tasks[index]
-                    let skip = false
-                    if (filter) skip = (taskFilterMatch(task, filter) === false)
-                    if (!skip && task) {
-                        if (isTaskFinished(task)) {
-                            task.node_count = 0
-                        }
-                        task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-                        task.start()
+
+        function startSchedule (node, id) {
+            const schedule = getSchedule(node, id)
+
+            if (schedule) {
+                const primaryTask = schedule?.primaryTask?.task
+                const endTask = schedule?.endTask?.task
+                if (primaryTask) {
+                    if (isTaskFinished(primaryTask)) {
+                        primaryTask.node_count = 0
                     }
+                    primaryTask.stop()// prevent bug where calling start without first calling stop causes events to bunch up
+                    primaryTask.start()
                 }
+                if (endTask) {
+                    if (isTaskFinished(endTask)) {
+                        endTask.node_count = 0
+                    }
+                    endTask.stop()// prevent bug where calling start without first calling stop causes events to bunch up
+                    endTask.start()
+                }
+            } else {
+                console.log('Schedule not found for', id)
+                node.warn('No schedule found for', id)
             }
         }
+
+        function stopSchedule (node, id, resetCounter = true) {
+            const schedule = getSchedule(node, id)
+
+            if (schedule) {
+                if (schedule) {
+                    const primaryTask = schedule?.primaryTask?.task
+                    const endTask = schedule?.endTask?.task
+                    if (primaryTask) {
+                        primaryTask.stop()
+                        if (resetCounter) { primaryTask.node_count = 0 }
+                    }
+                    if (endTask) {
+                        endTask.stop()
+                        if (resetCounter) { endTask.node_count = 0 }
+                    }
+                }
+            } else {
+                console.log('Schedule not found for', id)
+                node.warn('No schedule found for', id)
+            }
+        }
+
+        function startAllSchedules (node, filter) {
+            if (node.schedules) {
+                node.schedules.forEach(schedule => {
+                    let skip = false
+                    if (filter) skip = (scheduleFilterMatch(schedule, filter) === false)
+                    if (!skip && schedule) {
+                        // if (isTaskFinished(schedule)) {
+                        //     schedule.node_count = 0
+                        // }
+                        startSchedule(node, schedule.id)
+                    }
+                })
+            }
+        }
+
+        function getTasks (node) {
+            if (node.schedules) {
+                return node.schedules.reduce((tasks, schedule) => {
+                    if (schedule?.primaryTask?.task) {
+                        tasks.push(schedule.primaryTask.task)
+                    }
+                    if (schedule?.endTask?.task) {
+                        tasks.push(schedule.endTask.task)
+                    }
+                    return tasks
+                }, [])
+            }
+            return []
+        }
+
         function deleteAllTasks (node, filter) {
             if (node.tasks) {
                 for (let index = 0; index < node.tasks.length; index++) {
@@ -1923,14 +3062,89 @@ module.exports = function (RED) {
                 }
             }
         }
-        function deleteTask (node, name) {
-            let task = getTask(node, name)
+
+        function deleteAllTasksFromSchedules (node, filter) {
+            if (node.schedules) {
+                node.schedules.forEach(schedule => {
+                    let skip = false
+
+                    if (filter) skip = (scheduleFilterMatch(schedule, filter) === false)
+
+                    if (!skip) {
+                        try {
+                            let primaryTask = schedule?.primaryTask?.task
+                            let endTask = schedule?.endTask?.task
+                            if (primaryTask) {
+                                _deleteTask(primaryTask)
+                                primaryTask = null
+                            }
+                            if (endTask) {
+                                _deleteTask(endTask)
+                                endTask = null
+                            }
+                            // eslint-disable-next-line no-empty
+                        } catch (error) {
+                            console.log('deleteAllTasks', error)
+                        }
+                    }
+                })
+            }
+        }
+
+        function deleteSchedule (node, id) {
+            const schedule = getSchedule(node, id)
+
+            if (schedule) {
+                let primaryTask = schedule?.primaryTask?.task
+                let endTask = schedule?.endTask?.task
+                if (primaryTask) {
+                    _deleteTask(primaryTask)
+                    primaryTask = null
+                }
+                if (endTask) {
+                    _deleteTask(endTask)
+                    endTask = null
+                }
+                node.schedules = node.schedules.filter(s => s && s.id !== id)
+                console.log('removed schedule', node.schedules)
+            }
+        }
+
+        function deleteAllSchedules (node, filter, resetCounter) {
+            if (node.schedules) {
+                node.schedules.forEach(schedule => {
+                    let skip = false
+                    if (filter) skip = (scheduleFilterMatch(schedule, filter) === false)
+                    if (!skip && schedule) {
+                        // if (isTaskFinished(schedule)) {
+                        //     schedule.node_count = 0
+                        // }
+                        deleteSchedule(node, schedule.id, resetCounter)
+                    }
+                })
+            }
+        }
+
+        function removeEndTask (node, scheduleId) {
+            const schedule = getSchedule(node, scheduleId)
+
+            if (schedule) {
+                let endTask = schedule?.endTask?.task
+                if (endTask) {
+                    _deleteTask(endTask)
+                    endTask = null
+                }
+            }
+        }
+
+        function deleteTask (node, id) {
+            let task = getTask(node, id)
             if (task) {
                 _deleteTask(task)
-                node.tasks = node.tasks.filter(t => t && t.name !== name)
                 task = null
             }
         }
+
         function _deleteTask (task) {
             try {
                 task.off('run')
@@ -1943,9 +3157,37 @@ module.exports = function (RED) {
             } catch (error) { }
         }
 
-        function getSchedule (node, scheduleName) {
+        function updateSchedules (node, schedules) {
+            node.schedules = schedules
+            updateUISchedules(node)
+        }
+
+        function updateUISchedules (node) {
+            const schedules = node.schedules || []
+            const uiSchedules = schedules.map(schedule => generateUiSchedule(schedule))
+            base.stores.state.set(base, node, null, 'schedules', uiSchedules)
+            return uiSchedules
+        }
+
+        function generateUiSchedule (schedule) {
+            // Create a shallow copy of the schedule object
+            const uiSchedule = { ...schedule }
+
+            // Remove only the necessary properties
+            // delete uiSchedule.primaryTask?.task
+            // delete uiSchedule.endTask?.task
+
+            return uiSchedule
+        }
+
+        function getUiSchedules (node) {
             const schedules = base.stores.state.getProperty(node.id, 'schedules') || []
-            const scheduleIndex = schedules.findIndex(schedule => schedule.name === scheduleName)
+            return schedules
+        }
+
+        function getScheduleById (node, scheduleId) {
+            const schedules = node.schedules || []
+            const scheduleIndex = schedules.findIndex(schedule => schedule.id === scheduleId)
             let schedule = null
             if (scheduleIndex !== -1) {
                 // Get the schedule
@@ -1953,46 +3195,28 @@ module.exports = function (RED) {
             }
             return schedule
         }
-        function updateSchedule (node, scheduleName, task = null, props, emitEvent = true, eventName = 'update') {
-            const schedules = base.stores.state.getProperty(node.id, 'schedules') || []
-            const scheduleIndex = schedules.findIndex(schedule => schedule.name === scheduleName)
-            let stateChange = false
-            let schedule = null
+        function updateSchedule (node, schedule, emitEvent = true, eventName = 'update') {
+            const { id } = schedule
+            if (!id) {
+                console.error("The updated object must have an 'id' property.")
+                return
+            }
 
-            if (scheduleIndex !== -1) {
-                // Get the schedule
-                schedule = schedules[scheduleIndex]
-
-                // Update the schedule with props
-                Object.assign(schedule, props)
+            // Use findIndex to locate the schedule more efficiently
+            const index = node.schedules.findIndex(sch => sch.id === id)
+            if (index !== -1) {
+                node.schedules[index] = { ...node.schedules[index], ...schedule }
             } else {
-                if (props && props.name) {
-                    schedules.push(props)
-                    schedule = props
-                }
+                console.error(`Schedule with id ${id} not found.`)
+                return
             }
 
-            if (schedule) { // Update the schedules property
-                // Remove null properties from schedule
-                for (const key in schedule) {
-                    if (schedule[key] === null) {
-                        delete schedule[key]
-                    }
-                }
-                stateChange = true
-                base.stores.state.set(base, node, null, 'schedules', schedules)
-                if (!task) {
-                    task = getTask(node, scheduleName)
-                }
-                if (task) {
-                    task.node_opt.schedule = schedule
-                }
-                if (emitEvent && stateChange) {
-                    const m = { ui_update: { schedules }, event: eventName, schedule: scheduleName }
-                    base.emit('msg-input:' + node.id, m, node)
-                }
+            const uiSchedules = updateUISchedules(node)
+            // Emit event if required
+            if (emitEvent) {
+                const m = { ui_update: { schedules: uiSchedules }, event: eventName }
+                base.emit('msg-input:' + node.id, m, node)
             }
-            return stateChange
         }
 
         async function updateTask (node, options, msg) {
@@ -2024,14 +3248,14 @@ module.exports = function (RED) {
 
             for (let index = 0; index < options.length; index++) {
                 const opt = options[index]
-                const task = getTask(node, opt.name)
+                const task = getTask(node, opt.id)
                 const isDynamic = !task || task.isDynamic
                 // let isStatic = task && task.isStatic;
                 let opCount = 0; let modified = false
                 if (task) {
                     modified = true
                     opCount = task.node_count || 0
-                    deleteTask(node, opt.name)
+                    deleteTask(node, opt.id)
                 }
                 const taskCount = node.tasks ? node.tasks.length : 0
                 const taskIndex = task && node.fanOut ? (task.node_index || 0) : taskCount
@@ -2042,7 +3266,6 @@ module.exports = function (RED) {
                     t.isDynamic = isDynamic
                 }
             }
-            requestSerialisation()// request persistent state be written
         }
 
         async function createTask (node, opt, index, _static) {
@@ -2080,9 +3303,11 @@ module.exports = function (RED) {
                 const ds = parseDateSequence(opt.expression)
                 task = ds.task
             }
-            task.isDynamic = !_static
             task.isStatic = _static
-            task.name = '' + opt.name
+            task.id = opt.id
+            task.scheduleId = opt.scheduleId
+            task.primary = opt.primary
+            task.selfRenew = opt.selfRenew
             task.node_topic = opt.topic
             task.node_expressionType = opt.expressionType
             task.node_expression = opt.expression
@@ -2098,370 +3323,389 @@ module.exports = function (RED) {
             task.node_opt = opt
             task.node_limit = opt.limit || 0
 
-            // generate schedule object for UI if it doesn't exist
-            if (!task.node_opt.schedule && !task.node_opt.endSchedule && !task.node_opt.solarTimespanSchedule) {
-                const props = generateScheduleObject(task)
-                if (props) {
-                    updateSchedule(node, task.name, task, props, true, 'add')
-                }
-            }
+            // // generate schedule object for UI if it doesn't exist
+            // if (!task.node_opt.schedule && !task.node_opt.endSchedule && !task.node_opt.solarTimespanSchedule) {
+            //     const props = generateScheduleObject(task)
+            //     if (props) {
+            //         updateSchedule(node, task.name, task, props, true, 'add')
+            //     }
+            // }
 
             task.stop()
             task.on('run', (timestamp) => {
+                const now = new Date()
                 node.status({ fill: 'green', shape: 'dot', text: formatShortDateTimeWithTZ(timestamp, node.timeZone, node.use24HourFormat) })
                 node.debug(`running '${task.name}' ~ '${task.node_topic}'\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
                 const indicator = task.isDynamic ? 'ring' : 'dot'
                 node.status({ fill: 'green', shape: indicator, text: 'Running ' + formatShortDateTimeWithTZ(timestamp, node.timeZone, node.use24HourFormat) })
-                if (task.node_opt.schedule) {
-                    if (task.node_opt.schedule.hasEndTime || task.node_opt.schedule.hasDuration) {
-                        const status = getNextStatus(node, task)
-                        let props = {}
-                        if (task.node_opt.schedule.hasDuration === 'time' && task.node_opt.schedule.solarEventStart === false) {
-                            props = {
-                                nextEndDate: status.nextDate,
-                                nextEndDescription: status.nextDescription,
-                                nextEndUTC: status.nextUTC,
-                                active: false,
-                                currentStartTime: null
-                            }
-                        } else {
-                            props = {
-                                nextDate: status.nextDate,
-                                nextDescription: status.nextDescription,
-                                nextUTC: status.nextUTC,
-                                active: true,
-                                currentStartTime: new Date().toISOString()
-                            }
-                        }
 
-                        updateSchedule(node, task.name, task, props, true, 'run')
-                    }
-                }
-                if (task.node_opt.endSchedule) {
-                    const status = getNextStatus(node, task)
-                    const props = {
-                        nextEndDate: status.nextDate,
-                        nextEndDescription: status.nextDescription,
-                        nextEndUTC: status.nextUTC,
-                        active: false,
-                        currentStartTime: null
-                    }
-                    updateSchedule(node, task.node_opt.scheduleName, null, props, true, 'run')
-                }
-
-                // solarTimespanSchedule
-                if (task.node_opt.solarTimespanSchedule) {
-                    const status = getNextStatus(node, task)
-                    let props = {}
-
-                    if (task.node_opt.solarEventStart === true) {
-                        props = {
-                            nextEndDate: status.nextDate,
-                            nextEndDescription: status.nextDescription,
-                            nextEndUTC: status.nextUTC,
-                            active: false,
-                            currentStartTime: null
-                        }
-                    } else {
-                        props = {
-                            nextDate: status.nextDate,
-                            nextDescription: status.nextDescription,
-                            nextUTC: status.nextUTC,
-                            active: true,
-                            currentStartTime: new Date().toISOString()
-                        }
-                    }
-
-                    updateSchedule(node, task.node_opt.scheduleName, null, props, true, 'run')
-                }
-                if (isTaskFinished(task)) {
-                    process.nextTick(function () {
-                        // using nextTick is a work around for an issue (#3) in cronosjs where the job restarts itself after this event handler has exited
-                        task.stop()
-                        updateNextStatus(node)
-                    })
-                    return
-                }
-                task.node_count = task.node_count + 1// ++ stops at 2147483647
-                sendMsg(node, task, timestamp)
-                process.nextTick(async function () {
-                    if (task.node_expressionType === 'solar') {
-                        await updateTask(node, task.node_opt, null)
-                        if (task.node_opt.schedule) {
-                            if (task.node_opt.schedule.duration && task.node_opt.schedule.hasDuration === true) {
-                                const duration = task.node_opt.schedule.duration * 60 * 1000 // Assuming duration is in minutes
-                                const eventTime = task.node_solarEventTimes.nextEventTimeOffset
-
-                                // Convert nextEvent to timestamp, add duration, and create new Date object
-                                const newDate = new Date(new Date(eventTime).getTime() + duration)
-
-                                // create new task
-                                const endCmd = {
-                                    command: 'add',
-                                    name: `${task.node_opt.schedule.name}_end_sched_type`,
-                                    topic: task.node_topic,
-                                    expression: newDate,
-                                    payload: task.node_opt.schedule?.endPayload || false,
-                                    type: 'bool',
-                                    dontStartTheTask: !task.node_opt.schedule.enabled,
-                                    scheduleName: task.node_opt.schedule.name,
-                                    endSchedule: true,
-                                    noExport: true
-                                }
-                                await updateTask(node, endCmd, null)
-                            }
-                            if (task.node_opt.schedule.hasDuration === 'time' && task.node_opt.schedule.solarEventTimespanTime) {
-                                const solarTimespanTask = getTask(node, `${task.node_opt.schedule.name}_end_sched_type`)
-                                const status = getNextStatus(node, solarTimespanTask)
-                                let props = {}
-                                if (task.node_opt.schedule.solarEventStart === true) {
-                                    props = {
-                                        nextEndDate: status.nextDate,
-                                        nextEndDescription: status.nextDescription,
-                                        nextEndUTC: status.nextUTC
-                                    }
-                                } else {
-                                    props = {
-                                        nextDate: status.nextDate,
-                                        nextDescription: status.nextDescription,
-                                        nextUTC: status.nextUTC
-                                    }
-                                }
-                                updateSchedule(node, task.node_opt.schedule.name, null, props, true, 'update')
-                                props = {}
-
-                                const schedule = getSchedule(node, task.node_opt.schedule.name)
-
-                                props.duration = (new Date(schedule.nextUTC).getTime() - new Date(schedule.nextEndUTC).getTime()) / 60000
-                                updateSchedule(node, task.node_opt.schedule.name, null, props, true, 'update')
-                            }
-                        }
-                    }
-                    requestSerialisation()// request persistent state be written
-                })
-            })
-                .on('ended', () => {
-                    node.debug(`ended '${task.name}' ~ '${task.node_topic}'`)
-                    updateNextStatus(node)
-                    requestSerialisation()// request persistent state be written
-                })
-                .on('started', () => {
-                    // Function to validate date format
-                    function isValidDate (dateString) {
-                        const date = new Date(dateString)
-                        return date instanceof Date && !isNaN(date)
-                    }
-
+                let schedule = getScheduleById(node, task.scheduleId)
+                if (schedule) {
                     node.debug(`started '${task.name}' ~ '${task.node_topic}'`)
                     process.nextTick(function () {
                         updateNextStatus(node)
                     })
-                    if (task.node_opt.schedule) {
-                        const status = getNextStatus(node, task)
-                        let props = {}
-                        if (task.node_opt.schedule.solarEventStart === false) {
-                            props = {
-                                enabled: true,
-                                nextEndDate: status.nextDate,
-                                nextEndDescription: status.nextDescription,
-                                nextEndUTC: status.nextUTC
-                            }
+                    schedule = updateScheduleNextStatus(node, schedule)
+
+                    if (task.primary) {
+                        // no timespan schedule
+                        if (!schedule.timespan) {
+                            delete schedule.active
+                            delete schedule.currentStartTime
                         } else {
-                            props = {
-                                enabled: true,
-                                nextDate: status.nextDate,
-                                nextDescription: status.nextDescription,
-                                nextUTC: status.nextUTC
+                            schedule.active = true
+                            schedule.currentStartTime = now
+                        }
+                    } else {
+                        const nextStartDate = schedule?.primaryTask?.nextDate || new Date()
+
+                        // handle solar timespan schedules where solar event is end time
+                        if (task.node_expressionType === 'cron' && schedule.scheduleType === 'solar') {
+                            const { payload: endPayload, payloadType: endPayloadType } = getPayloadAndType(schedule, 'endPayloadValue', false)
+
+                            const solarCmd = {
+                                command: 'add',
+                                id: schedule.endTaskId || RED.util.generateId(),
+                                scheduleId: schedule.id,
+                                topic: schedule.topic,
+                                expressionType: 'solar',
+                                solarType: 'selected',
+                                solarEvents: schedule.solarEvent,
+                                solarDays: null,
+                                date: nextStartDate,
+                                offset: schedule.offset,
+                                locationType: 'fixed',
+                                payload: endPayload,
+                                payloadType: endPayloadType,
+                                dontStartTheTask: !schedule.enabled,
+                                endSchedule: true,
+                                limit: 1
+                            }
+                            const description = generateSolarDescription(node, solarCmd)
+                            if (description && description.lastEventTimeOffset) {
+                                // check if the last solar event time is before the primary task's last event time in which case we add an upcoming end task
+                                if (schedule?.primaryTask?.lastDate > description.lastEventTimeOffset) {
+                                    schedule.active = true
+                                    schedule.currentStartTime = now
+                                    updateTask(node, solarCmd, null)
+                                } else {
+                                    schedule.active = false
+                                    schedule.currentStartTime = null
+                                }
                             }
                         }
-                        if (!task.node_opt.schedule.hasDuration && !task.node_opt.schedule.hasEndTime) {
-                            props.active = null
-                            props.currentStartTime = null
-                        }
+                        if (schedule.timespan === 'duration') {
+                            // If timespan is duration, create a new task for the end of the schedule
+                            const duration = schedule.duration * 60 * 1000
 
-                        updateSchedule(node, task.name, task, props, true, 'start')
-                        if (task.node_expressionType === 'solar') {
-                            if (task.node_opt.schedule.duration && task.node_opt.schedule.hasDuration === true) {
-                                const duration = task.node_opt.schedule.duration * 60 * 1000 // Assuming duration is in minutes
-                                const eventTime = task.node_solarEventTimes.nextEventTimeOffset
+                            // Convert nextEvent to timestamp, add duration, and create new Date object with today's date in UTC
+                            const nextEndDate = new Date(nextStartDate.getTime() + duration)
 
-                                // Convert nextEvent to timestamp, add duration, and create new Date object with today's date in UTC
-                                const now = new Date()
-                                const todayDateUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+                            // Check if newDateUTC is in the future and then create task
+                            if (nextEndDate > now) {
+                                const { payload: endPayload, payloadType: endPayloadType } = getPayloadAndType(schedule, 'endPayloadValue', false)
 
-                                const eventTimeInMs = new Date(eventTime).getTime()
-                                let newDateUTC = new Date(todayDateUTC.getTime() + eventTimeInMs % (24 * 60 * 60 * 1000) + duration)
-
-                                // Check if newDateUTC is in the past
-                                if (newDateUTC.getTime() < now.getTime()) {
-                                    // If in the past, set newDateUTC to eventTime + duration
-                                    newDateUTC = new Date(eventTimeInMs + duration)
-                                }
-
-                                // create new task
+                                // create new end task
                                 const endCmd = {
                                     command: 'add',
-                                    name: `${task.node_opt.schedule.name}_end_sched_type`,
+                                    id: schedule.endTaskId || RED.util.generateId(),
+                                    scheduleId: schedule.id,
                                     topic: task.node_topic,
-                                    expression: newDateUTC,
-                                    payload: task.node_opt.schedule?.endPayload || false,
-                                    type: 'bool',
-                                    dontStartTheTask: !task.node_opt.schedule.enabled,
-                                    scheduleName: task.node_opt.schedule.name,
+                                    expression: nextEndDate,
+                                    payload: endPayload,
+                                    type: endPayloadType,
+                                    dontStartTheTask: !schedule.enabled,
                                     endSchedule: true,
-                                    noExport: true
+                                    limit: 1
                                 }
+
+                                updateTask(node, endCmd, null)
+                            }
+                        } else if (schedule.timespan === 'time') {
+                            let nextEndDate = null
+
+                            if (isValidDateObject(schedule?.primaryTask?.lastDate)) {
+                                const nextEndTimeOccurrence = getNextTimeOccurrence(node, nextStartDate, schedule.solarEventTimespanTime || schedule.endTime)
+                                // check if end task is already completed
+                                if (now < nextEndTimeOccurrence) {
+                                    nextEndDate = nextEndTimeOccurrence
+                                }
+                            }
+
+                            if (nextEndDate) {
+                                const { payload: endPayload, payloadType: endPayloadType } = getPayloadAndType(schedule, 'endPayloadValue', false)
+
+                                // create new end task
+                                const endCmd = {
+                                    command: 'add',
+                                    id: schedule.endTaskId || RED.util.generateId(),
+                                    scheduleId: schedule.id,
+                                    topic: task.node_topic,
+                                    expression: nextEndDate,
+                                    payload: endPayload,
+                                    type: endPayloadType,
+                                    dontStartTheTask: !schedule.enabled,
+                                    endSchedule: true,
+                                    limit: 1
+                                }
+
                                 updateTask(node, endCmd, null)
                             }
                         }
-                    }
-                    if (task.node_opt.endSchedule) {
-                        const status = getNextStatus(node, task)
-                        const props = {
-                            nextEndDate: status.nextDate,
-                            nextEndDescription: status.nextDescription,
-                            nextEndUTC: status.nextUTC
-                        }
 
-                        const schedule = getSchedule(node, task.node_opt.scheduleName)
-                        if (schedule) {
-                            if (isValidDate(schedule.nextUTC) && isValidDate(props.nextEndUTC)) {
-                                if (new Date(schedule.nextUTC) < new Date(props.nextEndUTC)) {
-                                    props.active = false
-                                } else if (new Date(schedule.nextUTC) > new Date(props.nextEndUTC)) {
-                                    if (new Date(props.nextEndUTC) > new Date()) {
-                                        props.active = true
-                                        if (schedule.duration && props.nextEndUTC) {
-                                            props.currentStartTime = new Date(new Date(props.nextEndUTC).getTime() - schedule.duration * 60000).toISOString()
-                                        } else {
-                                            props.currentStartTime = new Date().toISOString()
-                                        }
-                                    } else {
-                                        props.active = false
-                                    }
-                                } else {
-                                    console.log('Next date is the same as next end date')
+                        schedule.active = false
+                        schedule.currentStartTime = null
+                    }
+                    updateSchedule(node, schedule)
+
+                    if (isTaskFinished(task)) {
+                        if (task?.selfRenew) {
+                            process.nextTick(async function () {
+                                if (schedule) {
+                                    const cmd = generateTaskCmd(schedule)
+                                    await updateTask(node, cmd, null)
                                 }
-                            } else {
-                                console.log('Invalid date format')
+                            })
+                        } else {
+                            process.nextTick(function () {
+                                // using nextTick is a work around for an issue (#3) in cronosjs where the job restarts itself after this event handler has exited
+                                task.stop()
+                                updateNextStatus(node)
+                            })
+                        }
+                        return
+                    }
+                    task.node_count = task.node_count + 1// ++ stops at 2147483647
+                    sendMsg(node, task, timestamp)
+                    process.nextTick(async function () {
+                        if (task.node_expressionType === 'solar') {
+                            await updateTask(node, task.node_opt, null)
+                            schedule = updateScheduleNextStatus(node, schedule)
+                            updateSchedule(node, schedule)
+                        }
+                        if (
+                            schedule.scheduleType === 'time' &&
+                            ['hourly', 'minutes'].includes(schedule.period) &&
+                            !isCronCompatible(
+                                schedule.period === 'hourly' ? schedule.hourlyInterval : schedule.minutesInterval,
+                                schedule.period === 'hourly' ? 'hour' : 'minute'
+                            )
+                        ) {
+                            if (!schedule.primaryTask?.nextDates?.length || schedule.primaryTask?.nextDates?.length <= 1) {
+                                const cmd = generateTaskCmd(schedule)
+                                await updateTask(node, cmd, null)
                             }
                         }
+                    })
+                }
+            })
+                .on('ended', () => {
+                    node.debug(`ended '${task.name}' ~ '${task.node_topic}'`)
+                    updateNextStatus(node)
+                })
+                .on('started', () => {
+                    let schedule = getScheduleById(node, task.scheduleId)
+                    if (schedule) {
+                        schedule.enabled = true
 
-                        updateSchedule(node, task.node_opt.scheduleName, null, props, true, 'started')
-                    }
+                        const now = new Date()
+                        schedule = updateScheduleNextStatus(node, schedule)
+                        node.debug(`started '${task.name}' ~ '${task.node_topic}'`)
+                        process.nextTick(function () {
+                            updateNextStatus(node)
+                        })
 
-                    if (task.node_opt.solarTimespanSchedule) {
-                        const status = getNextStatus(node, task)
-                        let props = {}
-                        if (task.node_opt.solarEventStart === true) {
-                            props = {
-                                nextEndDate: status.nextDate,
-                                nextEndDescription: status.nextDescription,
-                                nextEndUTC: status.nextUTC
+                        if (task.primary) {
+                            // no timespan schedule
+                            if (schedule.timespan === false) {
+                                delete schedule.active
+                                delete schedule.currentStartTime
+                            }
+
+                            // handle solar timespan schedules where solar event is end time
+                            if (task.node_expressionType === 'cron' && schedule.scheduleType === 'solar') {
+                                const { payload: endPayload, payloadType: endPayloadType } = getPayloadAndType(schedule, 'endPayloadValue', false)
+
+                                const solarCmd = {
+                                    command: 'add',
+                                    id: schedule.endTaskId || RED.util.generateId(),
+                                    scheduleId: schedule.id,
+                                    topic: schedule.topic,
+                                    expressionType: 'solar',
+                                    solarType: 'selected',
+                                    solarEvents: schedule.solarEvent,
+                                    solarDays: null,
+                                    offset: schedule.offset,
+                                    locationType: 'fixed',
+                                    payload: endPayload,
+                                    payloadType: endPayloadType,
+                                    dontStartTheTask: !schedule.enabled,
+                                    endSchedule: true,
+                                    limit: 1
+                                }
+                                const description = generateSolarDescription(node, solarCmd)
+                                if (description && description.lastEventTimeOffset) {
+                                    // check if the last solar event time is before the primary task's last event time in which case we add an upcoming end task
+                                    if (schedule?.primaryTask?.lastDate > description.lastEventTimeOffset) {
+                                        schedule.active = true
+                                        schedule.currentStartTime = schedule?.primaryTask?.lastDate
+                                        updateTask(node, solarCmd, null)
+                                    } else {
+                                        schedule.active = false
+                                        schedule.currentStartTime = null
+                                        solarCmd.date = new Date(schedule?.primaryTask?.nextDate)
+                                        updateTask(node, solarCmd, null)
+                                    }
+                                }
+                            } else if (schedule.timespan === 'duration') {
+                                // If timespan is duration, create a new task for the end of the schedule
+                                const duration = schedule.duration * 60 * 1000
+
+                                // Convert nextEvent to timestamp, add duration, and create new Date object with today's date in UTC
+                                let nextEndDate = new Date(new Date(schedule?.primaryTask?.lastDate).getTime() + duration)
+
+                                if (nextEndDate > now) {
+                                    schedule.active = true
+                                    schedule.currentStartTime = schedule?.primaryTask?.lastDate
+                                } else {
+                                    nextEndDate = new Date(new Date(schedule?.primaryTask?.nextDate).getTime() + duration)
+                                    schedule.active = false
+                                    schedule.currentStartTime = null
+                                }
+
+                                // Check if newDateUTC is in the future and then create task
+                                const { payload: endPayload, payloadType: endPayloadType } = getPayloadAndType(schedule, 'endPayloadValue', false)
+
+                                // create new end task
+                                const endCmd = {
+                                    command: 'add',
+                                    id: schedule.endTaskId || RED.util.generateId(),
+                                    scheduleId: schedule.id,
+                                    topic: task.node_topic,
+                                    expression: nextEndDate,
+                                    payload: endPayload,
+                                    type: endPayloadType,
+                                    dontStartTheTask: !schedule.enabled,
+                                    endSchedule: true,
+                                    limit: 1
+                                }
+
+                                updateTask(node, endCmd, null)
+                            } else if (schedule.timespan === 'time') {
+                                let nextEndDate = null
+
+                                if (isValidDateObject(schedule?.primaryTask?.lastDate)) {
+                                    const nextEndTimeOccurrence = getNextTimeOccurrence(node, schedule?.primaryTask?.lastDate, schedule.solarEventTimespanTime || schedule.endTime)
+                                    // check if end task is already completed
+                                    if (now < nextEndTimeOccurrence) {
+                                        nextEndDate = nextEndTimeOccurrence
+                                        schedule.active = true
+                                        schedule.currentStartTime = schedule?.primaryTask?.lastDate
+                                    }
+                                }
+
+                                if (!nextEndDate) {
+                                    nextEndDate = getNextTimeOccurrence(node, schedule?.primaryTask?.nextDate, schedule.solarEventTimespanTime || schedule.endTime)
+                                    schedule.active = false
+                                    schedule.currentStartTime = null
+                                }
+                                if (nextEndDate) {
+                                    const { payload: endPayload, payloadType: endPayloadType } = getPayloadAndType(schedule, 'endPayloadValue', false)
+
+                                    // create new end task
+                                    const endCmd = {
+                                        command: 'add',
+                                        id: schedule.endTaskId || RED.util.generateId(),
+                                        scheduleId: schedule.id,
+                                        topic: task.node_topic,
+                                        expression: nextEndDate,
+                                        payload: endPayload,
+                                        type: endPayloadType,
+                                        dontStartTheTask: !schedule.enabled,
+                                        endSchedule: true,
+                                        limit: 1
+                                    }
+
+                                    updateTask(node, endCmd, null)
+                                } else {
+                                    schedule.active = false
+                                    schedule.currentStartTime = null
+                                }
                             }
                         } else {
-                            props = {
-                                nextDate: status.nextDate,
-                                nextDescription: status.nextDescription,
-                                nextUTC: status.nextUTC
-                            }
+                            // handle end schedule starts
                         }
-                        updateSchedule(node, task.node_opt.scheduleName, null, props, true, 'update')
-                        props = {}
-                        const schedule = getSchedule(node, task.node_opt.scheduleName)
-                        console.log(schedule)
-                        if (schedule) {
-                            if (isValidDate(schedule.nextUTC) && isValidDate(schedule.nextEndUTC)) {
-                                const durationInMinutes = Math.abs(new Date(schedule.nextUTC).getTime() - new Date(schedule.nextEndUTC).getTime()) / 60000
-                                if (new Date(schedule.nextUTC) < new Date(schedule.nextEndUTC)) {
-                                    props.duration = durationInMinutes
-                                    props.active = false
-                                } else if (new Date(schedule.nextUTC) > new Date(schedule.nextEndUTC)) {
-                                    if (new Date(schedule.nextEndUTC) > new Date()) {
-                                        props.duration = 24 * 60 - durationInMinutes // Subtract from 24 hours in minutes
-                                        props.active = true
-                                        if (props.duration && schedule.nextEndUTC) {
-                                            props.currentStartTime = new Date(new Date(schedule.nextEndUTC).getTime() - (props.duration * 60000)).toISOString()
-                                            console.log(props.currentStartTime)
-                                        } else {
-                                            props.currentStartTime = new Date().toISOString()
-                                        }
-                                    } else {
-                                        props.active = false
-                                    }
-                                } else {
-                                    props.duration = 0
-                                    console.log('Next date is the same as next end date')
-                                }
-                            } else {
-                                console.log('Invalid date format')
-                            }
-                        }
-                        console.log(props)
-
-                        updateSchedule(node, task.node_opt.scheduleName, null, props, true, 'started')
+                        schedule = updateScheduleNextStatus(node, schedule)
+                        updateSchedule(node, schedule)
                     }
-
-                    requestSerialisation()// request persistent state be written
                 })
                 .on('stopped', () => {
                     node.debug(`stopped '${task.name}' ~ '${task.node_topic}'`)
                     updateNextStatus(node)
-                    if (task.node_opt.schedule) {
-                        const status = getNextStatus(node, task)// get next status
-                        const props = {
-                            enabled: false,
-                            nextDate: status.nextDate,
-                            nextDescription: status.nextDescription
-                        }
+                    if (task.primary === true) {
+                        let schedule = getScheduleById(node, task.scheduleId)
+                        if (schedule) {
+                            schedule.enabled = false
 
-                        if (task.node_opt.schedule.hasDuration || task.node_opt.schedule.hasEndTime) {
-                            props.active = false
-                            props.currentStartTime = null
-                        }
+                            schedule = updateScheduleNextStatus(node, schedule)
 
-                        updateSchedule(node, task.name, task, props, true, 'stop')
+                            if (schedule.timespan === 'duration' || schedule.timespan === 'time') {
+                                schedule.active = false
+                                schedule.currentStartTime = null
+                            }
+                            updateSchedule(node, schedule)
+                        }
                     }
-                    requestSerialisation()// request persistent state be written
                 })
+
             task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
+            const schedule = getScheduleById(node, task.scheduleId)
+            if (schedule) {
+                // Initialize primaryTask and endTask if they don't exist
+                if (!schedule.primaryTask) {
+                    schedule.primaryTask = {}
+                }
+                if (!schedule.endTask) {
+                    schedule.endTask = {}
+                }
+
+                // Update the task within the schedule
+                if (task.primary === true) {
+                    schedule.primaryTask.task = task
+                } else {
+                    schedule.endTaskId = task.id
+                    schedule.endTask.task = task
+                }
+                updateSchedule(node, schedule)
+            }
+
             if (opt.dontStartTheTask !== true) {
                 task.start()
             }
-            node.tasks.push(task)
+
             return task
         }
         function requestSerialisation () {
             if (node.serialisationRequestBusy || node.postponeSerialisation) {
                 return
             }
+
             node.queuedSerialisationRequest = Date.now()
         }
         async function serialise () {
             let filePath = ''
             try {
-                // if (!node.persistDynamic) {
-                //     return
-                // }
                 if (!FSAvailable && node.storeName === 'local_file_system') {
                     return
                 }
-                const dynNodes = node.tasks.filter((e) => e && e.isDynamic)
-                const statNodes = node.tasks.filter((e) => e && e.isDynamic !== true)
+                const schedules = node.schedules || []
+                const exportedSchedules = schedules
+                    .filter((item) => !item.isStatic) // Exclude items with isStatic === true
+                    .map((item) => exportSchedule(item))
 
-                const exp = (task) => {
-                    if (task.node_opt && task.node_opt.noExport !== true) {
-                        return exportTask(task, true)
-                    }
-                    return null
-                }
-
-                const dynNodesExp = dynNodes.map(exp).filter((task) => task !== null)
-                const statNodesExp = statNodes.map(exp).filter((task) => task !== null)
-
-                const state = {
-                    dynamicSchedules: dynNodesExp,
-                    staticSchedules: statNodesExp
+                const scheduleStates = {
+                    version: 2,
+                    schedules: exportedSchedules
                 }
                 if (node.storeName === 'NONE') {
                     return
@@ -2470,7 +3714,7 @@ module.exports = function (RED) {
                 if (node.storeName === 'local_file_system') {
                     try {
                         filePath = getPersistFilePath()
-                        const fileData = JSON.stringify(state)
+                        const fileData = JSON.stringify(scheduleStates)
                         fs.writeFileSync(filePath, fileData)
                     } catch (err) {
                         node.error(`An error occurred while writing state to file '${filePath}' - (${err.message})`)
@@ -2481,16 +3725,16 @@ module.exports = function (RED) {
                     if (!contextAvailable || STORE_NAMES.indexOf(storeName) === -1) {
                         return
                     }
-                    await contextSet(node.context(), contextKey, state, storeName)
+                    await contextSet(node.context(), contextKey, scheduleStates, storeName)
                 }
 
                 /* if(!dynNodesExp || !dynNodesExp.length){
-                    //FUTURE TODO: Sanity check before deletion
-                    //and only if someone asks for it :)
-                    //other wise, file clean up is a manual task
-                    fs.unlinkSync(filePath);
-                    return;
-                } */
+                        //FUTURE TODO: Sanity check before deletion
+                        //and only if someone asks for it :)
+                        //other wise, file clean up is a manual task
+                        fs.unlinkSync(filePath);
+                        return;
+                    } */
             } catch (e) {
                 node.error(`Error saving persistence data. ${e.message}`)
             } finally {
@@ -2505,9 +3749,6 @@ module.exports = function (RED) {
                 base.emit('msg-input:' + node.id, msg, node)
             }
             try {
-                // if (!node.persistDynamic) {
-                //     return
-                // }
                 if (!FSAvailable && node.storeName === 'local_file_system') {
                     return
                 }
@@ -2517,58 +3758,156 @@ module.exports = function (RED) {
                         sendSchedules()
                         return // nothing to add
                     }
-                    if (state.staticSchedules && state.staticSchedules.length) {
-                        for (let iOpt = 0; iOpt < state.staticSchedules.length; iOpt++) {
-                            const opt = state.staticSchedules[iOpt]
-                            const task = node.tasks.find(e => e.name === opt.name)
-                            if (task) {
-                                task.node_count = opt.count
-                            }
-                            if (opt.isRunning === false) {
-                                stopTask(node, opt.name)
-                            } else if (opt.isRunning === true) {
-                                startTask(node, opt.name)
-                            }
-                        }
-                        updateNodeNextInfo(node)
-                    }
-                    if (state.dynamicSchedules && state.dynamicSchedules.length) {
-                        // eslint-disable-next-line prefer-const
-                        const uiSchedules = base.stores.state.getProperty(node.id, 'schedules') || []
-                        for (let iOpt = 0; iOpt < state.dynamicSchedules.length; iOpt++) {
-                            const opt = state.dynamicSchedules[iOpt]
-                            let task
-                            opt.name = opt.name || opt.topic
-                            if (opt?.schedule) {
-                                // Find the schedule
-                                const scheduleIndex = uiSchedules.findIndex(storeSchedule => storeSchedule.name === opt.schedule.name)
 
-                                if (scheduleIndex !== -1) {
-                                    // Get the schedule
-                                    uiSchedules[scheduleIndex] = opt.schedule
-                                } else {
-                                    uiSchedules.push(opt.schedule)
+                    if (state.version === 2) {
+                        const stateSchedules = state.schedules || []
+                        const schedules = node.schedules || []
+                        const cmds = []
+                        stateSchedules.forEach(schedule => {
+                            // Generate ID if it doesn't exist
+                            if (schedule.id === undefined || schedule.id === null) {
+                                schedule.id = RED.util.generateId()
+                            }
+                            // Generate task command
+                            const cmd = generateTaskCmd(schedule)
+                            if (cmd) {
+                                // Check if primary is true
+                                if (cmd.primary) {
+                                    // Set schedule.primaryTaskId to id
+                                    schedule.primaryTaskId = cmd.id
                                 }
-                                base.stores.state.set(base, node, null, 'schedules', uiSchedules)
+                                cmds.push(cmd)
                             }
 
-                            opt.dontStartTheTask = !opt.isRunning
-                            // eslint-disable-next-line prefer-const
-                            task = await createTask(node, opt, iOpt, false)
-                            if (task) {
-                                task.node_count = opt.count
-                                task.isRunning = opt.isRunning
-                                task.isDynamic = true
+                            // Get or add the schedule
+                            const nodeSchedule = getSchedule(node, schedule.id)
+                            if (nodeSchedule) {
+                                // Directly overwrite nodeSchedule object
+                                node.schedules[node.schedules.indexOf(nodeSchedule)] = schedule
+                            } else {
+                                schedules.push(schedule) // Add new schedule
                             }
-                            if (opt.isRunning === false) {
-                                stopTask(node, opt.name)
-                            } else if (opt.isRunning === true) {
-                                startTask(node, opt.name)
+                        })
+
+                        if (cmds.length > 0) {
+                            try {
+                                await updateTask(node, cmds, null)
+                                updateNextStatus(node, true)
+
+                                // get status
+                                schedules.forEach(msgSchedule => {
+                                    let schedule = getSchedule(node, msgSchedule.id)
+
+                                    if (schedule) {
+                                        schedule = updateScheduleNextStatus(node, schedule, false)
+                                    } else {
+                                        console.log('Schedule not found in schedules')
+                                    }
+                                })
+                            } catch (error) {
+                                console.error(error)
                             }
                         }
-                        updateNodeNextInfo(node)
-                        sendSchedules()
+                    } else {
+                        // if (state.staticSchedules && state.staticSchedules.length) {
+                        //     for (let iOpt = 0; iOpt < state.staticSchedules.length; iOpt++) {
+                        //         const opt = state.staticSchedules[iOpt]
+                        //         const task = node.tasks.find(e => e.name === opt.name)
+                        //         if (task) {
+                        //             task.node_count = opt.count
+                        //         }
+                        //         if (opt.isRunning === false) {
+                        //             stopTask(node, opt.name)
+                        //         } else if (opt.isRunning === true) {
+                        //             startTask(node, opt.name)
+                        //         }
+                        //     }
+                        //     updateNodeNextInfo(node)
+                        // }
+                        if (state.dynamicSchedules && state.dynamicSchedules.length) {
+                            // eslint-disable-next-line prefer-const
+                            const schedules = node.schedules || []
+                            const cmds = []
+
+                            for (let iOpt = 0; iOpt < state.dynamicSchedules.length; iOpt++) {
+                                const opt = state.dynamicSchedules[iOpt]
+                                opt.name = opt.name || opt.topic
+                                const schedule = opt?.schedule
+                                if (schedule) {
+                                    // Generate ID if it doesn't exist
+                                    if (schedule.id === undefined || schedule.id === null) {
+                                        schedule.id = RED.util.generateId()
+                                    }
+
+                                    // Convert hasDuration to timespan
+                                    if (schedule.hasDuration !== undefined) {
+                                        if (schedule.hasDuration === true) {
+                                            schedule.timespan = 'duration'
+                                        } else if (schedule.hasDuration === false) {
+                                            schedule.timespan = false
+                                        } else if (schedule.hasDuration === 'time') {
+                                            schedule.timespan = 'time'
+                                        }
+                                    }
+
+                                    // Convert hasEndTime to timespan
+                                    if (schedule.hasEndTime !== undefined) {
+                                        if (schedule.hasEndTime === true) {
+                                            schedule.timespan = 'time'
+                                        } else if (schedule.hasEndTime === false) {
+                                            schedule.timespan = false
+                                        }
+                                    }
+                                    if (!schedule.timespan) {
+                                        schedule.timespan = false
+                                    }
+
+                                    // Generate task command
+                                    const cmd = generateTaskCmd(schedule)
+                                    if (cmd) {
+                                        // Check if primary is true
+                                        if (cmd.primary) {
+                                            // Set schedule.primaryTaskId to id
+                                            schedule.primaryTaskId = cmd.id
+                                        }
+                                        cmds.push(cmd)
+                                    }
+
+                                    // Get or add the schedule
+                                    const nodeSchedule = getSchedule(node, schedule.id)
+                                    if (nodeSchedule) {
+                                        Object.assign(nodeSchedule, schedule) // Update existing schedule
+                                    } else {
+                                        schedules.push(schedule) // Add new schedule
+                                    }
+                                }
+                            }
+                            if (cmds.length > 0) {
+                                try {
+                                    await updateTask(node, cmds, null)
+                                    updateNextStatus(node, true)
+
+                                    // get status
+                                    schedules.forEach(msgSchedule => {
+                                        let schedule = getSchedule(node, msgSchedule.id)
+
+                                        if (schedule) {
+                                            schedule = updateScheduleNextStatus(node, schedule, false)
+                                        } else {
+                                            console.log('Schedule not found in schedules')
+                                        }
+                                    })
+                                } catch (error) {
+                                    console.error(error)
+                                }
+                            }
+                            requestSerialisation() // upgrade persistence
+                        }
                     }
+                    const uiSchedules = updateUISchedules(node)
+                    const m = { ui_update: { uiSchedules }, event: 'load' }
+                    base.emit('msg-input:' + node.id, m, node)
+                    updateNodeNextInfo(node)
                 }
                 if (node.storeName === 'NONE') {
                     sendSchedules()
@@ -2578,7 +3917,9 @@ module.exports = function (RED) {
                     filePath = getPersistFilePath()
                     if (fs.existsSync(filePath)) {
                         const fileData = fs.readFileSync(filePath)
-                        const state = JSON.parse(fileData)
+
+                        const data = JSON.parse(fileData)
+                        const state = data?.state || data
                         await restoreState(state)
                     } else {
                         sendSchedules()
@@ -2600,10 +3941,12 @@ module.exports = function (RED) {
                 node.error(`scheduler: Error loading persistence data '${filePath}'. ${error.message}`)
             }
         }
+
         function getPersistFilePath () {
             const fileName = `node-${node.id}.json`
             return path.join(persistPath, fileName)
         }
+
         function updateNextStatus (node, force) {
             const now = new Date()
             updateNodeNextInfo(node, now)
@@ -2615,12 +3958,12 @@ module.exports = function (RED) {
                 }
             }
 
-            if (node.tasks) {
+            if (node.schedules && node.schedules.length) {
                 const indicator = node.nextIndicator || 'dot'
                 if (node.nextDate) {
                     const d = formatShortDateTimeWithTZ(node.nextDate, node.timeZone, node.use24HourFormat) || 'Never'
                     node.status({ fill: 'blue', shape: indicator, text: (node.nextEvent || 'Next') + ': ' + d })
-                } else if (node.tasks && node.tasks.length) {
+                } else if (node.schedules && node.schedules.length) {
                     node.status({ fill: 'grey', shape: indicator, text: 'All stopped' })
                 } else {
                     node.status({}) // no tasks
@@ -2629,6 +3972,7 @@ module.exports = function (RED) {
                 node.status({})
             }
         }
+
         function getNextTask (tasks) {
             try {
                 const now = new Date()
@@ -2662,6 +4006,345 @@ module.exports = function (RED) {
             }
             return null
         }
+
+        /**
+         * Retrieves the next schedule from a node's schedules.
+         *
+         * This function iterates over the schedules of a given node to find the
+         * schedule with the closest upcoming date. It returns the schedule with
+         * the nearest future date compared to the current time.
+         *
+         * @param {Object} node - The node containing schedules to evaluate.
+         * @returns {Object|null} The schedule with the closest future date, or null if no valid schedule is found.
+         */
+        function getNextSchedule (node) {
+            if (node && node.schedules && Array.isArray(node.schedules)) {
+                const now = new Date()
+
+                let closestSchedule = null
+                let closestTimeDifference = Infinity
+
+                node.schedules.forEach(schedule => {
+                    if (schedule && schedule.primaryTask && schedule.primaryTask.nextDate) {
+                        const nextDate = new Date(schedule.primaryTask.nextDate)
+
+                        if (nextDate > now) {
+                            const timeDifference = nextDate - now
+
+                            if (timeDifference < closestTimeDifference) {
+                                closestTimeDifference = timeDifference
+                                closestSchedule = schedule
+                            }
+                        }
+                    }
+                })
+
+                return closestSchedule
+            }
+
+            return null
+        }
+
+        /**
+         * Retrieves the next scheduled task from a node's schedule list.
+         *
+         * This function checks both primary and end tasks within each schedule
+         * to determine the closest upcoming task based on the current time.
+         *
+         * @param {Object} node - The node containing schedules to evaluate.
+         * @returns {Object|null} An object containing the closest schedule and its type ('primary' or 'end'),
+         * or null if no valid schedules are found.
+         */
+        function getNextScheduleTask (node) {
+            if (node.schedules && Array.isArray(node.schedules)) {
+                const now = new Date()
+                let closestSchedule = null
+                let closestTimeDifference = Infinity
+                let taskType = ''
+
+                node.schedules.forEach(schedule => {
+                    if (schedule.primaryTask && schedule.primaryTask.nextDate) {
+                        const primaryTaskNextDate = new Date(schedule.primaryTask.nextDate)
+
+                        if (primaryTaskNextDate > now) {
+                            const primaryTaskTimeDifference = primaryTaskNextDate - now
+
+                            if (primaryTaskTimeDifference < closestTimeDifference) {
+                                closestTimeDifference = primaryTaskTimeDifference
+                                closestSchedule = schedule
+                                taskType = 'primary'
+                            }
+                        }
+                    }
+
+                    if (schedule.endTask && schedule.endTask.nextDate) {
+                        const endTaskNextDate = new Date(schedule.endTask.nextDate)
+
+                        if (endTaskNextDate > now) {
+                            const endTaskTimeDifference = endTaskNextDate - now
+
+                            if (endTaskTimeDifference < closestTimeDifference) {
+                                closestTimeDifference = endTaskTimeDifference
+                                closestSchedule = schedule
+                                taskType = 'end'
+                            }
+                        }
+                    }
+                })
+
+                return { schedule: closestSchedule, type: taskType }
+            }
+            return null
+        }
+
+        function generateTaskCmd (schedule) {
+            if (!schedule) {
+                console.error('Schedule is undefined or null')
+                return null
+            }
+
+            let cmd = null
+
+            // Determine payloads for start command
+            const { payload: startPayload, payloadType: startPayloadType } =
+                getPayloadAndType(schedule, 'payloadValue', true)
+
+            // Helper to abbreviate days in a description string using dayMapping.
+            const abbreviateDays = (description) =>
+                description
+                    ? description.replace(
+                        /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/g,
+                        (day) => dayMapping[day] || day
+                    )
+                    : ''
+
+            // A helper to create a command object and apply default options.
+            function createCommand (expression, expressionType, additionalOptions = {}) {
+                const command = {
+                    command: 'add',
+                    scheduleId: schedule.id,
+                    // Check if either primaryTask or primaryTaskId exists
+                    id:
+                        (schedule.primaryTask && schedule.primaryTask.id) ||
+                        schedule.primaryTaskId ||
+                        RED.util.generateId(),
+                    topic: schedule.topic,
+                    expression,
+                    expressionType,
+                    payload: startPayload,
+                    payloadType: startPayloadType,
+                    dontStartTheTask: !schedule.enabled,
+                    // If "isDynamic" is true or if "isStatic" is false
+                    isDynamic: schedule.isDynamic || !schedule.isStatic,
+                    isStatic: schedule.isStatic,
+                    primary: true,
+                    ...additionalOptions
+                }
+                applyOptionDefaults(node, command)
+                return command
+            }
+
+            // ------------------ SCHEDULE TYPE: TIME ------------------
+            if (schedule.scheduleType === 'time') {
+                let startCronExpression = ''
+                let expressionType = 'cron'
+                let selfRenew = false
+
+                switch (schedule.period) {
+                case 'minutes': {
+                    if (isCronCompatible(schedule.minutesInterval, 'minute')) {
+                        startCronExpression = `*/${schedule.minutesInterval} * * * *`
+                    } else {
+                        expressionType = 'dates'
+                        selfRenew = true
+                        startCronExpression = generateDateSequence(schedule.minutesInterval, 'minute', 'both', 10)
+                    }
+                    // If timespan is not duration then remove any end task.
+                    if (schedule.timespan !== 'duration') {
+                        removeEndTask(node, schedule.id)
+                    }
+                    break
+                }
+                case 'hourly': {
+                    // (Note: corrected to use hourlyInterval and 'hour' check)
+                    if (isCronCompatible(schedule.hourlyInterval, 'hour')) {
+                        startCronExpression = `0 */${schedule.hourlyInterval} * * *`
+                    } else {
+                        expressionType = 'dates'
+                        selfRenew = true
+                        startCronExpression = generateDateSequence(schedule.hourlyInterval, 'hour', 'both', 10)
+                    }
+                    if (schedule.timespan !== 'duration') {
+                        removeEndTask(node, schedule.id)
+                    }
+                    break
+                }
+                case 'daily': {
+                    const dailyDays = schedule.days.length === 7
+                        ? '*'
+                        : schedule.days.map((day) => day.substring(0, 3).toUpperCase()).join(',')
+                    const [hour, minute] = schedule.time.split(':')
+                    startCronExpression = `0 ${minute} ${hour} * * ${dailyDays}`
+                    if (schedule.timespan !== 'time') {
+                        removeEndTask(node, schedule.id)
+                    }
+                    break
+                }
+                case 'weekly': {
+                    const weeklyDays = schedule.days.map((day) => day.substring(0, 3).toUpperCase()).join(',')
+                    const [hour, minute] = schedule.time.split(':')
+                    startCronExpression = `0 ${minute} ${hour} * * ${weeklyDays}`
+                    if (schedule.timespan !== 'time') {
+                        removeEndTask(node, schedule.id)
+                    }
+                    break
+                }
+                case 'monthly': {
+                    const hasLastDay = schedule.days.includes('Last')
+                    const otherDays = schedule.days.filter((day) => day !== 'Last').join(',')
+                    const monthlyDays = hasLastDay ? (otherDays ? `${otherDays},L` : 'L') : otherDays
+                    const [hour, minute] = schedule.time.split(':')
+                    startCronExpression = `0 ${minute} ${hour} ${monthlyDays} * *`
+                    if (schedule.timespan !== 'time') {
+                        removeEndTask(node, schedule.id)
+                    }
+                    break
+                }
+                case 'yearly': {
+                    const [hour, minute] = schedule.time.split(':')
+                    startCronExpression = `0 ${minute} ${hour} ${schedule.days} ${schedule.month.substring(0, 3).toUpperCase()} *`
+                    if (schedule.timespan !== 'time') {
+                        removeEndTask(node, schedule.id)
+                    }
+                    break
+                }
+                default:
+                    // Default to a cron that never triggers.
+                    startCronExpression = '0 0 31 2 ? *'
+                }
+
+                // Construct the start command if we have a cron expression.
+                if (startCronExpression) {
+                    const startCmd = createCommand(startCronExpression, expressionType, {
+                        ...(selfRenew ? { selfRenew } : {})
+                    })
+
+                    // Generate a description.
+                    let description = ''
+                    if (expressionType === 'dates' && (schedule.period === 'minutes' || schedule.period === 'hourly')) {
+                        // Use an interval description for minute or hourly schedules.
+                        const interval = schedule.period === 'hourly' ? schedule.hourlyInterval : schedule.minutesInterval
+                        const unit = schedule.period === 'hourly' ? 'hour' : 'minute'
+                        description = generateIntervalDescription(interval, unit)
+                    } else {
+                        description = generateDescription(node, startCmd).description
+                    }
+                    schedule.description = abbreviateDays(description)
+                    cmd = startCmd
+                } else {
+                    console.error('Invalid startCronExpression', startCronExpression)
+                }
+            } else if (schedule.scheduleType === 'solar') {
+                // ------------------ SCHEDULE TYPE: SOLAR ------------------
+
+                // When timespan is false, remove any existing end task.
+                if (schedule.timespan === false) {
+                    removeEndTask(node, schedule.id)
+                }
+                if (schedule.timespan === false || schedule.timespan === 'duration' || schedule.solarEventStart === true) {
+                    // Create a solar command
+                    const solarCmd = createCommand(null, 'solar', {
+                        solarType: schedule.solarType || 'selected',
+                        solarEvents: schedule.solarEvent || schedule.solarEvents,
+                        solarDays: schedule.solarDays || null,
+                        offset: schedule.offset,
+                        locationType: 'fixed'
+                    })
+                    schedule.description = generateSolarDescription(node, solarCmd).description
+                    cmd = solarCmd
+                } else if (
+                    schedule.timespan === 'time' &&
+                    schedule.solarEventTimespanTime &&
+                    schedule.solarEventStart === false
+                ) {
+                    // Create a solar time command
+                    const dailyDaysOfWeek =
+                        !schedule.solarDays || schedule.solarDays.length === 7
+                            ? '*'
+                            : schedule.solarDays.map((day) => day.substring(0, 3).toUpperCase()).join(',')
+                    const timeParts = schedule.solarEventTimespanTime.split(':')
+                    const timeCronExpression = `0 ${timeParts[1]} ${timeParts[0]} * * ${dailyDaysOfWeek}`
+                    const timeCmd = createCommand(timeCronExpression, 'cron', {
+                        solarTimespanSchedule: true,
+                        solarEventStart: schedule.solarEventStart
+                    })
+                    const description = generateDescription(node, timeCmd).description
+                    schedule.description = abbreviateDays(description)
+                    cmd = timeCmd
+                }
+            } else if (schedule.scheduleType === 'cron') {
+                // ------------------ SCHEDULE TYPE: CRON ------------------
+
+                if (schedule.startCronExpression) {
+                    // Use createCommand for a cron command.
+                    const cronCmd = createCommand(schedule.startCronExpression, 'cron')
+                    const description = generateDescription(node, cronCmd).description
+                    schedule.description = description.replace(
+                        /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/g,
+                        (match) => dayMapping[match]
+                    )
+                    cmd = cronCmd
+                } else {
+                    console.error('Invalid startCronExpression', schedule.startCronExpression)
+                }
+                if (schedule.timespan === false) {
+                    removeEndTask(node, schedule.id)
+                }
+            } else if (schedule.scheduleType === 'dates') {
+                // ------------------ SCHEDULE TYPE: DATES ------------------
+
+                // Construct the dates command manually.
+                const datesCmd = {
+                    command: 'add',
+                    scheduleId: schedule.id,
+                    id:
+                        (schedule.primaryTask && schedule.primaryTask.id) ||
+                        schedule.primaryTaskId ||
+                        RED.util.generateId(),
+                    topic: schedule.topic,
+                    expression: schedule.expression,
+                    expressionType: 'dates',
+                    payload: startPayload,
+                    payloadType: schedule.payloadType || startPayloadType,
+                    dontStartTheTask: !schedule.enabled,
+                    isDynamic: schedule.isDynamic || !schedule.isStatic,
+                    isStatic: schedule.isStatic,
+                    primary: true
+                }
+                applyOptionDefaults(node, datesCmd)
+                const description = generateDescription(node, datesCmd).description
+                schedule.description = description.replace(
+                    /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/g,
+                    (match) => dayMapping[match]
+                )
+                cmd = datesCmd
+                if (schedule.timespan === false) {
+                    removeEndTask(node, schedule.id)
+                }
+            }
+
+            return cmd
+        }
+
+        /**
+         * Generates an array of messages to be sent to the specified output pin.
+         *
+         * @param {Object} node - The node object containing configuration details.
+         * @param {Object} msg - The message object to be sent.
+         * @param {string} type - The type of message, which can be 'static', 'dynamic', or 'command-response'.
+         * @param {number} index - The index of the output pin, used when fan-out is enabled.
+         * @returns {Array} An array with the message placed at the appropriate index, based on the node configuration.
+         */
         function generateSendMsg (node, msg, type, index) {
             const outputCount = node.outputs
             const fanOut = node.fanOut
@@ -2696,474 +4379,222 @@ module.exports = function (RED) {
             arr[idx] = msg
             return arr
         }
+
         // #region UI Actions
+
+        /**
+        * Submits a schedule by processing and updating the node's schedules.
+        *
+        * @param {Object} msg - The message object containing the payload with schedules.
+        * @returns {void}
+        *
+        * Processes the schedules from the message payload, updates the node's schedules,
+        * and emits UI updates. If there are schedule commands, they are handled asynchronously.
+        * In case of an error, logs the error and reports it to the node.
+        */
         async function submitSchedule (msg) {
-            // Helper function to determine payload and payloadType
-            function getPayloadAndType (schedule, valueKey, defaultValue) {
-                if (schedule?.payloadType === 'custom') {
-                    return {
-                        payload: schedule[valueKey] ?? defaultValue,
-                        payloadType: 'custom'
-                    }
-                } else {
-                    return {
-                        payload: schedule[valueKey] ?? defaultValue,
-                        payloadType: 'bool'
-                    }
+            if (!msg?.payload?.schedules) return
+
+            try {
+                const schedules = node.schedules || []
+                const scheduleCommands = processSchedules(msg.payload.schedules, schedules)
+
+                updateSchedules(node, schedules)
+                emitUiUpdate(node, getUiSchedules(node), 'submit')
+
+                if (scheduleCommands.length > 0) {
+                    await handleScheduleCommands(scheduleCommands, msg)
                 }
-            }
 
-            if (msg?.payload?.schedules) {
-                try {
-                    const schedules = base.stores.state.getProperty(node.id, 'schedules') || []
-                    const scheduleArray = msg.payload.schedules
-                    const cmds = []
-                    scheduleArray.forEach(schedule => {
-                        if (schedule.scheduleType === 'time') {
-                            let startCronExpression
-                            let endCronExpression
-
-                            switch (schedule.period) {
-                            case 'minutes':
-                                startCronExpression = `*/${schedule.minutesInterval} * * * *`
-                                if (schedule.hasDuration) {
-                                    const offsetMinute = schedule.duration % 60
-                                    endCronExpression = `${offsetMinute}-59/${schedule.minutesInterval} * * * *`
-                                } else {
-                                    // Remove the end task if it exists
-                                    deleteTask(node, `${schedule.name}_end_sched_type`)
-                                }
-                                break
-
-                            case 'hourly':
-                                startCronExpression = `0 */${schedule.hourlyInterval} * * *`
-                                if (schedule.hasDuration) {
-                                    const offsetHour = Math.floor(schedule.duration / 60)
-                                    const offsetMinute = schedule.duration % 60
-                                    endCronExpression = `${offsetMinute} ${offsetHour}/${schedule.hourlyInterval} * * *`
-                                } else {
-                                    // Remove the end task if it exists
-                                    deleteTask(node, `${schedule.name}_end_sched_type`)
-                                }
-                                break
-
-                            case 'daily':
-                                const dailyDaysOfWeek = schedule.days.length === 7 ? '*' : schedule.days.map(day => day.substring(0, 3).toUpperCase()).join(',')
-                                const startTime = new Date()
-                                startTime.setHours(schedule.time.split(':')[0])
-                                startTime.setMinutes(schedule.time.split(':')[1])
-                                startCronExpression = `0 ${schedule.time.split(':')[1]} ${schedule.time.split(':')[0]} * * ${dailyDaysOfWeek}`
-                                if (schedule.hasEndTime) {
-                                    const endTime = new Date()
-                                    endTime.setHours(schedule.endTime.split(':')[0])
-                                    endTime.setMinutes(schedule.endTime.split(':')[1])
-                                    schedule.duration = (endTime - startTime) / 60000
-                                    endCronExpression = `0 ${schedule.endTime.split(':')[1]} ${schedule.endTime.split(':')[0]} * * ${dailyDaysOfWeek}`
-                                } else {
-                                    // Remove the end task if it exists
-                                    deleteTask(node, `${schedule.name}_end_sched_type`)
-                                }
-                                break
-
-                            case 'weekly':
-                                const weeklyDaysOfWeek = schedule.days.map(day => day.substring(0, 3).toUpperCase()).join(',')
-                                const startTimeWeekly = new Date()
-                                startTimeWeekly.setHours(schedule.time.split(':')[0])
-                                startTimeWeekly.setMinutes(schedule.time.split(':')[1])
-                                startCronExpression = `0 ${schedule.time.split(':')[1]} ${schedule.time.split(':')[0]} * * ${weeklyDaysOfWeek}`
-                                if (schedule.hasEndTime) {
-                                    const endTimeWeekly = new Date()
-                                    endTimeWeekly.setHours(schedule.endTime.split(':')[0])
-                                    endTimeWeekly.setMinutes(schedule.endTime.split(':')[1])
-                                    schedule.duration = (endTimeWeekly - startTimeWeekly) / 60000
-                                    endCronExpression = `0 ${schedule.endTime.split(':')[1]} ${schedule.endTime.split(':')[0]} * * ${weeklyDaysOfWeek}`
-                                } else {
-                                    // Remove the end task if it exists
-                                    deleteTask(node, `${schedule.name}_end_sched_type`)
-                                }
-                                break
-
-                            case 'monthly':
-                                const hasLastDay = schedule.days.includes('Last')
-                                const otherDays = schedule.days.filter(day => day !== 'Last').join(',')
-                                const monthlyDays = hasLastDay ? (otherDays ? `${otherDays},L` : 'L') : otherDays
-                                const startTimeMonthly = new Date()
-                                startTimeMonthly.setHours(schedule.time.split(':')[0])
-                                startTimeMonthly.setMinutes(schedule.time.split(':')[1])
-                                startCronExpression = `0 ${schedule.time.split(':')[1]} ${schedule.time.split(':')[0]} ${monthlyDays} * *`
-                                if (schedule.hasEndTime) {
-                                    const endTimeMonthly = new Date()
-                                    endTimeMonthly.setHours(schedule.endTime.split(':')[0])
-                                    endTimeMonthly.setMinutes(schedule.endTime.split(':')[1])
-                                    schedule.duration = (endTimeMonthly - startTimeMonthly) / 60000
-                                    endCronExpression = `0 ${schedule.endTime.split(':')[1]} ${schedule.endTime.split(':')[0]} ${monthlyDays} * *`
-                                } else {
-                                    // Remove the end task if it exists
-                                    deleteTask(node, `${schedule.name}_end_sched_type`)
-                                }
-                                break
-
-                            case 'yearly':
-                                const startTimeYearly = new Date()
-                                startTimeYearly.setHours(schedule.time.split(':')[0])
-                                startTimeYearly.setMinutes(schedule.time.split(':')[1])
-                                startCronExpression = `0 ${schedule.time.split(':')[1]} ${schedule.time.split(':')[0]} ${schedule.days} ${schedule.month.substring(0, 3).toUpperCase()} *`
-                                if (schedule.hasEndTime) {
-                                    const endTimeYearly = new Date()
-                                    endTimeYearly.setHours(schedule.endTime.split(':')[0])
-                                    endTimeYearly.setMinutes(schedule.endTime.split(':')[1])
-                                    schedule.duration = (endTimeYearly - startTimeYearly) / 60000
-                                    endCronExpression = `0 ${schedule.endTime.split(':')[1]} ${schedule.endTime.split(':')[0]} ${schedule.days} ${schedule.month.substring(0, 3).toUpperCase()} *`
-                                } else {
-                                    // Remove the end task if it exists
-                                    deleteTask(node, `${schedule.name}_end_sched_type`)
-                                }
-                                break
-
-                            default:
-                                startCronExpression = '0 0 31 2 ? *' // Default to never
-                            }
-
-                            // Determine payloads and payloadTypes for start and end commands
-                            const { payload: startPayload, payloadType: startPayloadType } = getPayloadAndType(schedule, 'payloadValue', true)
-                            const { payload: endPayload, payloadType: endPayloadType } = getPayloadAndType(schedule, 'endPayloadValue', false)
-
-                            // Construct startCmd
-                            const startCmd = {
-                                command: 'add',
-                                name: schedule.name,
-                                topic: schedule.topic,
-                                expression: startCronExpression,
-                                expressionType: 'cron',
-                                payload: startPayload,
-                                payloadType: startPayloadType,
-                                schedule,
-                                dontStartTheTask: !schedule.enabled
-                            }
-
-                            // Construct endCmd
-                            const endCmd = {
-                                ...startCmd,
-                                name: `${schedule.name}_end_sched_type`,
-                                expression: endCronExpression,
-                                payload: endPayload,
-                                payloadType: endPayloadType,
-                                schedule: null,
-                                scheduleName: schedule.name,
-                                endSchedule: true
-                            }
-
-                            applyOptionDefaults(node, startCmd)
-
-                            // abbreviate days of week to three letters
-                            const dayMapping = {
-                                Monday: 'Mon',
-                                Tuesday: 'Tue',
-                                Wednesday: 'Wed',
-                                Thursday: 'Thu',
-                                Friday: 'Fri',
-                                Saturday: 'Sat',
-                                Sunday: 'Sun'
-                            }
-
-                            const description = _describeExpression(
-                                startCmd.expression,
-                                startCmd.expressionType,
-                                startCmd.timeZone || node.timeZone,
-                                startCmd.offset,
-                                startCmd.solarType,
-                                startCmd.solarEvents,
-                                startCmd.time,
-                                startCmd,
-                                node.use24HourFormat
-                            ).description
-
-                            if (description) {
-                                schedule.description = description.replace(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/g, match => dayMapping[match])
-                            }
-                            // if (schedule.hasEndTime) {
-                            //     schedule.endCronExpression = endCronExpression
-                            //     schedule.endTimeDescription = _describeExpression(
-                            //         schedule.endCronExpression,
-                            //         'cron',
-                            //         schedule.timeZone || node.timeZone,
-                            //         schedule.offset,
-                            //         schedule.solarType,
-                            //         schedule.solarEvents,
-                            //         schedule.endTime,
-                            //         schedule,
-                            //         node.use24HourFormat
-                            //     ).description
-                            // }
-                            if (startCronExpression) {
-                                schedule.startCronExpression = startCronExpression
-                                cmds.push(startCmd)
-                            } else {
-                                console.error('Invalid startCronExpression', startCronExpression)
-                                return
-                            }
-                            if (endCronExpression && (schedule.hasEndTime || schedule.hasDuration)) {
-                                schedule.endCronExpression = endCronExpression
-                                cmds.push(endCmd)
-                            }
-                        } else if (schedule.scheduleType === 'solar') {
-                            if (!schedule.hasDuration) {
-                                // Remove the end/time task if it exists
-                                deleteTask(node, `${schedule.name}_end_sched_type`)
-                            }
-                            // Determine payloads and payloadTypes for start and end commands
-                            const { payload: startPayload, payloadType: startPayloadType } = getPayloadAndType(schedule, 'payloadValue', true)
-                            const { payload: endPayload, payloadType: endPayloadType } = getPayloadAndType(schedule, 'endPayloadValue', false)
-
-                            const solarCmd = {
-                                command: 'add',
-                                name: schedule.name,
-                                topic: schedule.topic,
-                                expressionType: 'solar',
-                                solarType: 'selected',
-                                solarEvents: schedule.solarEvent,
-                                offset: schedule.offset,
-                                locationType: 'fixed',
-                                payload: schedule.solarEventStart === false && schedule.hasDuration === 'time' ? endPayload : startPayload,
-                                payloadType: schedule.solarEventStart === false && schedule.hasDuration === 'time' ? endPayloadType : startPayloadType,
-                                schedule,
-                                dontStartTheTask: !schedule.enabled
-                            }
-
-                            schedule.description = generateSolarDescription(node, solarCmd)
-                            cmds.push(solarCmd)
-                            if (schedule.hasDuration === 'time' && schedule.solarEventTimespanTime) {
-                                const dailyDaysOfWeek = schedule.days === undefined ? '*' : schedule.days.length === 7 ? '*' : schedule.days.map(day => day.substring(0, 3).toUpperCase()).join(',')
-                                const solarTime = new Date()
-                                solarTime.setHours(schedule.solarEventTimespanTime.split(':')[0])
-                                solarTime.setMinutes(schedule.solarEventTimespanTime.split(':')[1])
-                                const timeCronExpression = `0 ${schedule.solarEventTimespanTime.split(':')[1]} ${schedule.solarEventTimespanTime.split(':')[0]} * * ${dailyDaysOfWeek}`
-
-                                // Construct startCmd
-                                const timeCmd = {
-                                    command: 'add',
-                                    name: `${schedule.name}_end_sched_type`,
-                                    topic: schedule.topic,
-                                    expression: timeCronExpression,
-                                    expressionType: 'cron',
-                                    payload: schedule.solarEventStart === false && schedule.hasDuration === 'time' ? startPayload : endPayload,
-                                    payloadType: schedule.solarEventStart === false && schedule.hasDuration === 'time' ? startPayloadType : endPayloadType,
-                                    scheduleName: schedule.name,
-                                    schedule: null,
-                                    dontStartTheTask: !schedule.enabled,
-                                    solarTimespanSchedule: true,
-                                    solarEventStart: schedule.solarEventStart
-
-                                }
-                                cmds.push(timeCmd)
-                            }
-                        } else if (schedule.scheduleType === 'cron') {
-                            if (schedule.startCronExpression) {
-                                const startCmd = {
-                                    command: 'add',
-                                    name: schedule.name,
-                                    topic: schedule.topic,
-                                    expression: schedule.startCronExpression,
-                                    expressionType: 'cron',
-                                    payload: schedule?.payloadValue || true,
-                                    payloadType: 'bool',
-                                    schedule,
-                                    dontStartTheTask: !schedule.enabled
-                                }
-                                applyOptionDefaults(node, startCmd)
-
-                                // abbreviate days of week to three letters
-                                const dayMapping = {
-                                    Monday: 'Mon',
-                                    Tuesday: 'Tue',
-                                    Wednesday: 'Wed',
-                                    Thursday: 'Thu',
-                                    Friday: 'Fri',
-                                    Saturday: 'Sat',
-                                    Sunday: 'Sun'
-                                }
-
-                                const description = _describeExpression(
-                                    startCmd.expression,
-                                    startCmd.expressionType,
-                                    startCmd.timeZone || node.timeZone,
-                                    startCmd.offset,
-                                    startCmd.solarType,
-                                    startCmd.solarEvents,
-                                    startCmd.time,
-                                    startCmd,
-                                    node.use24HourFormat
-                                ).description
-
-                                if (description) {
-                                    schedule.description = description.replace(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/g, match => dayMapping[match])
-                                }
-
-                                if (schedule.startCronExpression) {
-                                    cmds.push(startCmd)
-                                }
-                            } else {
-                                console.error('Invalid startCronExpression', schedule.startCronExpression)
-                                return
-                            }
-                        }
-
-                        // Find the schedule
-                        const scheduleIndex = schedules.findIndex(storeSchedule => storeSchedule.name === schedule.name)
-
-                        if (scheduleIndex !== -1) {
-                            // Get the schedule
-                            schedules[scheduleIndex] = schedule
-                        } else {
-                            schedules.push(schedule)
-                        }
-                    })
-
-                    const m = { ui_update: { schedules }, event: 'submit' }
-                    base.emit('msg-input:' + node.id, m, node)
-                    base.stores.state.set(base, node, m, 'schedules', schedules)
-
-                    if (cmds.length > 0) {
-                        try {
-                            await updateTask(node, cmds, msg)
-                            updateNextStatus(node, true)
-                            requestSerialisation()// update persistence
-
-                            // get status
-                            scheduleArray.forEach(msgSchedule => {
-                                const scheduleIndex = schedules.findIndex(schedule => schedule.name === msgSchedule.name)
-
-                                if (scheduleIndex !== -1) {
-                                    // Request task status
-                                    const task = getTask(node, msgSchedule.name)
-                                    const status = getNextStatus(node, task)
-
-                                    schedules[scheduleIndex].nextDate = status.nextDate
-                                    schedules[scheduleIndex].nextDescription = status.nextDescription
-                                } else {
-                                    console.log('Task not found in schedules')
-                                }
-                            })
-                        } catch (error) {
-                            console.error(error)
-                            return
-                        }
-                    }
-                    base.stores.state.set(base, node, msg, 'schedules', schedules)
-                    // Send the status of schedules
-                    const msgStatus = { ui_update: { schedules }, event: 'submit_status' }
-                    base.emit('msg-input:' + node.id, msgStatus, node)
-                } catch (error) {
-                    console.log(error)
-                    node.error(error)
-                }
+                emitUiUpdate(node, getUiSchedules(node), 'submit_status')
+                sendTopicMsg(node, new Date())
+            } catch (error) {
+                console.error('Error in submitSchedule:', error)
+                node.error(error)
             }
         }
 
-        function removeSchedule (msg) {
-            if (msg?.payload?.name) {
-                const schedules = base.stores.state.getProperty(node.id, 'schedules') || []
-                const scheduleIndex = schedules.findIndex(schedule => schedule.name === msg.payload.name)
+        /**
+         * Handles schedule commands by updating tasks and schedules.
+         *
+         * This function processes the given schedule commands by updating the task
+         * associated with the schedule and the provided message. It then updates the
+         * next status of the node and requests serialization. For each schedule ID
+         * in the message payload, it retrieves the corresponding schedule and updates
+         * its next status. If a schedule is not found for a given ID, a warning is logged.
+         *
+         * @param {Object} scheduleCommands - The commands to update the schedule.
+         * @param {Object} msg - The message containing the payload with schedule IDs.
+         * @throws Will throw an error if processing the schedule commands fails.
+         */
+        async function handleScheduleCommands (scheduleCommands, msg) {
+            try {
+                await updateTask(node, scheduleCommands, msg)
+                updateNextStatus(node, true)
+                requestSerialisation()
 
-                if (scheduleIndex !== -1) {
-                    const schedule = schedules[scheduleIndex]
-                    schedules.splice(scheduleIndex, 1)
-                    base.stores.state.set(base, node, msg, 'schedules', schedules)
-                    deleteTask(node, msg.payload.name)
-
-                    if (schedule.hasEndTime || schedule.hasDuration) {
-                        deleteTask(node, `${schedule.name}_end_sched_type`)
-                    }
-
-                    updateNextStatus(node, true)
-                    requestSerialisation()
-                    const m = { ui_update: { schedules }, event: 'remove', schedule: msg.payload.name }
-                    base.emit('msg-input:' + node.id, m, node)
-                } else {
-                    console.log('Schedule not found for', msg?.payload?.name)
-                    node.warn('No schedule found for', msg?.payload?.name)
-                }
-            }
-        }
-
-        function setScheduleEnabled (msg) {
-            const schedules = base.stores.state.getProperty(node.id, 'schedules') || []
-
-            function handleTask (name, enabled) {
-                const scheduleIndex = schedules.findIndex(schedule => schedule.name === name)
-                if (scheduleIndex !== -1) {
-                    const schedule = schedules[scheduleIndex]
-                    console.log(enabled)
-                    console.log(schedule)
-                    if (enabled) {
-                        startTask(node, name)
-                        if (schedule.hasEndTime || schedule.hasDuration) {
-                            console.log('startTask')
-                            startTask(node, `${name}_end_sched_type`)
-                        }
+                msg.payload.schedules.forEach(({ id }) => {
+                    const schedule = getSchedule(node, id)
+                    if (schedule) {
+                        updateScheduleNextStatus(node, schedule, false)
                     } else {
-                        stopTask(node, name, true)
-                        if (schedule.hasEndTime || schedule.hasDuration) {
-                            stopTask(node, `${name}_end_sched_type`, true)
-                        }
+                        console.warn(`Schedule not found for ID: ${id}`)
                     }
+                })
+            } catch (error) {
+                console.error('Error processing schedule commands:', error)
+                throw error // Rethrow the error for upstream handling.
+            }
+        }
 
-                    updateNextStatus(node, true)
+        /**
+         * Processes an array of schedule objects, generating commands and updating the schedules list.
+         *
+         * @param {Array} scheduleArray - An array of schedule objects to be processed.
+         * @param {Array} schedules - A list of existing schedules to be updated or appended to.
+         * @returns {Array} An array of command objects generated from the schedules.
+         */
+        function processSchedules (scheduleArray, schedules) {
+            const commands = []
+            scheduleArray.forEach(schedule => {
+                schedule.id = schedule.id ?? RED.util.generateId()
+                schedule.isDynamic = schedule.isStatic !== true
+
+                const cmd = generateTaskCmd(schedule)
+                if (cmd?.primary) schedule.primaryTaskId = cmd.id
+                if (cmd) commands.push(cmd)
+
+                const existingSchedule = getSchedule(node, schedule.id)
+                if (existingSchedule) {
+                    Object.assign(existingSchedule, schedule)
                 } else {
-                    console.log('Schedule not found for', name)
-                    node.warn('No schedule found for', name)
+                    schedules.push(schedule)
                 }
+            })
+            return commands
+        }
+
+        /**
+         * Emits a UI update event for a specific node.
+         *
+         * @param {Object} node - The node object for which the UI update is emitted.
+         * @param {Array} uiSchedules - An array of UI schedules to be included in the update.
+         * @param {string} eventType - The type of event triggering the UI update.
+         */
+        function emitUiUpdate (node, uiSchedules, eventType) {
+            const updateMessage = {
+                ui_update: { schedules: uiSchedules },
+                event: eventType
+            }
+            base.emit(`msg-input:${node.id}`, updateMessage, node)
+        }
+
+        /**
+         * Removes a schedule based on the provided message payload.
+         *
+         * @param {Object} msg - The message object containing the schedule ID.
+         * @param {Object} msg.payload - The payload of the message.
+         * @param {string} msg.payload.id - The ID of the schedule to be removed.
+         *
+         * Logs a warning if no schedule ID is provided. Deletes the schedule,
+         * updates the next status, requests serialization, updates the UI schedules,
+         * and emits a UI update event.
+         */
+        function removeSchedule (msg) {
+            if (!msg?.payload?.id) {
+                console.warn('No schedule ID provided for removal.')
+                return
             }
 
-            if (Array.isArray(msg?.payload?.names) && msg.payload.names.length > 0) {
+            deleteSchedule(node, msg.payload.id)
+            updateNextStatus(node, true)
+            requestSerialisation()
+
+            const uiSchedules = updateUISchedules(node)
+            emitUiUpdate(node, uiSchedules, 'remove')
+            sendTopicMsg(node, new Date())
+        }
+
+        /**
+         * Toggles the scheduling state of tasks based on the provided message payload.
+         *
+         * @param {Object} msg - The message object containing scheduling information.
+         * @param {Object} msg.payload - The payload of the message.
+         * @param {Array|string} msg.payload.names - An array of task names or a single task name to be processed.
+         * @param {boolean} msg.payload.enabled - A flag indicating whether to enable or disable the schedule.
+         *
+         * The function iterates over the task names provided in the payload and either starts or stops
+         * the schedule for each task based on the 'enabled' flag. It also updates the next status
+         * and requests serialization after processing.
+         */
+        function setScheduleEnabled (msg) {
+            const handleTask = (id, enabled) => {
+                enabled ? startSchedule(node, id) : stopSchedule(node, id)
+                updateNextStatus(node, true)
+            }
+
+            if (Array.isArray(msg?.payload?.names)) {
                 msg.payload.names.forEach(name => handleTask(name, msg.payload.enabled))
             } else if (msg?.payload?.name) {
                 handleTask(msg.payload.name, msg.payload.enabled)
             }
-
+            sendTopicMsg(node, new Date())
             requestSerialisation()
         }
 
+        /**
+         * Handles a request to update the status of a schedule based on a message payload.
+         *
+         * @param {Object} msg - The message object containing the payload.
+         * @param {Object} msg.payload - The payload of the message.
+         * @param {string} msg.payload.id - The ID of the schedule to update.
+         *
+         * Logs a warning if the schedule ID is not provided or if the schedule is not found.
+         * Updates the schedule status if a valid schedule is retrieved.
+         */
         function requestScheduleStatus (msg) {
-            if (msg?.payload?.name) {
-                const task = getTask(node, msg.payload.name)
-                if (task) {
-                    const status = getNextStatus(node, task, true)
-                    const props = {
-                        nextDate: status.nextDate,
-                        nextDescription: status.nextDescription,
-                        nextUTC: status.nextUTC,
-                        nextDates: status.nextDates
-                    }
-                    updateSchedule(node, msg.payload.name, task, props, true, 'status')
-                    updateNextStatus(node, true)
-                } else {
-                    console.log('Task not found for', msg.payload.name)
-                    node.warn('Task not found for', msg.payload.name)
-                }
+            if (!msg?.payload?.id) {
+                console.warn('No schedule ID provided for status request.')
+                return
+            }
+
+            const schedule = getSchedule(node, msg.payload.id)
+            if (schedule) {
+                updateSchedule(node, updateScheduleNextStatus(node, schedule))
+                updateNextStatus(node, true)
+            } else {
+                console.warn(`Schedule not found for ID: ${msg.payload.id}`)
             }
         }
 
+        /**
+         * Asynchronously describes a cron expression from the message payload.
+         *
+         * @param {Object} msg - The message object containing the payload with the cron expression.
+         * @returns {void} Emits a message with the detailed description of the cron expression.
+         *
+         * The function checks for the presence of a cron expression in the message payload.
+         * It applies default options, retrieves a detailed description of the cron expression,
+         * and formats the next execution dates. The day names in the description are replaced
+         * with localized versions. The results are emitted back with the original expression included.
+         * Logs a warning if no cron expression is found and handles any errors during processing.
+         */
         async function describeExpression (msg) {
-            if (msg?.payload?.cronExpression) {
+            if (!msg?.payload?.cronExpression) {
+                console.warn('No cronExpression found in the payload.')
+                return
+            }
+
+            try {
                 const cmd = {
                     expression: msg.payload.cronExpression,
                     expressionType: 'cron'
                 }
 
+                // Apply defaults to the options
                 applyOptionDefaults(node, cmd)
 
-                // abbreviate days of week to three letters
-                const dayMapping = {
-                    Monday: 'Mon',
-                    Tuesday: 'Tue',
-                    Wednesday: 'Wed',
-                    Thursday: 'Thu',
-                    Friday: 'Fri',
-                    Saturday: 'Sat',
-                    Sunday: 'Sun'
-                }
-
+                // Get the detailed cron expression description
                 const cronExpression = await _asyncDescribeExpression(
                     cmd.expression,
                     cmd.expressionType,
@@ -3176,19 +4607,31 @@ module.exports = function (RED) {
                     node.use24HourFormat
                 )
 
+                // Replace day names with localized versions if a description exists
                 if (cronExpression.description) {
-                    cronExpression.description = cronExpression.description.replace(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/g, match => dayMapping[match])
+                    cronExpression.description = cronExpression.description.replace(
+                        /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/g,
+                        match => dayMapping[match]
+                    )
                 }
+
+                // Include the original expression in the response
                 cronExpression.expression = msg.payload.cronExpression
-                if (cronExpression.nextDates && cronExpression.nextDates.length) {
+
+                // Format next execution dates
+                if (Array.isArray(cronExpression.nextDates) && cronExpression.nextDates.length > 0) {
                     cronExpression.nextDates = cronExpression.nextDates.map(dateString => {
                         const date = new Date(dateString)
                         return formatShortDateTimeWithTZ(date, node.timeZone, node.use24HourFormat)
                     })
                 }
 
-                const m = { payload: { cronExpression }, event: 'describe' }
-                base.emit('msg-input:' + node.id, m, node)
+                // Emit the results back
+                const message = { payload: { cronExpression }, event: 'describe' }
+                base.emit(`msg-input:${node.id}`, message, node)
+            } catch (error) {
+                console.error('Error in describeExpression:', error)
+                node.error(error)
             }
         }
         // #endregion UI Actions
@@ -3208,6 +4651,15 @@ module.exports = function (RED) {
                         requestScheduleStatus(msg)
                     } else if (msg.action === 'describe') {
                         describeExpression(msg)
+                    } else if (msg.action === 'checkUpdate') {
+                        checkForUpdate(version, packageName, (result) => {
+                            if (result) {
+                                const m = { payload: { updateResult: { ...result } }, event: 'updateCheck' }
+                                base.emit('msg-input:' + node.id, m, node)
+                            } else {
+                                console.log('Failed to check for updates.')
+                            }
+                        })
                     } else { console.log('Unknown action', msg.action) }
 
                     if (msg.ui_update) {
@@ -3235,6 +4687,25 @@ module.exports = function (RED) {
 
     // #endregion D2
     // #endregion Node-RED
+
+    function getPayloadAndType (schedule, valueKey, defaultValue) {
+        if (schedule?.payloadType === 'custom') {
+            return {
+                payload: schedule[valueKey] ?? defaultValue,
+                payloadType: 'custom'
+            }
+        } else if (['bool', 'true_false', 'true', 'false', true, false].includes(schedule?.payloadType)) {
+            return {
+                payload: schedule[valueKey] ?? defaultValue,
+                payloadType: 'bool'
+            }
+        } else {
+            return {
+                payload: schedule[valueKey] ?? defaultValue,
+                payloadType: schedule?.payloadType
+            }
+        }
+    }
 
     function evaluateNodeProperty (value, type, node, msg) {
         return new Promise(function (resolve, reject) {
@@ -3403,15 +4874,16 @@ module.exports = function (RED) {
                     res.json([])
                     return
                 }
-                const dynNodes = node.tasks.filter((e) => e && e.isDynamic)
-                const exp = (t) => {
+                const dynSchedules = node.schedules.filter(schedule => schedule && schedule.isStatic !== true)
+                const exp = (schedule) => {
                     return {
-                        config: exportTask(t, false),
-                        status: getTaskStatus(node, t, { includeSolarStateOffset: true })
+                        config: exportSchedule(schedule),
+                        status: getScheduleStatus(node, schedule, true)
                     }
                 }
-                const dynNodesExp = dynNodes.map(exp)
-                res.json(dynNodesExp)
+                const dynSchedulesExp = dynSchedules.map(exp)
+
+                res.json(dynSchedulesExp)
             } else if (operation === 'tz') {
                 res.json(timeZones)
             }
@@ -3425,8 +4897,8 @@ module.exports = function (RED) {
 }
 
 /**
-     * Array of timezones
-     */
+         * Array of timezones
+         */
 const timeZones = [
     { code: 'CI', latLon: '+0519-00402', tz: 'Africa/Abidjan', UTCOffset: '+00:00', UTCDSTOffset: '+00:00' },
     { code: 'GH', latLon: '+0533-00013', tz: 'Africa/Accra', UTCOffset: '+00:00', UTCDSTOffset: '+00:00' },

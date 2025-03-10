@@ -416,7 +416,7 @@ copies or substantial portions of the Software.
         }
 
         function generateUniqueId (length = 16) {
-            const characters = 'abcdefghijklmnopqrstuvwxyz0123456789'
+            const characters = 'abcdef0123456789'
             let result = ''
             for (let i = 0; i < length; i++) {
                 const randomIndex = Math.floor(Math.random() * characters.length)
@@ -1128,14 +1128,14 @@ copies or substantial portions of the Software.
 
                 // create common location typed input
                 $('#node-input-defaultLocation').typedInput({
-                    default: 'default',
+                    default: 'fixed',
                     types: [
-                        {
-                            value: 'default',
-                            label: 'Location per schedule',
-                            hasValue: false,
-                            icon: 'fa fa-map-marker'
-                        },
+                        // {
+                        //     value: 'default',
+                        //     label: 'Location per schedule',
+                        //     hasValue: false,
+                        //     icon: 'fa fa-map-marker'
+                        // },
                         {
                             value: 'fixed',
                             label: 'Fixed Location',
@@ -1481,7 +1481,7 @@ copies or substantial portions of the Software.
                                     htmlBuilder.push('      <div class="accordion-title">')
                                     htmlBuilder.push(`        <name>${item.config.name}</name>`)
                                     htmlBuilder.push(`        <topic>${item.config.topic}</topic>`)
-                                    htmlBuilder.push(`        <desc>${item.status.nextDescription}</desc>`)
+                                    htmlBuilder.push(`        <desc>${item.status.primaryTask?.nextDescription}</desc>`)
                                     htmlBuilder.push('        <i class="fa fa-plus"></i>')
                                     htmlBuilder.push('      </div> ')
                                     htmlBuilder.push('    </a>')
@@ -2047,6 +2047,10 @@ copies or substantial portions of the Software.
                     // #### ROW 1 ####
                     const row1 = $('<div style="display: flex; margin: 0px 0px 5px 0px"/>').appendTo(container)
 
+                    // Store the unique ID invisibly
+                    const optionId = option.id || generateUniqueId()
+                    container.data('id', optionId)
+
                     // generate the name field
                     const nameClass = 'node-input-option-name' + ((!option.name || dupCheck[option.name]) ? ' input-error' : '')
                     const nameField = $('<input/>', { class: nameClass, type: 'text', style: nameStyle, placeholder: 'name', title: 'name', value: option.name }).appendTo(row1)
@@ -2403,6 +2407,7 @@ copies or substantial portions of the Software.
                 options.each(function (i) {
                     const option = $(this)
                     const o = {
+                        id: option.data('id') || generateUniqueId(),
                         name: option.find('.node-input-option-name').val(),
                         topic: option.find('.node-input-option-topic').val(),
                         payloadType: option.find('.node-input-option-payload').typedInput('type'),
@@ -2728,7 +2733,7 @@ copies or substantial portions of the Software.
             <div style="display: flex; justify-content: space-between;">
                 <label for="node-input-option-container-div" style="vertical-align:top;flex-basis: 120px;">
                     <i class="fa fa-list-alt"></i> 
-                    Schedules
+                    Static Schedules
                 </label>
                 <div style="flex-grow: 1; column-gap: 2px; margin-bottom: 2px; margin-top: 0px; display: flex; padding: 0px 0px 0px 4px;">
                     <!-- Toolbar -->
