@@ -2180,8 +2180,13 @@ module.exports = function (RED) {
             msg.scheduledEvent = !msg.manualTrigger
             const taskType = task.isDynamic ? 'dynamic' : 'static'
 
-            const index = node.topics.findIndex(topic => topic === schedule.topic || task.node_topic)
-
+            const index = node.topics.findIndex(topic => {
+                if (schedule.topic) {
+                    return topic === schedule.topic
+                } else {
+                    return topic === task.node_topic
+                }
+            })
             if (index === -1) {
                 // Handle the case where the topic is not found
                 node.error(`Topic "${schedule.topic || task.node_topic}" not found for ${schedule.name || task.name}`)
