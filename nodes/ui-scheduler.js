@@ -913,6 +913,11 @@ function getNextWeekday (weekdays, startDate = new Date()) {
     const startIndex = start.getDay()
     let minDays = 7 // initialize with maximum days in a week
     const now = new Date()
+
+    if (weekdays === null || !Array.isArray(weekdays) || weekdays.length === 0) {
+        weekdays = allDaysOfWeek
+    }
+
     weekdays.forEach(day => {
         const dayIndex = allDaysOfWeek.indexOf(day)
         if (dayIndex === -1) {
@@ -951,6 +956,10 @@ function getLastWeekday (weekdays, startDate = new Date()) {
     const start = new Date(startDate)
     const startIndex = start.getDay()
     let minDays = 7 // initialize with maximum days in a week
+
+    if (weekdays === null || !Array.isArray(weekdays) || weekdays.length === 0) {
+        weekdays = allDaysOfWeek
+    }
 
     weekdays.forEach(day => {
         const dayIndex = allDaysOfWeek.indexOf(day)
