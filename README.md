@@ -7,16 +7,23 @@ This node is still in beta and is not yet ready for production use. Any contribu
 
 ## Features
 
-- Integration with Node-RED Dashboard 2.0 for UI-based schedule management.
-- Schedule events by minute, hour, day, week, month, or yearly periods.
-- Support for solar events (e.g., sunrise, sunset).
-- Use cron expressions and cron builder in UI to specify schedules.
-- Persistence of schedules to local file system or Node-RED context stores.
-- Supports timespans (e.g., "from 10:00 AM to 12:00 PM") or durations (e.g., "for 5 minutes").
-- Supports using Solar with Time schedules when adding a timespan schedule. (e.g., "from 5:00 AM to Sunrise")
-- Supports wrap-around schedules (e.g., "from 9:00 PM to 7:00 AM")
-- Optionally send current state of timespan or duration schedules at a specified interval.
-- Supports custom payloads for schedules.
+- 🔌 **Integration with Node-RED Dashboard 2.0:** UI-based schedule management made effortless.
+- ⏰ **Flexible Scheduling:** Define events by minute, hour, day, week, month, or yearly periods.
+- 🌅 **Solar Events Support:** Incorporate natural cues like sunrise and sunset.
+- 📝 **Cron Expressions & Builder:** Specify schedules seamlessly with cron expressions using the intuitive UI cron builder.
+- 💾 **Persistent Storage:** Save schedules to your local file system or Node-RED context stores for reliability.
+- ⏳ **Timespan & Duration Options:** Easily set timespans (e.g., from 10:00 AM to 12:00 PM) and durations (e.g., for 5 minutes).
+- 🌞 **Solar with Time Integration:** Mix solar events with traditional time schedules (e.g., from 5:00 AM to Sunrise) for dynamic scheduling.
+- 🔄 **Wrap-Around Schedules:** Support schedules that span across days (e.g., from 9:00 PM to 7:00 AM).
+- 📡 **State Updates:** Optionally broadcast the current status of timespan or duration schedules at set intervals.
+- 📦 **Custom Payloads:** Attach custom payloads to your schedules for tailored automation.
+- 🌐 **Multi-Language Translations:** Available in multiple languages:
+  - 🇬🇧 English
+  - 🇩🇪 German
+  - 🇫🇷 French
+  - 🇮🇹 Italian
+  - 🇳🇱 Dutch
+  - 🇪🇸 Spanish
 
 ![Overview](https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/blob/40658aef518f54a6068e5eb9bfc79029e86b4c16/assets/overview.png?raw=true)
 
@@ -25,7 +32,9 @@ This node is still in beta and is not yet ready for production use. Any contribu
   <img src="https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/blob/40658aef518f54a6068e5eb9bfc79029e86b4c16/assets/newSchedule.gif?raw=true" alt="Adding New Schedule" style="width: 45%!important; margin: 0 10px;"/>
 </div>
 
-## Installation
+
+
+## 📦Installation
 
 You can install this node directly from the "Manage Palette" menu in the Node-RED interface.
 
@@ -33,18 +42,23 @@ Alternatively, run the following command in your Node-RED user directory - typic
 
     npm install @cgjgh/node-red-dashboard-2-ui-scheduler
 
-## Support my Node-RED Dashboard development
+## 🤝 Support my Node-RED Dashboard development
 Finding this useful? By supporting my Node-RED Dashboard development, you’ll help drive new features, enhancements, and updates. Your encouragement means everything—thank you for considering!
+
 <a href="https://www.buymeacoffee.com/cgjgh" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/arial-blue.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
-## Usage
+## 💡Usage
 
 - Add a scheduler node to your flow.
 - Open the node's configuration dialog and optionally configure the timezone, location from map, and persistence options.
 - Open the dashboard and you will see an empty scheduler. 
 - Click the plus sign at the top right corner of the node to create a new schedule.
 
-## Acknowledgements
+## 🌐 Setting Language
+ - Edit <code>~/.node-red/settings.js</code> and add/uncomment the following line: <code>lang: 'en'</code> Available languages codes are: <code>en</code>, <code>de</code>, <code>fr</code>, <code>it</code>, <code>nl</code>, <code>es</code>
+ - Open the node's configuration dialog and set the desired language for scheduler in the Dashboard 2.0 UI
+
+## 🙏 Acknowledgements
 
 Inspired by: [node-red-contrib-ui-time-scheduler](https://flows.nodered.org/node/node-red-contrib-ui-time-scheduler)
 

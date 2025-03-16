@@ -401,7 +401,7 @@ msg.payload = "name"; //  name of the schedule</code></pre>
                         <li>FILTER: adding <code>-all</code> to any of these commands will operate on all schedules. e.g. <code>status-all</code> will return the status of all schedules</li>
                         <li>FILTER: adding <code>-all-dynamic</code> to any of these commands will only affect dynamic schedules e.g. <code>remove-all-dynamic</code> will remove all dynamic schedules</li>
                         <li>FILTER: adding <code>-all-static</code> to any of these commands will only affect static schedules e.g. <code>stop-all-static</code></li>
-                        <li>FILTER: adding <code>-topic</code> to any of these commands will only affect schedules whose topic matches the topic specified in payload. <code>stop-topic</code></li>
+                        <li>FILTER: adding <code>-topic</code> to any of these commands will only affect schedules whose topic matches the topic specified in payload e.g. <code>stop-topic</code></li>
                         <li>FILTER: adding <code>-active</code> to status, export and remove commands will operate on all active schedules. e.g. <code>status-active</code> </li>
                         <li>FILTER: adding <code>-active-static</code> to status, export and remove commands will operate on all static schedules that are active. e.g. <code>status-active-static</code></li>
                         <li>FILTER: adding <code>-active-dynamic</code> to status, export and remove commands will operate on all dynamic schedules that are active. e.g. <code>status-active-dynamic</code></li>
@@ -483,13 +483,10 @@ msg.payload = "name"; //  name of the schedule</code></pre>
         <dd>GENERAL NOTES...<br>
             <ul>
                 <li>Adding a schedule with the same name as an existing schedule will replace the existing one</li>
-                <li>Adding a schedule with property <code>"limit":3</code> will cause that schedule to be stopped after the third trigger. It can be started again by injecting a payload of <code>{"command":"start" "name": "schedule name"}</code></li>
-                <li>Static (UI added) schedules can be also be updated by using the name specified in the UI</li>
-                <li>When a ui-scheduler node is modified and deployed (or node-red is restarted), dynamic entries are discarded and must be injected again</li>
                 <li>When a ui-scheduler node outputs a msg in response to a command, <code>msg.commandResponse</code> will be <code>true</code> to indicate the message is in response to a command and not a scheduled event</li>
                 <li>When a ui-scheduler node outputs a msg for a cron/solar event, <code>msg.scheduledEvent</code> will be <code>true</code> to indicate the message is due to a scheduled event and not a control response</li>
                 <li>The status indicator will be shown as a "ring" for dynamic schedules or shown as a "dot" for static schedules</li>
-                <li>if the payload is to "Default Payload", then the content of <code>msg.ui-scheduler</code> is moved to <code>msg.payload</code></li>
+                <li>if the payload is set to "Default Payload", then the content of <code>msg.ui-scheduler</code> is moved to <code>msg.payload</code></li>
             </ul>
         </dd>
     </dl>
