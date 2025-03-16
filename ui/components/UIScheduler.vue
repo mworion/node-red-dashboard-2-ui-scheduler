@@ -756,7 +756,7 @@
                         <v-col cols="12" class="d-flex justify-center">
                             <v-select
                                 v-model="offset" :items="offsetItems" :label="t('offsetMinutes')"
-                                :rules="[rules.required]"
+                                :rules="[rules.requiredNumber]"
                             >
                                 <template #prepend-inner>
                                     <v-icon>mdi-plus-minus</v-icon>
@@ -1256,7 +1256,8 @@ export default {
         // Validation rules
         rules () {
             return {
-                required: value => !!value || this.t('required')
+                required: value => !!value || this.t('required'),
+                requiredNumber: value => (value !== undefined && value !== null && (value === 0 || !!value)) || this.t('required')
             }
         },
 
