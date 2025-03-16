@@ -963,7 +963,7 @@ copies or substantial portions of the Software.
                 timeZone: { value: '' },
                 use24HourFormat: { value: false },
                 useNewTimePicker: { value: false },
-                storeName: { value: 'NONE' },
+                storeName: { value: 'local_file_system' },
                 commandResponseMsgOutput: { value: 'fanOut' },
                 defaultLocation: { value: '' },
                 defaultLocationType: { value: '' },
@@ -1100,12 +1100,12 @@ copies or substantial portions of the Software.
                 }
 
                 // populate store names
-                const currentStore = node.storeName || 'NONE'
+                const currentStore = node.storeName || 'local_file_system'
                 $('#node-input-storeName').empty()
                 $('#node-input-storeName').append('<option value="NONE">None: Don\'t persist state</option>')
                 $('#node-input-storeName').append('<option value="local_file_system">File: local file system</option>')
                 RED.settings.context.stores.forEach(function (item) {
-                    const defaultStore = hasProperty(RED.settings, 'context') ? RED.settings.context.default : 'NONE'
+                    const defaultStore = hasProperty(RED.settings, 'context') ? RED.settings.context.default : 'local_file_system'
                     if (!item) {
                         return // skip empty store names
                     }
