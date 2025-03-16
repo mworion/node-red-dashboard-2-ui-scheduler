@@ -3170,12 +3170,16 @@ module.exports = function (RED) {
         }
 
         function generateUiSchedule (schedule) {
-            // Create a shallow copy of the schedule object
-            const uiSchedule = { ...schedule }
+            // Create a shallow copy of the schedule object with deep clones for nested objects
+            const uiSchedule = {
+                ...schedule,
+                primaryTask: schedule.primaryTask ? { ...schedule.primaryTask } : undefined,
+                endTask: schedule.endTask ? { ...schedule.endTask } : undefined
+            }
 
             // Remove only the necessary properties
-            // delete uiSchedule.primaryTask?.task
-            // delete uiSchedule.endTask?.task
+            delete uiSchedule.primaryTask?.task
+            delete uiSchedule.endTask?.task
 
             return uiSchedule
         }
