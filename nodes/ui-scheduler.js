@@ -1,4 +1,4 @@
-const version = '3.1.0'
+const version = '3.1.1'
 const packageName = '@cgjgh/node-red-dashboard-2-ui-scheduler'
 /* eslint-disable no-unused-vars */
 
@@ -83,8 +83,7 @@ const daysOfWeek = [
     { title: 'Saturday', value: 'saturday', short: 'Sat' }
 ]
 
-// Function to get all day 'value' properties
-const allDaysOfWeek = () => daysOfWeek.map(day => day.value)
+const allDaysOfWeek = daysOfWeek.map(day => day.value)
 
 /**
  * Abbreviates the day names in a given description string.
@@ -1631,51 +1630,6 @@ function exportSchedule (schedule) {
             isStatic
         }).filter(([_, value]) => value !== undefined)
     )
-}
-
-/**
-     * Exports a task object with selected properties and optional status information.
-     *
-     * @param {Object} task - The task object containing various properties.
-     * @param {boolean} includeStatus - Flag indicating whether to include status-related properties.
-     * @returns {Object} An object containing the exported task properties.
-     */
-function exportTask (task, includeStatus) {
-    const o = {
-        topic: task.node_topic || task.name,
-        name: task.name || task.node_topic,
-        // index: task.node_index,
-        payloadType: task.node_payloadType,
-        payload: task.node_payload,
-        limit: task.node_limit || null,
-        expressionType: task.node_expressionType,
-        ...(task?.node_opt?.schedule && { schedule: exportSchedule(task.node_opt.schedule) }),
-        ...(task?.node_opt?.endSchedule && { endSchedule: task.node_opt.endSchedule }),
-        ...(task?.node_opt?.scheduleName && { scheduleName: task.node_opt.scheduleName }),
-        ...(task?.node_opt?.solarTimespanSchedule && { solarTimespanSchedule: task.node_opt.solarTimespanSchedule }),
-        ...(task?.node_opt?.solarEventStart && { solarEventStart: task.node_opt.solarEventStart })
-    }
-
-    if (o.expressionType === 'solar') {
-        o.solarType = task.node_solarType
-        o.solarEvents = task.node_solarEvents
-        o.location = task.node_location
-        o.offset = task.node_offset
-        if (task.node_opt?.solarDays) {
-            o.solarDays = task.node_opt.solarDays
-        }
-    } else {
-        o.expression = task.node_expression
-    }
-
-    if (includeStatus) {
-        o.isDynamic = task.isDynamic === true
-        o.modified = task.node_modified === true
-        o.isRunning = task.isRunning === true
-        o.count = task.node_count
-    }
-
-    return o
 }
 
 function isTaskFinished (_task) {
