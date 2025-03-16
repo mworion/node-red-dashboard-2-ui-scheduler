@@ -310,6 +310,11 @@ function getDayName (dayKey) {
     return dayObj ? dayObj.title : ''
 }
 
+function getDayAbbreviation (dayKey) {
+    const dayObj = daysOfWeek.find(d => d.value === dayKey)
+    return dayObj ? dayObj.short : ''
+}
+
 /**
  * Humanize a cron express
  * @param {string} expression the CRON expression to humanize
@@ -583,7 +588,7 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
                 } else {
                     const solarEventsArray = solarEvents.split(',')
                     const events = solarEventsArray.map(event => getSolarEventName(event)).join(', ')
-                    result.description = events + ((opts.solarDays && opts.solarDays.length) ? ', ' + opts.solarDays.map(day => day.substring(0, 3)).join(',') : '')
+                    result.description = events + ((opts.solarDays && opts.solarDays.length) ? ', ' + opts.solarDays.map(day => getDayAbbreviation(day)).join(', ') : '')
                 }
             } else {
                 if (count === 1) {
@@ -722,7 +727,7 @@ async function _asyncDescribeExpression (expression, expressionType, timeZone, o
                 } else {
                     const solarEventsArray = solarEvents.split(',')
                     const events = solarEventsArray.map(event => getSolarEventName(event)).join(', ')
-                    result.description = events + ((opts.solarDays && opts.solarDays.length) ? ', ' + opts.solarDays.map(day => day.substring(0, 3)).join(',') : '')
+                    result.description = events + ((opts.solarDays && opts.solarDays.length) ? ', ' + opts.solarDays.map(day => getDayAbbreviation(day)).join(',') : '')
                 }
             } else {
                 if (count === 1) {
