@@ -4516,27 +4516,27 @@ module.exports = function (RED) {
         }
 
         /**
-         * Toggles the scheduling state of tasks based on the provided message payload.
-         *
-         * @param {Object} msg - The message object containing scheduling information.
-         * @param {Object} msg.payload - The payload of the message.
-         * @param {Array|string} msg.payload.names - An array of task names or a single task name to be processed.
-         * @param {boolean} msg.payload.enabled - A flag indicating whether to enable or disable the schedule.
-         *
-         * The function iterates over the task names provided in the payload and either starts or stops
-         * the schedule for each task based on the 'enabled' flag. It also updates the next status
-         * and requests serialization after processing.
-         */
+             * Toggles the scheduling state of tasks based on the provided message payload.
+             *
+             * @param {Object} msg - The message object containing scheduling information.
+             * @param {Object} msg.payload - The payload of the message.
+             * @param {Array|string} msg.payload.names - An array of task names or a single task name to be processed.
+             * @param {boolean} msg.payload.enabled - A flag indicating whether to enable or disable the schedule.
+             *
+             * The function iterates over the task names provided in the payload and either starts or stops
+             * the schedule for each task based on the 'enabled' flag. It also updates the next status
+             * and requests serialization after processing.
+             */
         function setScheduleEnabled (msg) {
             const handleTask = (id, enabled) => {
                 enabled ? startSchedule(node, id) : stopSchedule(node, id)
                 updateNextStatus(node, true)
             }
 
-            if (Array.isArray(msg?.payload?.names)) {
-                msg.payload.names.forEach(name => handleTask(name, msg.payload.enabled))
-            } else if (msg?.payload?.name) {
-                handleTask(msg.payload.name, msg.payload.enabled)
+            if (Array.isArray(msg?.payload?.ids)) {
+                msg.payload.ids.forEach(id => handleTask(id, msg.payload.enabled))
+            } else if (msg?.payload?.id) {
+                handleTask(msg.payload.id, msg.payload.enabled)
             }
             sendTopicMsg(node, new Date())
             requestSerialisation()

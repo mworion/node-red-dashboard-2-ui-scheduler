@@ -1892,7 +1892,7 @@ export default {
             if (item.id) {
                 this.$socket.emit('widget-action', this.id, {
                     action: 'setEnabled',
-                    payload: { name: item.id, enabled },
+                    payload: { id: item.id, enabled },
                     topic: item.topics
                 })
             } else if (item.name) { // remove later
