@@ -1555,6 +1555,7 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
      * @param {string} schedule.month - The month the schedule is active.
      * @param {string} schedule.solarEvent - The solar event associated with the schedule.
      * @param {number} schedule.offset - The offset for the solar event.
+     * @param {Array} schedule.solarDays - The days the solar schedule is active.
      * @param {string} schedule.solarEventStart - The start of the solar event.
      * @param {string} schedule.solarEventTimespanTime - The timespan for the solar event.
      * @param {string} schedule.startCronExpression - The cron expression for the start.
@@ -1585,6 +1586,7 @@ function exportSchedule (schedule) {
         month,
         solarEvent,
         offset,
+        solarDays,
         solarEventStart,
         solarEventTimespanTime,
         startCronExpression,
@@ -1616,6 +1618,7 @@ function exportSchedule (schedule) {
             month,
             solarEvent,
             offset,
+            solarDays,
             solarEventStart,
             solarEventTimespanTime,
             startCronExpression,
@@ -3962,6 +3965,15 @@ module.exports = function (RED) {
                             if (schedule.id === undefined || schedule.id === null) {
                                 schedule.id = RED.util.generateId()
                             }
+
+                            // Convert schedule.days and schedule.solarDays to lowercase
+                            if (schedule.days) {
+                                schedule.days = schedule.days.map(day => day.toLowerCase())
+                            }
+                            if (schedule.solarDays) {
+                                schedule.solarDays = schedule.solarDays.map(day => day.toLowerCase())
+                            }
+
                             // Generate task command
                             const cmd = generateTaskCmd(schedule)
                             if (cmd) {
