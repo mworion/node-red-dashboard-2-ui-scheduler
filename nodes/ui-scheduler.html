@@ -1,3 +1,4 @@
+<!-- eslint-disable no-unused-vars -->
 <!--
 MIT License
 
@@ -960,10 +961,11 @@ copies or substantial portions of the Software.
                 height: { value: 1 },
                 // FUTURE config: { type: "ui-scheduler Config" },
                 outputField: { value: 'payload' },
+                locale: { value: 'en' },
                 timeZone: { value: '' },
                 use24HourFormat: { value: false },
                 useNewTimePicker: { value: false },
-                storeName: { value: 'NONE' },
+                storeName: { value: 'local_file_system' },
                 commandResponseMsgOutput: { value: 'fanOut' },
                 defaultLocation: { value: '' },
                 defaultLocationType: { value: '' },
@@ -1089,6 +1091,9 @@ copies or substantial portions of the Software.
                     })
                 }
 
+                // set locale:
+                $('#node-input-locale').val(node.locale || 'en')
+
                 node.commandResponseMsgOutput = ['output1', 'output2', 'fanOut'].indexOf(node.commandResponseMsgOutput) >= 0 ? node.commandResponseMsgOutput : 'fanOut'
                 // eslint-disable-next-line no-undef
                 initMap()
@@ -1100,12 +1105,12 @@ copies or substantial portions of the Software.
                 }
 
                 // populate store names
-                const currentStore = node.storeName || 'NONE'
+                const currentStore = node.storeName || 'local_file_system'
                 $('#node-input-storeName').empty()
                 $('#node-input-storeName').append('<option value="NONE">None: Don\'t persist state</option>')
                 $('#node-input-storeName').append('<option value="local_file_system">File: local file system</option>')
                 RED.settings.context.stores.forEach(function (item) {
-                    const defaultStore = hasProperty(RED.settings, 'context') ? RED.settings.context.default : 'NONE'
+                    const defaultStore = hasProperty(RED.settings, 'context') ? RED.settings.context.default : 'local_file_system'
                     if (!item) {
                         return // skip empty store names
                     }
@@ -2400,6 +2405,10 @@ copies or substantial portions of the Software.
                 if (RED._cron_plus_debug) { console.log('oneditsave - ui-scheduler') }
                 removeEventListener('fullscreenchange', onSchedulesExpandCompress)
                 const node = this
+
+                // set locale: default to en-US if not set
+                node.locale = $('#node-input-locale').val()
+    
                 const options = $('#node-input-option-container').children()
 
                 node.options = []
@@ -2613,157 +2622,236 @@ copies or substantial portions of the Software.
             <div id="ui-scheduler-map"></div>
         </div>
     
-        <div id="ui-scheduler-dynamic-nodes-dialog" style="display: none;" title="Dynamic schedules...">
-            <div id="ui-scheduler-dynamic-nodes-table-placeholder"  style="display: flex;align-items: center;/*justify-content: center;*/">
-            </div>
-            <div id="ui-scheduler-dynamic-nodes-loader" style="position: absolute;  left: 46%;  top: 46%;">
-                <i class="fa fa-spinner fa-spin" style="font-size:48px"></i>
-            </div>
+       <!-- Dynamic Nodes Dialog -->
+        <div id="ui-scheduler-dynamic-nodes-dialog" style="display: none;" 
+            title="" data-i18n-title="ui-scheduler.label.dynamicNodesDialogTitle">
+        <div id="ui-scheduler-dynamic-nodes-table-placeholder" style="display: flex; align-items: center;">
         </div>
-    
-        <div id="ui-scheduler-expression-builder-dialog" style="display: none;" title="Easy Expression Builder...">
-            <div id="ui-scheduler-expression-builder" >
-            </div>
+        <div id="ui-scheduler-dynamic-nodes-loader" style="position: absolute; left: 46%; top: 46%;">
+            <i class="fa fa-spinner fa-spin" style="font-size:48px"></i>
         </div>
-    
+        </div>
+
+        <!-- Expression Builder Dialog -->
+        <div id="ui-scheduler-expression-builder-dialog" style="display: none;" 
+            title="" data-i18n-title="ui-scheduler.label.expressionBuilderDialogTitle">
+        <div id="ui-scheduler-expression-builder">
+        </div>
+        </div>
+
         <!-- For Rows -->
         <div class="form-row ui-scheduler-form-row">
-            <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Name</span></label>
-            <input type="text" id="node-input-name" style="width: calc(100% - 130px)" placeholder="Name">
+        <label for="node-input-name">
+            <i class="fa fa-tag"></i>
+            <span data-i18n="ui-scheduler.label.name"></span>
+        </label>
+        <input type="text" id="node-input-name" style="width: calc(100% - 130px)" placeholder="Name">
         </div>
+
         <div class="form-row ui-scheduler-form-row">
-            <label for="node-input-group"><i class="fa fa-table"></i> Group</label>
-            <input type="text" id="node-input-group">
+        <label for="node-input-group">
+            <i class="fa fa-table"></i>
+            <span data-i18n="ui-scheduler.label.group"></span>
+        </label>
+        <input type="text" id="node-input-group">
         </div>
+
         <div class="form-row nr-db-ui-element-sizer-row">
-            <label><i class="fa fa-object-group"></i> <span data-i18n="ui-switch.label.size">Size</label>
-            <button class="editor-button" id="node-input-size"></button>
-        </div>
-        <div class="form-row nr-db-ui-manual-size-row">
-            <label><i class="fa fa-arrows-h"></i> <span data-i18n="ui-switch.label.width">Width</label>
-            <input type="hidden" id="node-input-width">
-        </div>
-        <div class="form-row nr-db-ui-manual-size-row">
-            <label><i class="fa fa-arrows-v"></i> <span data-i18n="ui-switch.label.height">Height</label>
-            <input type="hidden" id="node-input-height">
-        </div>
-        <div class="form-row ui-scheduler-form-row">
-            <label for="node-input-label"><i class="fa fa-i-cursor"></i> Label</label>
-            <input type="text" id="node-input-label">
-        </div>
-        <div class="form-row ui-scheduler-form-row">
-            <label for="node-input-timeZone"><i class="fa fa-globe"></i> Timezone</label>
-            <input type="text" id="node-input-timeZone" style="width: calc(100% - 130px)" placeholder="Leave empty for none/system">
-        </div>
-        <div class=" form-row ui-scheduler-form-row">
-            <label for="node-input-use24HourFormat"><i class="fa fa-clock-o"></i> 24 Hour Format </label>
-            <input type="checkbox" id="node-input-use24HourFormat" style="display: inline-block; width: auto; margin: 0px 0px 0px 4px;">
-        </div>
-        <div class="form-row ui-scheduler-form-row">
-            <label for="node-input-defaultLocation"><i class="fa fa-map-marker"></i> Location</label>
-            <input type="text" id="node-input-defaultLocation" style="width: calc(100% - 130px)" placeholder="lat lng - click to open map >">
-        </div>
-        <div class="form-row ui-scheduler-form-row">
-            <label for="node-input-commandResponseMsgOutput"><i class="fa fa-dot-circle-o"></i> Outputs</label>
-            <select style="width: calc(100% - 130px)" id="node-input-commandResponseMsgOutput">
-              <option value="output1">1 output: All messages to output 1</option>
-              <option value="output2">2 outputs: Command responses to output 1, Schedule messages to output 2</option>
-              <option value="fanOut" >Fan out: Separate outputs for command messages and each topic</option>
-            </select>
+        <label>
+            <i class="fa fa-object-group"></i>
+            <span data-i18n="ui-scheduler.label.size"></span>
+        </label>
+        <button class="editor-button" id="node-input-size"></button>
         </div>
 
-        <div class="form-row">
-            <label for="node-input-send-state-container-div" style="vertical-align:top;width:auto">
-                <i class="fa fa-refresh"></i> Send State of Schedules:
+        <div class="form-row nr-db-ui-manual-size-row">
+        <label>
+            <i class="fa fa-arrows-h"></i>
+            <span data-i18n="ui-scheduler.label.width"></span>
+        </label>
+        <input type="hidden" id="node-input-width">
+        </div>
+
+        <div class="form-row nr-db-ui-manual-size-row">
+        <label>
+            <i class="fa fa-arrows-v"></i>
+            <span data-i18n="ui-scheduler.label.height"></span>
+        </label>
+        <input type="hidden" id="node-input-height">
+        </div>
+
+        <div class="form-row ui-scheduler-form-row">
+        <label for="node-input-label">
+            <i class="fa fa-i-cursor"></i>
+            <span data-i18n="ui-scheduler.label.label"></span>
+        </label>
+        <input type="text" id="node-input-label">
+        </div>
+
+        <div class="form-row ui-scheduler-form-row">
+            <label for="node-input-locale">
+                <i class="fa fa-globe"></i>
+                <span data-i18n="ui-scheduler.label.language"></span>
             </label>
-            <div id="node-input-send-state-container-div" class="form-row" style="box-sizing:border-box; border-radius:5px; padding:5px; border:1px solid var(--red-ui-form-input-border-color, #ccc); overflow-y:auto; width: 100%;">
-                <span>
-                    <label style="width:auto; vertical-align:top" for="node-input-sendStateInterval"><i class="fa fa-refresh"></i>
-                        <span data-i18n="ui-scheduler.label.sendStateInterval"></span>
-                    </label>
-                    <input type="number" id="node-input-sendStateInterval" min="1" max="60"
-                        style="display:inline-block; width:auto; vertical-align:top; margin-right:50px;" />
-                </span>
-                <span>
-                    <label style="width:auto; vertical-align:top" for="node-input-sendActiveState"><i class="fa fa-dot-circle-o"></i>
-                        <span data-i18n="ui-scheduler.label.sendActiveState"></span>
-                    </label>
-                    <input type="checkbox" id="node-input-sendActiveState"
-                        style="display:inline-block; width:auto; vertical-align:top; margin-right:50px;">
-                    <span data-i18n="ui-scheduler.sendActiveState"></span>
-                </span>
-                <span>
-                    <label style="width:auto; vertical-align:top" for="node-input-sendInactiveState"><i class="fa fa-dot-circle-o"></i>
-                        <span data-i18n="ui-scheduler.label.sendInactiveState"></span>
-                    </label>
-                    <input type="checkbox" id="node-input-sendInactiveState"
-                        style="display:inline-block; width:auto; vertical-align:top; margin-right:50px;">
-                    <span data-i18n="ui-scheduler.sendInactiveState"></span>
-                </span>
-            </div>
+            <select id="node-input-locale">
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Français</option>
+              <option value="it">Italiano</option>
+              <option value="nl">Nederlands</option>
+              <option value="es">Español</option>
+            </select>
+          </div>
+          
+        <div class="form-row ui-scheduler-form-row">
+        <label for="node-input-timeZone">
+            <i class="fa fa-globe"></i>
+            <span data-i18n="ui-scheduler.label.timeZone"></span>
+        </label>
+        <input type="text" id="node-input-timeZone" style="width: calc(100% - 130px)" 
+                placeholder="" data-i18n="[placeholder]ui-scheduler.label.timeZonePlaceholder">
         </div>
 
         <div class="form-row ui-scheduler-form-row">
-            <label for="node-input-storeName"><i class="fa fa-database"></i> Persist Schedules</label>
-            <select type="text" id="node-input-storeName" style="width: calc(100% - 130px);"></select>
+        <label for="node-input-use24HourFormat">
+            <i class="fa fa-clock-o"></i>
+            <span data-i18n="ui-scheduler.label.use24HourFormat"></span>
+        </label>
+        <input type="checkbox" id="node-input-use24HourFormat" style="display: inline-block; width: auto; margin: 0px 0px 0px 4px;">
         </div>
 
-        <div class="form-row ui-scheduler-form-row form-row-flex node-input-topic-container-row" style="margin-bottom: 0px;width: 100%">
-            <label for="node-input-topic-container-div"><i class="fa fa-list-alt"></i> <span
-                    data-i18n="ui-scheduler.label.topics"></span> </label>
-                    <div id="node-input-topic-container-div">
-                        <ol id="node-input-topic-container" style="list-style-type:none; margin:0; max-height: 200px;"></ol>
-                    </div>
+        <div class="form-row ui-scheduler-form-row">
+        <label for="node-input-defaultLocation">
+            <i class="fa fa-map-marker"></i>
+            <span data-i18n="ui-scheduler.label.defaultLocation"></span>
+        </label>
+        <input type="text" id="node-input-defaultLocation" style="width: calc(100% - 130px)" 
+                placeholder="" data-i18n="[placeholder]ui-scheduler.label.defaultLocationPlaceholder">
         </div>
-        
-        <div class="form-row ui-scheduler-form-row form-row-flex node-input-customPayload-container-row" style="margin-top: 20px; margin-bottom: 0px; width: 100%">
-            <label for="node-input-customPayload-container-div"><i class="fa fa-list-alt"></i> Custom Payloads</label>
-            <div id="node-input-customPayload-container-div" style="box-sizing:border-box; border-radius:5px; min-height:50px; height:auto; max-height: 200px; padding:5px; border:1px solid var(--red-ui-form-input-border-color, #ccc); overflow-y:auto; display:inline-block; width: 80%;">
-                <span id="valWarning" style="color: var(--red-ui-text-color-error, #910000)"><b>All Values must be valid and unique.</b></span>
-                <ol id="node-input-customPayload-container" style="list-style-type:none; margin:0;"></ol>
-            </div>
+
+        <div class="form-row ui-scheduler-form-row">
+        <label for="node-input-commandResponseMsgOutput">
+            <i class="fa fa-dot-circle-o"></i>
+            <span data-i18n="ui-scheduler.label.commandResponseMsgOutput"></span>
+        </label>
+        <select style="width: calc(100% - 130px)" id="node-input-commandResponseMsgOutput">
+            <option value="output1" data-i18n="ui-scheduler.label.outputOption1"></option>
+            <option value="output2" data-i18n="ui-scheduler.label.outputOption2"></option>
+            <option value="fanOut" data-i18n="ui-scheduler.label.outputOptionFanOut"></option>
+        </select>
         </div>
+
         <div class="form-row">
-            <a href="#" class="editor-button editor-button-small" id="node-input-add-customPayload" style="margin-bottom: 20px; margin-top:4px; margin-left:125px;"><i class="fa fa-plus"></i> <span>add</span></a>
+        <label for="node-input-send-state-container-div" style="vertical-align: top; width: auto">
+            <i class="fa fa-refresh"></i>
+            <span data-i18n="ui-scheduler.label.sendStateOfSchedules"></span>
+        </label>
+        <div id="node-input-send-state-container-div" class="form-row" style="box-sizing: border-box; border-radius: 5px; padding: 5px; border: 1px solid var(--red-ui-form-input-border-color, #ccc); overflow-y:auto; width: 100%;">
+            <span>
+            <label for="node-input-sendStateInterval" style="width: auto; vertical-align: top">
+                <i class="fa fa-refresh"></i>
+                <span data-i18n="ui-scheduler.label.sendStateInterval"></span>
+            </label>
+            <input type="number" id="node-input-sendStateInterval" min="1" max="60" style="display: inline-block; width: auto; vertical-align: top; margin-right: 50px;" />
+            </span>
+            <span>
+            <label for="node-input-sendActiveState" style="width: auto; vertical-align: top">
+                <i class="fa fa-dot-circle-o"></i>
+                <span data-i18n="ui-scheduler.label.sendActiveState"></span>
+            </label>
+            <input type="checkbox" id="node-input-sendActiveState" style="display: inline-block; width: auto; vertical-align: top; margin-right: 50px;">
+            <span data-i18n="ui-scheduler.label.sendActiveStateText"></span>
+            </span>
+            <span>
+            <label for="node-input-sendInactiveState" style="width: auto; vertical-align: top">
+                <i class="fa fa-dot-circle-o"></i>
+                <span data-i18n="ui-scheduler.label.sendInactiveState"></span>
+            </label>
+            <input type="checkbox" id="node-input-sendInactiveState" style="display: inline-block; width: auto; vertical-align: top; margin-right: 50px;">
+            <span data-i18n="ui-scheduler.label.sendInactiveStateText"></span>
+            </span>
         </div>
-        
-        <div id="node-ui-scheduler-tab-static-schedules" class="form-row ui-scheduler-form-row form-row-auto-height"
-            style="width: 100%; min-height: 200px; display: flex; flex-flow: column nowrap; max-width: min-content">
-            <!-- Row 1 -->
-            <div style="display: flex; justify-content: space-between;">
-                <label for="node-input-option-container-div" style="vertical-align:top;flex-basis: 120px;">
-                    <i class="fa fa-list-alt"></i> 
-                    Static Schedules
-                </label>
-                <div style="flex-grow: 1; column-gap: 2px; margin-bottom: 2px; margin-top: 0px; display: flex; padding: 0px 0px 0px 4px;">
-                    <!-- Toolbar -->
-                    <a href="#" accesskey="a" title="Add a new schedule [A]" class="editor-button editor-button-small" id="node-input-add-option">
-                        <span><i class="fa fa-plus" style="margin-right: 2px;"></i> <u>a</u>dd</span>
-                    </a>
-                    <a href="#"  accesskey="s" title="Show dynamic schedules [S]" class="editor-button editor-button-small" id="node-input-show-dynamic">
-                        <span><i class="fa fa-table" style="margin-right: 2px;"></i> dynamic <u>s</u>chedules</span>
-                    </a>
-                    <a href="#" accesskey="x" class="editor-button editor-button-small" id="ui-scheduler-expand-schedules-button" title="Hold the shift key for fullscreen [X]" style="margin-left: auto;">
-                        <span class="expand-icon"><i class="fa fa-expand" style="margin-right: 2px;"></i> e<u>x</u>pand</span>
-                    </a>
-                </div>
-            </div>
-            <!-- Row 2 (the list) -->
-            <div class="red-ui-editableList-border red-ui-editableList-container" id="node-input-option-container-div"
-                style="min-width: 300px;box-sizing: border-box;border-radius: 5px;padding: 5px;overflow-y:scroll;display: inline-block;height: calc(100% - -4px);min-height: 150px;">
-                <ol id="node-input-option-container" style=" list-style-type:none; margin: 0;" class="ui-sortable"></ol>
-            </div>
         </div>
 
         <div class="form-row ui-scheduler-form-row">
-            <label for="node-input-outputField"><i class="fa fa-sign-out"></i> Output property</label>
-            <input type="text" id="node-input-outputField" style="width: calc(100% - 130px)" placeholder="payload">
+        <label for="node-input-storeName">
+            <i class="fa fa-database"></i>
+            <span data-i18n="ui-scheduler.label.storeName"></span>
+        </label>
+        <select type="text" id="node-input-storeName" style="width: calc(100% - 130px);"></select>
         </div>
-        <div class=" form-row ui-scheduler-form-row">
-            <label for="node-input-useNewTimePicker"><i class="fa fa-clock-o"></i> Use new timepicker (if available)</label>
-            <input type="checkbox" id="node-input-useNewTimePicker" style="display: inline-block; width: auto; margin: 0px 0px 0px 4px;">
+
+        <div class="form-row ui-scheduler-form-row form-row-flex node-input-topic-container-row" style="margin-bottom: 0px; width: 100%">
+        <label for="node-input-topic-container-div">
+            <i class="fa fa-list-alt"></i>
+            <span data-i18n="ui-scheduler.label.topics"></span>
+        </label>
+        <div id="node-input-topic-container-div">
+            <ol id="node-input-topic-container" style="list-style-type: none; margin:0; max-height: 200px;"></ol>
         </div>
-    
+        </div>
+
+        <div class="form-row ui-scheduler-form-row form-row-flex node-input-customPayload-container-row" style="margin-top: 20px; margin-bottom: 0px; width: 100%">
+        <label for="node-input-customPayload-container-div">
+            <i class="fa fa-list-alt"></i>
+            <span data-i18n="ui-scheduler.label.customPayloads"></span>
+        </label>
+        <div id="node-input-customPayload-container-div" style="box-sizing: border-box; border-radius: 5px; min-height: 50px; height: auto; max-height: 200px; padding: 5px; border: 1px solid var(--red-ui-form-input-border-color, #ccc); overflow-y: auto; display: inline-block; width: 80%;">
+            <span id="valWarning" style="color: var(--red-ui-text-color-error, #910000)">
+            <b data-i18n="ui-scheduler.label.customPayloadsWarning"></b>
+            </span>
+            <ol id="node-input-customPayload-container" style="list-style-type: none; margin: 0;"></ol>
+        </div>
+        </div>
+
+        <div class="form-row">
+        <a href="#" class="editor-button editor-button-small" id="node-input-add-customPayload" style="margin-bottom: 20px; margin-top: 4px; margin-left: 125px;">
+            <i class="fa fa-plus"></i>
+            <span data-i18n="ui-scheduler.label.addCustomPayload"></span>
+        </a>
+        </div>
+
+        <div id="node-ui-scheduler-tab-static-schedules" class="form-row ui-scheduler-form-row form-row-auto-height" style="width: 100%; min-height: 200px; display: flex; flex-flow: column nowrap; max-width: min-content">
+        <!-- Row 1 -->
+        <div style="display: flex; justify-content: space-between;">
+            <label for="node-input-option-container-div" style="vertical-align: top; flex-basis: 120px;">
+            <i class="fa fa-list-alt"></i>
+            <span data-i18n="ui-scheduler.label.staticSchedules"></span>
+            </label>
+            <div style="flex-grow: 1; column-gap: 2px; margin-bottom: 2px; margin-top: 0px; display: flex; padding: 0px 0px 0px 4px;">
+            <!-- Toolbar -->
+            <a href="#" accesskey="a" title="Add a new schedule [A]" class="editor-button editor-button-small" id="node-input-add-option">
+                <span data-i18n="ui-scheduler.label.addOption"></span>
+            </a>
+            <a href="#" accesskey="s" title="Show dynamic schedules [S]" class="editor-button editor-button-small" id="node-input-show-dynamic">
+                <span data-i18n="ui-scheduler.label.showDynamicSchedules"></span>
+            </a>
+            <a href="#" accesskey="x" class="editor-button editor-button-small" id="ui-scheduler-expand-schedules-button" title="Hold the shift key for fullscreen [X]" style="margin-left: auto;">
+                <span class="expand-icon" data-i18n="ui-scheduler.label.expandSchedules"></span>
+            </a>
+            </div>
+        </div>
+        <!-- Row 2 (the list) -->
+        <div class="red-ui-editableList-border red-ui-editableList-container" id="node-input-option-container-div" style="min-width: 300px; box-sizing: border-box; border-radius: 5px; padding: 5px; overflow-y: scroll; display: inline-block; height: calc(100% - -4px); min-height: 150px;">
+            <ol id="node-input-option-container" style="list-style-type: none; margin: 0;" class="ui-sortable"></ol>
+        </div>
+        </div>
+
+        <div class="form-row ui-scheduler-form-row">
+        <label for="node-input-outputField">
+            <i class="fa fa-sign-out"></i>
+            <span data-i18n="ui-scheduler.label.outputField"></span>
+        </label>
+        <input type="text" id="node-input-outputField" style="width: calc(100% - 130px)" placeholder="" data-i18n="[placeholder]ui-scheduler.label.outputFieldPlaceholder">
+        </div>
+
+        <div class="form-row ui-scheduler-form-row">
+        <label for="node-input-useNewTimePicker">
+            <i class="fa fa-clock-o"></i>
+            <span data-i18n="ui-scheduler.label.useNewTimePicker"></span>
+        </label>
+        <input type="checkbox" id="node-input-useNewTimePicker" style="display: inline-block; width: auto; margin: 0px 0px 0px 4px;">
+        </div>
         <style>
             #ui-scheduler-map > div.leaflet-map-pane > div.leaflet-objects-pane > div.leaflet-popup-pane > div > div.leaflet-popup-content-wrapper,
             #ui-scheduler-map > div.leaflet-map-pane > div.leaflet-objects-pane > div.leaflet-popup-pane > div > div.leaflet-popup-tip-container > div {

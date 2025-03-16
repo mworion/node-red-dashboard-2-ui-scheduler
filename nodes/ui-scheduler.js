@@ -1,4 +1,4 @@
-const version = '3.0.1'
+const version = '3.1.0'
 const packageName = '@cgjgh/node-red-dashboard-2-ui-scheduler'
 /* eslint-disable no-unused-vars */
 
@@ -12,11 +12,11 @@ const path = require('path')
 const { TZDate } = require('@date-fns/tz')
 const coordParser = require('coord-parser')
 const cronosjs = require('cronosjs-extended')
-const cronstrue = require('cronstrue')
-const { addMinutes, addHours, startOfYear, formatDistanceStrict } = require('date-fns')
+const cronstrue = require('cronstrue/i18n')
+const { addMinutes, addHours, startOfYear } = require('date-fns')
 
+const { createMs } = require('enhanced-ms')
 const analytics = require('node-debug-analytics')
-const prettyMs = require('pretty-ms')
 const semver = require('semver')
 
 const SunCalc = require('suncalc2')
@@ -25,26 +25,33 @@ SunCalc.addTime(-18, 'nightEnd', 'nightStart')
 SunCalc.addTime(-6, 'civilDawn', 'civilDusk')
 SunCalc.addTime(6, 'morningGoldenHourEnd', 'eveningGoldenHourStart')
 
-const PERMITTED_SOLAR_EVENTS = [
-    'nightEnd',
-    // "astronomicalDawn",
-    'nauticalDawn',
-    'civilDawn',
-    // "morningGoldenHourStart",
-    'sunrise',
-    'sunriseEnd',
-    'morningGoldenHourEnd',
-    'solarNoon',
-    'eveningGoldenHourStart',
-    'sunsetStart',
-    'sunset',
-    // "eveningGoldenHourEnd",
-    'civilDusk',
-    'nauticalDusk',
-    // "astronomicalDusk",
-    'nightStart',
-    'nadir'
-]
+const availableLocales = ['en', 'de', 'fr', 'it', 'nl', 'es']
+
+/**
+ * Sets the locale for the given configuration object.
+ *
+ * If the current locale in the configuration is null or not in the list of
+ * available locales, it attempts to set the locale to the provided settingsLang
+ * if it is valid. Defaults to 'en' if no valid locale is found.
+ *
+ * @param {Object} config - The configuration object containing the locale setting.
+ * @param {string} settingsLang - The preferred language setting to be applied.
+ * @returns {string} - The finalized locale setting.
+ */
+function setLocale (config, settingsLang) {
+    if (config.locale === null || !availableLocales.includes(config.locale)) {
+        config.locale = (settingsLang && availableLocales.includes(settingsLang))
+            ? settingsLang
+            : 'en'
+    }
+    return config.locale
+}
+
+// globally accesible milliseconds formatter
+let enhancedMs
+function initializeMs (language) {
+    enhancedMs = createMs({ language })
+}
 
 // Solar events
 const solarEvents = [
@@ -64,17 +71,82 @@ const solarEvents = [
     { title: 'Nadir', value: 'nadir' }
 ]
 
-const dayMapping = {
-    Sunday: 'Sun',
-    Monday: 'Mon',
-    Tuesday: 'Tue',
-    Wednesday: 'Wed',
-    Thursday: 'Thu',
-    Friday: 'Fri',
-    Saturday: 'Sat'
+const PERMITTED_SOLAR_EVENTS = solarEvents.map(event => event.value)
+
+const daysOfWeek = [
+    { title: 'Sunday', value: 'sunday', short: 'Sun' },
+    { title: 'Monday', value: 'monday', short: 'Mon' },
+    { title: 'Tuesday', value: 'tuesday', short: 'Tue' },
+    { title: 'Wednesday', value: 'wednesday', short: 'Wed' },
+    { title: 'Thursday', value: 'thursday', short: 'Thu' },
+    { title: 'Friday', value: 'friday', short: 'Fri' },
+    { title: 'Saturday', value: 'saturday', short: 'Sat' }
+]
+
+// Function to get all day 'value' properties
+const allDaysOfWeek = () => daysOfWeek.map(day => day.value)
+
+/**
+ * Abbreviates the day names in a given description string.
+ *
+ * This function replaces full day names (e.g., "Monday") in the input
+ * description with their corresponding short forms (e.g., "Mon") using
+ * a predefined mapping of days of the week.
+ *
+ * @param {string} description - The input string containing full day names.
+ * @returns {string} - The modified string with abbreviated day names.
+ */
+const abbreviateDays = (description) => {
+    if (!description) return ''
+
+    // Create a mapping from title to short
+    const dayMapping = daysOfWeek.reduce((acc, day) => {
+        acc[day.title.toLowerCase()] = day.short // Store lowercase keys
+        return acc
+    }, {})
+
+    return description.replace(
+        new RegExp(`\\b(${daysOfWeek.map(day => day.title).join('|')})\\b`, 'gi'), // Add 'i' flag for case-insensitivity
+        (day) => dayMapping[day.toLowerCase()] || day // Normalize day to lowercase
+    )
 }
 
-const allDaysOfWeek = Object.keys(dayMapping)
+// localized strings
+let futureTemplate = 'in {time}'
+let pastTemplate = '{time} ago'
+let never = 'Never'
+
+/**
+ * Converts a given time in milliseconds to a human-readable format indicating
+ * how long ago the time was. If the input is not provided, defaults to 0.
+ * Utilizes the `enhancedMs` function to format the milliseconds and replaces
+ * any negative signs with an empty string. The formatted time is then inserted
+ * into the `pastTemplate` string.
+ *
+ * @param {number} ms - The time in milliseconds to be converted.
+ * @returns {string} A string representing the time in a human-readable format.
+ */
+function pastMs (ms) {
+    if (!ms) ms = 0
+    let enhanced = enhancedMs(ms)
+    if (enhanced && enhanced.indexOf('-') >= 0) {
+        enhanced = enhanced.replace(/-/g, '')
+    }
+
+    return pastTemplate.replace('{time}', enhanced)
+}
+
+/**
+ * Generates a future time string by replacing the placeholder in the futureTemplate
+ * with the enhanced milliseconds value.
+ *
+ * @param {number} ms - The number of milliseconds to be enhanced and formatted.
+ * @returns {string} A formatted string indicating the future time.
+ */
+function futureMs (ms) {
+    if (!ms) ms = 0
+    return futureTemplate.replace('{time}', enhancedMs(ms))
+}
 
 // accepted commands using topic as the command & (in compatible cases, the payload is the schedule name)
 // commands not supported by topic are : add/update & describe
@@ -151,6 +223,91 @@ function checkForUpdate (currentVersion, packageName, callback) {
             latestVersion
         })
     })
+}
+
+/**
+ * Applies localized names to solar events by updating their titles.
+ *
+ * This function iterates over the predefined list of solar events and attempts
+ * to retrieve a localized title for each event using the provided RED object.
+ * If a localized title is found, it updates the event's title with the localized
+ * version. The localization keys are constructed using the event's value.
+ *
+ * @param {Object} RED - The RED object used for retrieving localized strings.
+ */
+function applyLocalizedSolarEventNames (RED) {
+    solarEvents.forEach(event => {
+        // Get the localized title string for this event value.
+        const localizedTitle = RED._('ui-scheduler.solarEvents.' + event.value)
+        // Only update if a localized title is found (i.e. it isn't null or falsy)
+        if (localizedTitle) {
+            event.title = localizedTitle
+        }
+    })
+}
+
+/**
+ * Localizes the day names and their abbreviations in the `daysOfWeek` array.
+ *
+ * This function iterates over each day in the `daysOfWeek` array and updates
+ * the `title` and `short` properties with their localized equivalents using
+ * the provided `RED` object. If a localized short form is not available, it
+ * defaults to the first three letters of the localized title.
+ *
+ * @param {Object} RED - The localization object used to retrieve localized strings.
+ */
+function applyLocalizedDayNames (RED) {
+    daysOfWeek.forEach(day => {
+        // Get the localized title for this day.
+        const localizedTitle = RED._('ui-scheduler.days.' + day.value)
+        if (localizedTitle) {
+            day.title = localizedTitle
+        }
+
+        // Get the localized short value for this day.
+        const localizedShort = RED._('ui-scheduler.days.' + day.value + '.short')
+        if (localizedShort && localizedShort !== 'ui-scheduler.days.' + day.value + '.short') {
+            day.short = localizedShort
+        } else {
+            // Fall back to a three-letter abbreviation from the current title.
+            day.short = day.title.substring(0, 3)
+        }
+    })
+}
+
+/**
+ * Localizes the text templates for future, past, and never time references
+ * using the RED internationalization function. Updates the global variables
+ * `futureTemplate`, `pastTemplate`, and `never` with localized strings.
+ *
+ * @param {Object} RED - The RED object providing internationalization support.
+ */
+function applyLocalizedWords (RED) {
+    futureTemplate = RED._('ui-scheduler.label.future')
+    pastTemplate = RED._('ui-scheduler.label.past')
+    never = RED._('ui-scheduler.label.never')
+}
+
+/**
+ * Retrieves the title of a solar event based on the provided event key.
+ *
+ * @param {string} eventKey - The key representing the solar event.
+ * @returns {string} The title of the solar event if found, otherwise an empty string.
+ */
+function getSolarEventName (eventKey) {
+    const eventObj = solarEvents.find(e => e.value === eventKey)
+    return eventObj ? eventObj.title : ''
+}
+
+/**
+ * Retrieves the title of a day given its key.
+ *
+ * @param {string} dayKey - The key representing the day of the week.
+ * @returns {string} The title of the day if found, otherwise an empty string.
+ */
+function getDayName (dayKey) {
+    const dayObj = daysOfWeek.find(d => d.value === dayKey)
+    return dayObj ? dayObj.title : ''
 }
 
 /**
@@ -338,7 +495,7 @@ function getCurrentTimezone (node) {
  * @param {string} solarEvents a CSV of solar events to be included
  * @param {date} time Optional time to use (defaults to Date.now() if excluded)
  */
-function _describeExpression (expression, expressionType, timeZone, offset, solarType, solarEvents, time, opts, use24HourFormat = true) {
+function _describeExpression (expression, expressionType, timeZone, offset, solarType, solarEvents, time, opts, use24HourFormat = true, locale = null) {
     const now = time ? new Date(time) : new Date()
     opts = opts || {}
     let result = { description: undefined, nextDate: undefined, nextDescription: undefined, prettyNext: 'Never' }
@@ -374,10 +531,10 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             const nowOffset = new Date(now.getTime() - offset * 60000)
             const daysOfWeek = opt?.solarDays || null
 
-            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset, daysOfWeek)
+            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset, daysOfWeek, timeZone, use24HourFormat, locale)
             // eslint-disable-next-line eqeqeq
             if (opts.includeSolarStateOffset && offset != 0) {
-                const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0, daysOfWeek)
+                const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0, daysOfWeek, timeZone, use24HourFormat, locale)
                 result.solarStateOffset = ssOffset.solarState
             }
             result.offset = offset
@@ -417,21 +574,22 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             result.previousDate = dsLastDates[dsLastDates.length - 1]
             const ms = result.nextDate.valueOf() - now.valueOf()
             const msLast = result.previousDate ? now.valueOf() - result.previousDate.valueOf() : 0
-            result.prettyNext = (result.nextEvent ? result.nextEvent + ' ' : '') + `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
-            result.prettyPrevious = msLast > 0 ? (result.lastEvent ? result.lastEvent + ' ' : '') + prettyMs(msLast, { secondsDecimalDigits: 0, verbose: true }).replace(/-/g, ' ') + ' ago' : 'Never'
+
+            result.prettyNext = (result.nextEvent ? getSolarEventName(result.nextEvent) + ' ' : '') + futureMs(ms)
+            result.prettyPrevious = msLast > 0 ? (result.lastEvent ? getSolarEventName(result.lastEvent) + ' ' : '') + pastMs(msLast) : never
             if (expressionType === 'solar') {
                 if (solarType === 'all') {
                     result.description = 'All Solar Events'
                 } else {
                     const solarEventsArray = solarEvents.split(',')
-                    const events = solarEventsArray.map(event => mapSolarEvent(event)).join(', ')
-                    result.description = events + ((opts.solarDays && opts.solarDays.length) ? ' only on ' + opts.solarDays.map(day => day.substring(0, 3)).join(',') : '')
+                    const events = solarEventsArray.map(event => getSolarEventName(event)).join(', ')
+                    result.description = events + ((opts.solarDays && opts.solarDays.length) ? ', ' + opts.solarDays.map(day => day.substring(0, 3)).join(',') : '')
                 }
             } else {
                 if (count === 1) {
-                    result.description = 'One time at ' + formatShortDateTimeWithTZ(result.nextDate, timeZone, use24HourFormat)
+                    result.description = 'One time at ' + formatShortDateTimeWithTZ(result.nextDate, timeZone, use24HourFormat, locale)
                 } else {
-                    result.description = count + ' Date Sequences starting at ' + formatShortDateTimeWithTZ(result.nextDate, timeZone, use24HourFormat)
+                    result.description = count + ' Date Sequences starting at ' + formatShortDateTimeWithTZ(result.nextDate, timeZone, use24HourFormat, locale)
                 }
                 result.nextDates = dsFutureDates.slice(0, 5)
                 result.prevDates = dsLastDates.slice(-5)
@@ -445,20 +603,19 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
         const previous = ex.previousDate()
         if (next) {
             const ms = next.valueOf() - now.valueOf()
-            result.prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
-            try {
-                result.nextDates = ex.nextNDates(now, 5)
-            } catch (error) {
-                console.debug(error)
-            }
-        } else {
-            result.description = 'Invalid expression'
-            result.valid = false
-            return result
+            result.prettyNext = (result.nextEvent ? getSolarEventName(result.nextEvent) + ' ' : '') + futureMs(ms)
+        }
+        const msLast = result.previousDate ? now.valueOf() - result.previousDate.valueOf() : 0
+        result.prettyPrevious = msLast > 0 ? (result.lastEvent ? getSolarEventName(result.lastEvent) + ' ' : '') + pastMs(msLast) : never
+
+        try {
+            result.nextDates = ex.nextNDates(now, 5)
+        } catch (error) {
+            console.debug(error)
         }
         if (previous) {
             const ms = now.valueOf() - previous.valueOf()
-            result.prettyPrevious = prettyMs(ms, { secondsDecimalDigits: 0, verbose: true }) + ' ago'
+            result.prettyPrevious = pastMs(ms)
             try {
                 result.prevDates = ex.previousNDates(now, 5)
             } catch (error) {
@@ -469,14 +626,15 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
             // result.valid = false
             // return result
         }
-        result.description = humanizeCron(expression, null, use24HourFormat)
+
+        result.description = humanizeCron(expression, locale, use24HourFormat)
         result.nextDate = next
         result.previousDate = previous
     }
     return result
 }
 
-async function _asyncDescribeExpression (expression, expressionType, timeZone, offset, solarType, solarEvents, time, opts, use24HourFormat = true) {
+async function _asyncDescribeExpression (expression, expressionType, timeZone, offset, solarType, solarEvents, time, opts, use24HourFormat = true, locale = null) {
     const now = time ? new Date(time) : new Date()
     opts = opts || {}
     let result = { description: undefined, nextDate: undefined, nextDescription: undefined, prettyNext: 'Never' }
@@ -512,10 +670,10 @@ async function _asyncDescribeExpression (expression, expressionType, timeZone, o
             const nowOffset = new Date(now.getTime() - offset * 60000)
             const daysOfWeek = opt?.solarDays || null
 
-            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset, daysOfWeek)
+            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset, daysOfWeek, timeZone, use24HourFormat, locale)
             // eslint-disable-next-line eqeqeq
             if (opts.includeSolarStateOffset && offset != 0) {
-                const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0, daysOfWeek)
+                const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0, daysOfWeek, timeZone, use24HourFormat, locale)
                 result.solarStateOffset = ssOffset.solarState
             }
             result.offset = offset
@@ -546,28 +704,34 @@ async function _asyncDescribeExpression (expression, expressionType, timeZone, o
         const task = ds.task
         const dates = ds.dates
         const dsFutureDates = dates.filter(d => d >= now)
+        const dsLastDates = dates.filter(d => d <= now)
         const count = dsFutureDates ? dsFutureDates.length : 0
         result.description = 'Date sequence with fixed dates'
 
         if (task && task._sequence && count) {
             result.nextDate = dsFutureDates[0]
+            result.previousDate = dsLastDates[dsLastDates.length - 1]
             const ms = result.nextDate.valueOf() - now.valueOf()
-            result.prettyNext = (result.nextEvent ? result.nextEvent + ' ' : '') + `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
+            const msLast = result.previousDate ? now.valueOf() - result.previousDate.valueOf() : 0
+
+            result.prettyNext = (result.nextEvent ? getSolarEventName(result.nextEvent) + ' ' : '') + futureMs(ms)
+            result.prettyPrevious = msLast > 0 ? (result.lastEvent ? getSolarEventName(result.lastEvent) + ' ' : '') + pastMs(msLast) : never
             if (expressionType === 'solar') {
                 if (solarType === 'all') {
                     result.description = 'All Solar Events'
                 } else {
                     const solarEventsArray = solarEvents.split(',')
-                    const events = solarEventsArray.map(event => mapSolarEvent(event)).join(', ')
-                    result.description = events + ((opts.solarDays && opts.solarDays.length) ? ' only on ' + opts.solarDays.map(day => day.substring(0, 3)).join(',') : '')
+                    const events = solarEventsArray.map(event => getSolarEventName(event)).join(', ')
+                    result.description = events + ((opts.solarDays && opts.solarDays.length) ? ', ' + opts.solarDays.map(day => day.substring(0, 3)).join(',') : '')
                 }
             } else {
                 if (count === 1) {
-                    result.description = 'One time at ' + formatShortDateTimeWithTZ(result.nextDate, timeZone, use24HourFormat)
+                    result.description = 'One time at ' + formatShortDateTimeWithTZ(result.nextDate, timeZone, use24HourFormat, locale)
                 } else {
-                    result.description = count + ' Date Sequences starting at ' + formatShortDateTimeWithTZ(result.nextDate, timeZone, use24HourFormat)
+                    result.description = count + ' Date Sequences starting at ' + formatShortDateTimeWithTZ(result.nextDate, timeZone, use24HourFormat, locale)
                 }
                 result.nextDates = dsFutureDates.slice(0, 5)
+                result.prevDates = dsLastDates.slice(-5)
             }
         }
     }
@@ -578,20 +742,19 @@ async function _asyncDescribeExpression (expression, expressionType, timeZone, o
         const previous = ex.previousDate()
         if (next) {
             const ms = next.valueOf() - now.valueOf()
-            result.prettyNext = `in ${prettyMs(ms, { secondsDecimalDigits: 0, verbose: true })}`
-            try {
-                result.nextDates = ex.nextNDates(now, 5)
-            } catch (error) {
-                console.debug(error)
-            }
-        } else {
-            result.description = 'Invalid expression'
-            result.valid = false
-            return result
+            result.prettyNext = (result.nextEvent ? getSolarEventName(result.nextEvent) + ' ' : '') + futureMs(ms)
+        }
+        const msLast = result.previousDate ? now.valueOf() - result.previousDate.valueOf() : 0
+        result.prettyPrevious = msLast > 0 ? (result.lastEvent ? getSolarEventName(result.lastEvent) + ' ' : '') + pastMs(msLast) : never
+
+        try {
+            result.nextDates = ex.nextNDates(now, 5)
+        } catch (error) {
+            console.debug(error)
         }
         if (previous) {
-            const ms = previous.valueOf() - now.valueOf()
-            result.prettyPrevious = prettyMs(ms, { secondsDecimalDigits: 0, verbose: true }).replace(/-/g, ' ') + ' ago'
+            const ms = now.valueOf() - previous.valueOf()
+            result.prettyPrevious = pastMs(ms)
             try {
                 result.prevDates = ex.previousNDates(now, 5)
             } catch (error) {
@@ -602,7 +765,8 @@ async function _asyncDescribeExpression (expression, expressionType, timeZone, o
             // result.valid = false
             // return result
         }
-        result.description = humanizeCron(expression, null, use24HourFormat)
+
+        result.description = humanizeCron(expression, locale, use24HourFormat)
         result.nextDate = next
         result.previousDate = previous
     }
@@ -610,19 +774,21 @@ async function _asyncDescribeExpression (expression, expressionType, timeZone, o
 }
 
 /**
- * Returns a formatted string based on the provided tz.
- * If tz is not specified, then Date.toString() is used
- * @param {Date | string | number} date The date to format
- * @param {string} [tz] Timezone to use (exclude to use system)
- * @returns {string}
- * The formatted date or empty string if `date` is null|undefined
- */
-function formatShortDateTimeWithTZ (date, tz, use24HourFormat = true) {
+     * Formats a given date into a short date-time string with timezone information.
+     *
+     * @param {string|Date} date - The date to format. Can be a date string or a Date object.
+     * @param {string} tz - The timezone identifier (e.g., 'America/New_York').
+     * @param {boolean} [use24HourFormat=true] - Whether to use 24-hour format. Defaults to true.
+     * @param {string} [locale='en'] - The locale to use for formatting. Defaults to 'en'.
+     * @returns {string} The formatted date-time string or an error message if formatting fails.
+     */
+function formatShortDateTimeWithTZ (date, tz, use24HourFormat = true, locale = 'en') {
     if (!date) {
         return ''
     }
     let dateString
     const o = {
+        locale, // Specify the locale
         timeZone: tz || undefined,
         timeZoneName: 'short',
         year: 'numeric',
@@ -634,47 +800,47 @@ function formatShortDateTimeWithTZ (date, tz, use24HourFormat = true) {
         hourCycle: use24HourFormat ? 'h23' : 'h12'
     }
     try {
-        dateString = new Intl.DateTimeFormat('default', o).format(new Date(date))
+        dateString = new Intl.DateTimeFormat(locale, o).format(new Date(date))
     } catch (error) {
-        dateString = 'Error. Check timezone setting'
+        dateString = 'Error. Check timezone or locale setting'
     }
 
     return dateString
 }
 
 /**
- * Determine if a variable is a number
- * @param {string|number} n The string or number to test
- * @returns {boolean}
- */
+     * Determine if a variable is a number
+     * @param {string|number} n The string or number to test
+     * @returns {boolean}
+     */
 function isNumber (n) {
     return !isNaN(parseFloat(n)) && isFinite(n)
 }
 
 /**
- * Determine if a variable is a valid object
- * NOTE: Arrays are also objects - be sure to use Array.isArray if you need to know the difference
- * @param {*} o The variable to test
- * @returns {boolean}
- */
+     * Determine if a variable is a valid object
+     * NOTE: Arrays are also objects - be sure to use Array.isArray if you need to know the difference
+     * @param {*} o The variable to test
+     * @returns {boolean}
+     */
 function isObject (o) {
     return (typeof o === 'object' && o !== null)
 }
 
 /**
- * Determine if a variable is a valid date
- * @param {*} d The variable to test
- * @returns {boolean}
- */
+     * Determine if a variable is a valid date
+     * @param {*} d The variable to test
+     * @returns {boolean}
+     */
 function isValidDateObject (d) {
     return d instanceof Date && !isNaN(d)
 }
 
 /**
- * Determine if a variable is a cron like string
- * @param {string} expression The variable to test
- * @returns {boolean}
- */
+     * Determine if a variable is a cron like string
+     * @param {string} expression The variable to test
+     * @returns {boolean}
+     */
 function isCronLike (expression) {
     if (typeof expression !== 'string') return false
     if (expression.includes('*')) return true
@@ -684,10 +850,10 @@ function isCronLike (expression) {
 }
 
 /**
- * Apply defaults to the cron schedule object
- * @param {integer} optionIndex An index number to use for defaults
- * @param {object} option The option object to update
-*/
+     * Apply defaults to the cron schedule object
+     * @param {integer} optionIndex An index number to use for defaults
+     * @param {object} option The option object to update
+    */
 function applyOptionDefaults (node, option, optionIndex) {
     if (isObject(option) === false) {
         return// no point in continuing
@@ -727,14 +893,17 @@ function applyOptionDefaults (node, option, optionIndex) {
         if (!option.location) option.location = node.defaultLocation || ''
         option.locationType = node.defaultLocationType || 'fixed'
     }
+    option.locale = node.locale || 'en'
+    option.timezone = node.timezone || 'UTC'
+    option.timeFormat = node.use24HourFormat || '24'
 }
 /**
- * Calculates the next occurrence of a specified weekday from a given start date.
- *
- * @param {string[]} weekdays - An array of weekday names to search for the next occurrence.
- * @param {Date} [startDate=new Date()] - The date from which to start the search. Defaults to the current date.
- * @returns {Date} The date of the next occurrence of one of the specified weekdays.
- */
+     * Calculates the next occurrence of a specified weekday from a given start date.
+     *
+     * @param {string[]} weekdays - An array of weekday names to search for the next occurrence.
+     * @param {Date} [startDate=new Date()] - The date from which to start the search. Defaults to the current date.
+     * @returns {Date} The date of the next occurrence of one of the specified weekdays.
+     */
 function getNextWeekday (weekdays, startDate = new Date()) {
     const start = new Date(startDate)
     const startIndex = start.getDay()
@@ -765,12 +934,12 @@ function getNextWeekday (weekdays, startDate = new Date()) {
 }
 
 /**
- * Calculates the most recent occurrence of a specified weekday before a given start date.
- *
- * @param {string[]} weekdays - An array of weekday names to consider. If empty or not provided, all days of the week are considered.
- * @param {Date} [startDate=new Date()] - The date from which to start the search. Defaults to the current date.
- * @returns {Date} The date of the last occurrence of one of the specified weekdays.
- */
+     * Calculates the most recent occurrence of a specified weekday before a given start date.
+     *
+     * @param {string[]} weekdays - An array of weekday names to consider. If empty or not provided, all days of the week are considered.
+     * @param {Date} [startDate=new Date()] - The date from which to start the search. Defaults to the current date.
+     * @returns {Date} The date of the last occurrence of one of the specified weekdays.
+     */
 function getLastWeekday (weekdays, startDate = new Date()) {
     if (!weekdays || weekdays.length === 0) {
         weekdays = allDaysOfWeek
@@ -806,14 +975,14 @@ function getLastWeekday (weekdays, startDate = new Date()) {
 }
 
 /**
- * Retrieves the most recent event from a list of events that matches a specified
- * solar event and occurred before or at the current time.
- *
- * @param {Array} events - An array of event objects, each containing an 'event' and 'timeOffset'.
- * @param {Array} solarEventsArr - An array of solar event names to match against.
- * @param {Date} now - The current date and time used to compare event occurrences.
- * @returns {Object|null} The most recent matching event object, or null if no match is found.
- */
+     * Retrieves the most recent event from a list of events that matches a specified
+     * solar event and occurred before or at the current time.
+     *
+     * @param {Array} events - An array of event objects, each containing an 'event' and 'timeOffset'.
+     * @param {Array} solarEventsArr - An array of solar event names to match against.
+     * @param {Date} now - The current date and time used to compare event occurrences.
+     * @returns {Object|null} The most recent matching event object, or null if no match is found.
+     */
 function getLastOccurredEvent (events, solarEventsArr, now) {
     for (let i = events.length - 1; i >= 0; i--) {
         const item = events[i]
@@ -825,12 +994,12 @@ function getLastOccurredEvent (events, solarEventsArr, now) {
 }
 
 /**
- * Calculates the next occurrence of a specified time on or after a given start date.
- *
- * @param {Date} startDate - The starting date from which to calculate the next occurrence.
- * @param {string} timeString - The time in 'HH:MM' format to find the next occurrence of.
- * @returns {Date} A Date object representing the next occurrence of the specified time.
- */
+     * Calculates the next occurrence of a specified time on or after a given start date.
+     *
+     * @param {Date} startDate - The starting date from which to calculate the next occurrence.
+     * @param {string} timeString - The time in 'HH:MM' format to find the next occurrence of.
+     * @returns {Date} A Date object representing the next occurrence of the specified time.
+     */
 function getNextTimeOccurrence (node, startDate, timeString) {
     if (!startDate) startDate = new Date()
     if (!timeString) timeString = '00:00'
@@ -851,14 +1020,14 @@ function getNextTimeOccurrence (node, startDate, timeString) {
 }
 
 /**
- * Calculates the next occurrences of a time interval from the start of the year.
- *
- * @param {number} interval - The interval between occurrences, must be a positive number.
- * @param {string} unit - The unit of time for the interval, either 'minute' or 'hour'.
- * @param {number} [count=1] - The number of occurrences to calculate.
- * @returns {Date[]} An array of Date objects representing the next occurrences.
- * @throws {Error} Throws an error if the interval is not positive or if the unit is invalid.
- */
+     * Calculates the next occurrences of a time interval from the start of the year.
+     *
+     * @param {number} interval - The interval between occurrences, must be a positive number.
+     * @param {string} unit - The unit of time for the interval, either 'minute' or 'hour'.
+     * @param {number} [count=1] - The number of occurrences to calculate.
+     * @returns {Date[]} An array of Date objects representing the next occurrences.
+     * @throws {Error} Throws an error if the interval is not positive or if the unit is invalid.
+     */
 function getNextIntervalOccurrences (interval, unit, count = 1) {
     const now = new Date()
     const anchor = startOfYear(now) // Anchor: January 1st, 00:00
@@ -890,14 +1059,14 @@ function getNextIntervalOccurrences (interval, unit, count = 1) {
 }
 
 /**
- * Generates a sequence of past date occurrences based on a specified interval and unit.
- *
- * @param {number} interval - The interval between occurrences, must be a positive number.
- * @param {string} unit - The unit of time for the interval, either 'minute' or 'hour'.
- * @param {number} [count=1] - The number of past occurrences to generate, must be a positive number.
- * @returns {Date[]} An array of Date objects representing the past occurrences.
- * @throws {Error} If the interval is not a positive number or if the unit is invalid.
- */
+     * Generates a sequence of past date occurrences based on a specified interval and unit.
+     *
+     * @param {number} interval - The interval between occurrences, must be a positive number.
+     * @param {string} unit - The unit of time for the interval, either 'minute' or 'hour'.
+     * @param {number} [count=1] - The number of past occurrences to generate, must be a positive number.
+     * @returns {Date[]} An array of Date objects representing the past occurrences.
+     * @throws {Error} If the interval is not a positive number or if the unit is invalid.
+     */
 function getPreviousIntervalOccurrences (interval, unit, count = 1) {
     const now = new Date()
     const anchor = startOfYear(now) // Anchor: January 1st, 00:00
@@ -927,14 +1096,14 @@ function getPreviousIntervalOccurrences (interval, unit, count = 1) {
 }
 
 /**
- * Determines if a given interval is compatible with cron scheduling
- * based on the specified type ('minute' or 'hour').
- *
- * @param {number} interval - The interval to check for compatibility.
- * @param {string} type - The type of interval, either 'minute' or 'hour'.
- * @returns {boolean} True if the interval is compatible with cron scheduling; otherwise, false.
- * @throws {Error} Throws an error if the type is not 'minute' or 'hour'.
- */
+     * Determines if a given interval is compatible with cron scheduling
+     * based on the specified type ('minute' or 'hour').
+     *
+     * @param {number} interval - The interval to check for compatibility.
+     * @param {string} type - The type of interval, either 'minute' or 'hour'.
+     * @returns {boolean} True if the interval is compatible with cron scheduling; otherwise, false.
+     * @throws {Error} Throws an error if the type is not 'minute' or 'hour'.
+     */
 function isCronCompatible (interval, type) {
     if (type === 'minute') {
         return 60 % interval === 0
@@ -946,15 +1115,15 @@ function isCronCompatible (interval, type) {
 }
 
 /**
- * Generates a sequence of date occurrences based on a specified interval and unit.
- *
- * @param {number} interval - The interval between occurrences, must be a positive number.
- * @param {string} unit - The unit of time for the interval, either 'minute' or 'hour'.
- * @param {string} [type='both'] - The type of occurrences to generate: 'past', 'future', or 'both'.
- * @param {number} [count=1] - The number of occurrences to generate for each type, must be a positive number.
- * @returns {string} A comma-separated string of ISO formatted date occurrences.
- * @throws {Error} If the interval or count is not a positive number, or if the unit is invalid.
- */
+     * Generates a sequence of date occurrences based on a specified interval and unit.
+     *
+     * @param {number} interval - The interval between occurrences, must be a positive number.
+     * @param {string} unit - The unit of time for the interval, either 'minute' or 'hour'.
+     * @param {string} [type='both'] - The type of occurrences to generate: 'past', 'future', or 'both'.
+     * @param {number} [count=1] - The number of occurrences to generate for each type, must be a positive number.
+     * @returns {string} A comma-separated string of ISO formatted date occurrences.
+     * @throws {Error} If the interval or count is not a positive number, or if the unit is invalid.
+     */
 function generateDateSequence (interval, unit, type = 'both', count = 1) {
     if (interval <= 0 || count <= 0) {
         throw new Error('Interval and count must be positive numbers.')
@@ -979,22 +1148,22 @@ function generateDateSequence (interval, unit, type = 'both', count = 1) {
 }
 
 /**
- * Parses a given expression to determine if it represents a valid date sequence.
- *
- * The function checks if the input expression is a string and splits it by commas.
- * Each element is trimmed and checked if it resembles a cron-like expression.
- * If any element is cron-like, the function returns early with a result indicating
- * failure. Otherwise, it attempts to convert each element into a Date object.
- *
- * If the resulting dates can form a valid CronosTask sequence, the function
- * updates the result to indicate success and includes the sequence details.
- *
- * @param {string|Array} expression - The expression to parse, which can be a string
- *                                    of comma-separated values or an array.
- * @returns {Object} An object containing the parsing result, including whether
- *                   the expression is a valid date sequence, the original expression,
- *                   and the parsed dates if successful.
- */
+     * Parses a given expression to determine if it represents a valid date sequence.
+     *
+     * The function checks if the input expression is a string and splits it by commas.
+     * Each element is trimmed and checked if it resembles a cron-like expression.
+     * If any element is cron-like, the function returns early with a result indicating
+     * failure. Otherwise, it attempts to convert each element into a Date object.
+     *
+     * If the resulting dates can form a valid CronosTask sequence, the function
+     * updates the result to indicate success and includes the sequence details.
+     *
+     * @param {string|Array} expression - The expression to parse, which can be a string
+     *                                    of comma-separated values or an array.
+     * @returns {Object} An object containing the parsing result, including whether
+     *                   the expression is a valid date sequence, the original expression,
+     *                   and the parsed dates if successful.
+     */
 function parseDateSequence (expression) {
     const result = { isDateSequence: false, expression }
     let dates = expression
@@ -1024,18 +1193,18 @@ function parseDateSequence (expression) {
 }
 
 /**
- * Parses solar times based on the provided options and returns a task object
- * containing solar event times and a date sequence.
- *
- * @param {Object} opt - Options for parsing solar times.
- * @param {string} [opt.location='0.0,0.0'] - The location coordinates in 'lat,lon' format.
- * @param {number} [opt.offset=0] - The time offset in minutes.
- * @param {string|Date} [opt.date=new Date()] - The date for which to calculate solar times.
- * @param {Array<string>} [opt.solarDays=null] - Days of the week to consider for solar events.
- * @param {string|Array<string>} [opt.solarEvents] - Specific solar events to consider.
- * @param {string} [opt.solarType] - Type of solar events to consider, 'all' for all permitted events.
- * @returns {Object} A task object containing solar event times and a date sequence.
- */
+     * Parses solar times based on the provided options and returns a task object
+     * containing solar event times and a date sequence.
+     *
+     * @param {Object} opt - Options for parsing solar times.
+     * @param {string} [opt.location='0.0,0.0'] - The location coordinates in 'lat,lon' format.
+     * @param {number} [opt.offset=0] - The time offset in minutes.
+     * @param {string|Date} [opt.date=new Date()] - The date for which to calculate solar times.
+     * @param {Array<string>} [opt.solarDays=null] - Days of the week to consider for solar events.
+     * @param {string|Array<string>} [opt.solarEvents] - Specific solar events to consider.
+     * @param {string} [opt.solarType] - Type of solar events to consider, 'all' for all permitted events.
+     * @returns {Object} A task object containing solar event times and a date sequence.
+     */
 function parseSolarTimes (opt) {
     // opt.location = location || ''
     const pos = coordParser(opt.location || '0.0,0.0')
@@ -1043,26 +1212,26 @@ function parseSolarTimes (opt) {
     const date = opt.date ? new Date(opt.date) : new Date()
     const daysOfWeek = opt.solarDays || null
     const events = opt.solarType === 'all' ? PERMITTED_SOLAR_EVENTS : opt.solarEvents
-    const result = getSolarTimes(pos.lat, pos.lon, 0, events, date, offset, daysOfWeek)
+    const result = getSolarTimes(pos.lat, pos.lon, 0, events, date, offset, daysOfWeek, opt.timezone, opt.timeFormat, opt.locale)
     const task = parseDateSequence(result.eventTimes.map((o) => o.timeOffset))
     task.solarEventTimes = result
     return task
 }
 
 /**
- * Calculates solar event times for a given location and date range.
- *
- * @param {number} lat - Latitude of the location.
- * @param {number} lng - Longitude of the location.
- * @param {number} elevation - Elevation of the location (currently unused).
- * @param {string|string[]} solarEvents - Comma-separated string or array of solar events to consider.
- * @param {Date|null} [startDate=null] - Starting date for calculations. Defaults to current date if not provided.
- * @param {number} [offset=0] - Time offset in minutes to apply to event times.
- * @param {string[]|null} [daysOfWeek=null] - Array of weekdays to consider for event calculations.
- * @returns {Object} An object containing solar state, next and last event details, and event times.
- * @throws {Error} Throws an error if solarEvents is not a string or array.
- */
-function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offset = 0, daysOfWeek = null) {
+     * Calculates solar event times for a given location and date range.
+     *
+     * @param {number} lat - Latitude of the location.
+     * @param {number} lng - Longitude of the location.
+     * @param {number} elevation - Elevation of the location (currently unused).
+     * @param {string|string[]} solarEvents - Comma-separated string or array of solar events to consider.
+     * @param {Date|null} [startDate=null] - Starting date for calculations. Defaults to current date if not provided.
+     * @param {number} [offset=0] - Time offset in minutes to apply to event times.
+     * @param {string[]|null} [daysOfWeek=null] - Array of weekdays to consider for event calculations.
+     * @returns {Object} An object containing solar state, next and last event details, and event times.
+     * @throws {Error} Throws an error if solarEvents is not a string or array.
+     */
+function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offset = 0, daysOfWeek = null, timezone = null, timeFormat = null, locale = null) {
     // performance.mark('Start');
 
     let getNextWeek = false
@@ -1212,11 +1381,10 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
         // now filter to only future events of interest
         const futureEvents = !getNextWeek ? sorted.filter((e) => e && e.timeOffset >= startDate) : sorted.filter((e) => e && e.timeOffset >= initialStartDate)
         const wantedFutureEvents = []
-        const dayOfWeekNames = Object.keys(dayMapping)
         for (let index = 0; index < futureEvents.length; index++) {
             const fe = futureEvents[index]
             const eventDay = fe.timeOffset.getUTCDay()
-            const eventDayName = dayOfWeekNames[eventDay]
+            const eventDayName = allDaysOfWeek[eventDay]
 
             if (solarEventsArr.includes(fe.event) && (!daysOfWeek || daysOfWeek.includes(eventDayName))) {
                 wantedFutureEvents.push(fe)
@@ -1290,7 +1458,7 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
                 const se = solarEventsPast[index]
                 const seTime = timesIteration1[se]
                 const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
-                const localTime = formatShortDateTimeWithTZ(seTimeOffset, 'CST', false)
+                const localTime = formatShortDateTimeWithTZ(seTimeOffset, timezone, timeFormat, locale)
                 if (isValidDateObject(seTimeOffset) && seTimeOffset <= startDate) {
                     result.push({ event: se, time: seTime, timeOffset: seTimeOffset, localTimeOffset: localTime })
                     solarEventsPast.splice(index, 1)// remove that item
@@ -1312,7 +1480,7 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
                 const se = solarEventsFuture[index]
                 const seTime = timesIteration2[se]
                 const seTimeOffset = new Date(seTime.getTime() + offset * 60000)
-                const localTime = formatShortDateTimeWithTZ(seTimeOffset, 'CST', false)
+                const localTime = formatShortDateTimeWithTZ(seTimeOffset, timezone, timeFormat, locale)
                 if (isValidDateObject(seTimeOffset) && seTimeOffset > startDate) {
                     result.push({ event: se, time: seTime, timeOffset: seTimeOffset, localTimeOffset: localTime })
                     solarEventsFuture.splice(index, 1)// remove that item
@@ -1364,36 +1532,36 @@ function getSolarTimes (lat, lng, elevation, solarEvents, startDate = null, offs
 }
 
 /**
- * Exports a schedule object by filtering out undefined properties.
- *
- * @param {Object} schedule - The schedule object containing various properties.
- * @param {string} schedule.id - The unique identifier for the schedule.
- * @param {string} schedule.name - The name of the schedule.
- * @param {string} schedule.topic - The topic associated with the schedule.
- * @param {boolean} schedule.enabled - Indicates if the schedule is enabled.
- * @param {string} schedule.scheduleType - The type of schedule.
- * @param {string} schedule.period - The period of the schedule.
- * @param {string} schedule.time - The time for the schedule.
- * @param {string} schedule.endTime - The end time for the schedule.
- * @param {number} schedule.duration - The duration of the schedule.
- * @param {number} schedule.minutesInterval - The interval in minutes.
- * @param {number} schedule.hourlyInterval - The interval in hours.
- * @param {Array} schedule.days - The days the schedule is active.
- * @param {string} schedule.month - The month the schedule is active.
- * @param {string} schedule.solarEvent - The solar event associated with the schedule.
- * @param {number} schedule.offset - The offset for the solar event.
- * @param {string} schedule.solarEventStart - The start of the solar event.
- * @param {string} schedule.solarEventTimespanTime - The timespan for the solar event.
- * @param {string} schedule.startCronExpression - The cron expression for the start.
- * @param {string} schedule.primaryTaskId - The primary task identifier.
- * @param {string} schedule.endTaskId - The end task identifier.
- * @param {string} schedule.payloadType - The type of payload.
- * @param {string} schedule.payloadValue - The value of the payload.
- * @param {string} schedule.endPayloadValue - The value of the end payload.
- * @param {boolean} schedule.isDynamic - Indicates if the schedule is dynamic.
- * @param {boolean} schedule.isStatic - Indicates if the schedule is static.
- * @returns {Object} A new object containing only the defined properties of the schedule.
- */
+     * Exports a schedule object by filtering out undefined properties.
+     *
+     * @param {Object} schedule - The schedule object containing various properties.
+     * @param {string} schedule.id - The unique identifier for the schedule.
+     * @param {string} schedule.name - The name of the schedule.
+     * @param {string} schedule.topic - The topic associated with the schedule.
+     * @param {boolean} schedule.enabled - Indicates if the schedule is enabled.
+     * @param {string} schedule.scheduleType - The type of schedule.
+     * @param {string} schedule.period - The period of the schedule.
+     * @param {string} schedule.time - The time for the schedule.
+     * @param {string} schedule.endTime - The end time for the schedule.
+     * @param {number} schedule.duration - The duration of the schedule.
+     * @param {number} schedule.minutesInterval - The interval in minutes.
+     * @param {number} schedule.hourlyInterval - The interval in hours.
+     * @param {Array} schedule.days - The days the schedule is active.
+     * @param {string} schedule.month - The month the schedule is active.
+     * @param {string} schedule.solarEvent - The solar event associated with the schedule.
+     * @param {number} schedule.offset - The offset for the solar event.
+     * @param {string} schedule.solarEventStart - The start of the solar event.
+     * @param {string} schedule.solarEventTimespanTime - The timespan for the solar event.
+     * @param {string} schedule.startCronExpression - The cron expression for the start.
+     * @param {string} schedule.primaryTaskId - The primary task identifier.
+     * @param {string} schedule.endTaskId - The end task identifier.
+     * @param {string} schedule.payloadType - The type of payload.
+     * @param {string} schedule.payloadValue - The value of the payload.
+     * @param {string} schedule.endPayloadValue - The value of the end payload.
+     * @param {boolean} schedule.isDynamic - Indicates if the schedule is dynamic.
+     * @param {boolean} schedule.isStatic - Indicates if the schedule is static.
+     * @returns {Object} A new object containing only the defined properties of the schedule.
+     */
 function exportSchedule (schedule) {
     const {
         id,
@@ -1458,12 +1626,12 @@ function exportSchedule (schedule) {
 }
 
 /**
- * Exports a task object with selected properties and optional status information.
- *
- * @param {Object} task - The task object containing various properties.
- * @param {boolean} includeStatus - Flag indicating whether to include status-related properties.
- * @returns {Object} An object containing the exported task properties.
- */
+     * Exports a task object with selected properties and optional status information.
+     *
+     * @param {Object} task - The task object containing various properties.
+     * @param {boolean} includeStatus - Flag indicating whether to include status-related properties.
+     * @returns {Object} An object containing the exported task properties.
+     */
 function exportTask (task, includeStatus) {
     const o = {
         topic: task.node_topic || task.name,
@@ -1508,14 +1676,14 @@ function isTaskFinished (_task) {
 }
 
 /**
- * Retrieves the status of a given task, including its scheduling details and execution state.
- *
- * @param {Object} node - The node object containing default location and time zone settings.
- * @param {Object} task - The task object with scheduling expressions and options.
- * @param {Object} opts - Additional options for task evaluation.
- * @param {boolean} [getNextDates=false] - Flag to determine if future dates should be included in the result.
- * @returns {Object} An object containing task status, including descriptions, dates, time zones, and solar event details if applicable.
- */
+     * Retrieves the status of a given task, including its scheduling details and execution state.
+     *
+     * @param {Object} node - The node object containing default location and time zone settings.
+     * @param {Object} task - The task object with scheduling expressions and options.
+     * @param {Object} opts - Additional options for task evaluation.
+     * @param {boolean} [getNextDates=false] - Flag to determine if future dates should be included in the result.
+     * @returns {Object} An object containing task status, including descriptions, dates, time zones, and solar event details if applicable.
+     */
 function getTaskStatus (node, task, opts, getNextDates = false) {
     opts = opts || {}
     opts.locationType = node.defaultLocationType
@@ -1524,7 +1692,7 @@ function getTaskStatus (node, task, opts, getNextDates = false) {
     opts.solarDays = task.node_opt?.solarDays || null
     const sol = task.node_expressionType === 'solar'
     const exp = sol ? task.node_location : task.node_expression
-    const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, null, opts, node.use24HourFormat)
+    const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, null, opts, node.use24HourFormat, node.locale)
     let nextDescription = null
     let nextDate = null
     let lastDescription = null
@@ -1554,9 +1722,9 @@ function getTaskStatus (node, task, opts, getNextDates = false) {
         nextDescription,
         lastDescription,
         nextDate: running ? nextDate : null,
-        nextDateTZ: running ? formatShortDateTimeWithTZ(nextDate, tz, node.use24HourFormat) : null,
+        nextDateTZ: running ? formatShortDateTimeWithTZ(nextDate, tz, node.use24HourFormat, node.locale) : null,
         lastDate,
-        lastDateTZ: lastDate ? formatShortDateTimeWithTZ(lastDate, tz, node.use24HourFormat) : null,
+        lastDateTZ: lastDate ? formatShortDateTimeWithTZ(lastDate, tz, node.use24HourFormat, node.locale) : null,
         timeZone: tz,
         serverTime: new Date(),
         serverTimeZone: localTZ,
@@ -1565,13 +1733,13 @@ function getTaskStatus (node, task, opts, getNextDates = false) {
     if (getNextDates && h.nextDates && h.nextDates.length) {
         r.nextDates = h.nextDates.map(dateString => {
             const date = new Date(dateString)
-            return formatShortDateTimeWithTZ(date, node.timeZone, node.use24HourFormat)
+            return formatShortDateTimeWithTZ(date, node.timeZone, node.use24HourFormat, node.locale)
         })
     }
     if (getNextDates && h.prevDates && h.prevDates.length) {
         r.lastDates = h.prevDates.map(dateString => {
             const date = new Date(dateString)
-            return formatShortDateTimeWithTZ(date, node.timeZone, node.use24HourFormat)
+            return formatShortDateTimeWithTZ(date, node.timeZone, node.use24HourFormat, node.locale)
         })
     }
     if (sol) {
@@ -1584,16 +1752,16 @@ function getTaskStatus (node, task, opts, getNextDates = false) {
 }
 
 /**
- * Updates the schedule's next status by evaluating the tasks' current state and calculating
- * the duration between primary and end tasks if applicable. It processes solar events and
- * formats descriptions for tasks based on their expression type. If the schedule is disabled,
- * it resets the task status to default values.
- *
- * @param {Object} node - The node object containing default settings and configurations.
- * @param {Object} schedule - The schedule object containing tasks and their statuses.
- * @param {boolean} [getNextDates=true] - Flag to determine if next dates should be retrieved.
- * @returns {Object} The updated schedule with recalculated task statuses and durations.
- */
+     * Updates the schedule's next status by evaluating the tasks' current state and calculating
+     * the duration between primary and end tasks if applicable. It processes solar events and
+     * formats descriptions for tasks based on their expression type. If the schedule is disabled,
+     * it resets the task status to default values.
+     *
+     * @param {Object} node - The node object containing default settings and configurations.
+     * @param {Object} schedule - The schedule object containing tasks and their statuses.
+     * @param {boolean} [getNextDates=true] - Flag to determine if next dates should be retrieved.
+     * @returns {Object} The updated schedule with recalculated task statuses and durations.
+     */
 function updateScheduleNextStatus (node, schedule, getNextDates = true) {
     const calculateDuration = (start, end) => {
         if (start && end) {
@@ -1611,7 +1779,7 @@ function updateScheduleNextStatus (node, schedule, getNextDates = true) {
         let finalLastDescription = lastDescription || 'Never'
 
         if (task.node_expressionType === 'solar') {
-            const mapDescription = (description) => description.split(' ').map(word => PERMITTED_SOLAR_EVENTS.includes(word) ? mapSolarEvent(word) : word).join(' ')
+            const mapDescription = (description) => description.split(' ').map(word => PERMITTED_SOLAR_EVENTS.includes(word) ? getSolarEventName(word) : word).join(' ')
 
             finalNextDescription = mapDescription(finalNextDescription)
             finalLastDescription = mapDescription(finalLastDescription)
@@ -1632,7 +1800,7 @@ function updateScheduleNextStatus (node, schedule, getNextDates = true) {
                 : primaryTaskStatus.nextDate
 
             calculatedDuration = calculateDuration(startUTC, endTaskStatus.nextDate)
-            calculatedDurationPretty = prettyMs(calculatedDuration, { secondsDecimalDigits: 0, verbose: true })
+            calculatedDurationPretty = enhancedMs(calculatedDuration)
             schedule.calculatedDuration = calculatedDuration
             schedule.calculatedDurationPretty = calculatedDurationPretty
         }
@@ -1681,7 +1849,7 @@ function getScheduleStatus (node, schedule, getNextDates = true) {
         let finalLastDescription = lastDescription || 'Never'
 
         if (task.node_expressionType === 'solar') {
-            const mapDescription = (description) => description.split(' ').map(word => PERMITTED_SOLAR_EVENTS.includes(word) ? mapSolarEvent(word) : word).join(' ')
+            const mapDescription = (description) => description.split(' ').map(word => PERMITTED_SOLAR_EVENTS.includes(word) ? getSolarEventName(word) : word).join(' ')
 
             finalNextDescription = mapDescription(finalNextDescription)
             finalLastDescription = mapDescription(finalLastDescription)
@@ -1714,7 +1882,7 @@ function getScheduleStatus (node, schedule, getNextDates = true) {
                 : primaryTaskStatus.nextDate
 
             calculatedDuration = calculateDuration(startUTC, endTaskStatus.nextDate)
-            calculatedDurationPretty = prettyMs(calculatedDuration, { secondsDecimalDigits: 0, verbose: true })
+            calculatedDurationPretty = enhancedMs(calculatedDuration)
         }
 
         return {
@@ -1789,6 +1957,19 @@ module.exports = function (RED) {
         const node = this
         const group = RED.nodes.getNode(config.group)
         const base = group.getBase()
+
+        // set locale
+        config.locale = setLocale(config, RED.settings.lang)
+        node.locale = config.locale
+
+        // init milliseconds formatter for locale
+        initializeMs(node.locale)
+
+        // apply localized words
+        applyLocalizedSolarEventNames(RED)
+        applyLocalizedDayNames(RED)
+        applyLocalizedWords(RED)
+
         node.payloadType = config.payloadType || config.type || 'default'
         // delete config.type
         node.payload = config.payload
@@ -1837,7 +2018,7 @@ module.exports = function (RED) {
             node.storeName = config.storeName
         } else {
             // default
-            node.storeName = 'NONE'
+            node.storeName = 'local_file_system'
         }
 
         if (node.storeName && node.storeName !== 'local_file_system' && STORE_NAMES.indexOf(node.storeName) < 0) {
@@ -1884,7 +2065,7 @@ module.exports = function (RED) {
             if (schedule && type) {
                 const indicator = schedule?.isStatic ? 'ring' : 'dot'
                 node.nextDate = type === 'primary' ? schedule?.primaryTask?.nextDate : schedule?.endTask?.nextDate
-                node.nextEvent = `${schedule.name}-${type === 'primary' ? 'Start' : 'End'}`
+                node.nextEvent = `${schedule.name}-${type === 'primary' ? RED._('ui-scheduler.label.start') : RED._('ui-scheduler.label.end')}`
                 node.nextIndicator = indicator
             } else {
                 node.nextDate = null
@@ -1897,7 +2078,7 @@ module.exports = function (RED) {
             applyOptionDefaults(node, cmd) // Ensuring defaults are applied
             const description = _describeExpression(
                 cmd.location, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset,
-                cmd.solarType, cmd.solarEvents, cmd.time, cmd, node.use24HourFormat
+                cmd.solarType, cmd.solarEvents, cmd.time, cmd, node.use24HourFormat, node.locale
             )
 
             return description
@@ -1914,26 +2095,22 @@ module.exports = function (RED) {
                 cmd.solarEvents,
                 cmd.time,
                 cmd,
-                node.use24HourFormat
+                node.use24HourFormat, node.locale
             )
 
             return description
         }
 
         /**
-         * Generates a description of a time interval in minutes or hours.
-         *
-         * This function calculates a grammatically correct phrase representing
-         * the interval from the current time to a future time, based on the
-         * specified interval and unit. It uses the `formatDistanceStrict` function
-         * from the date-fns library to ensure accuracy.
-         *
-         * @param {number} interval - The positive number of units to add to the current time.
-         * @param {string} unit - The unit of time, either 'minute' or 'hour'.
-         * @returns {string} A string describing the interval, e.g., "Every 5 minutes".
-         * @throws {Error} Throws an error if the interval is not positive or if the unit is invalid.
-         */
-        function generateIntervalDescription (interval, unit) {
+ * Generates a human-readable description of a cron interval based on the given interval and unit.
+ *
+ * @param {Object} node - The node object containing locale and time format preferences.
+ * @param {number} interval - The interval value, must be a positive number.
+ * @param {string} unit - The unit of time for the interval, either "minute" or "hour".
+ * @returns {string} A human-readable description of the cron interval.
+ * @throws {Error} Throws an error if the interval is not positive or if the unit is invalid.
+ */
+        function generateIntervalDescription (node, interval, unit) {
             if (interval <= 0) {
                 throw new Error('Interval must be a positive number.')
             }
@@ -1941,16 +2118,19 @@ module.exports = function (RED) {
                 throw new Error('Unit must be either "minute" or "hour".')
             }
 
-            // Use date-fns to compute a grammatically correct phrase
-            const now = new Date()
-            const futureDate = unit === 'minute'
-                ? new Date(now.getTime() + interval * 60 * 1000) // Add minutes
-                : new Date(now.getTime() + interval * 60 * 60 * 1000) // Add hours
+            // Generate the cron expression
+            let expression
+            if (unit === 'minute') {
+                expression = `*/${interval} * * * *` // Cron expression for every 'interval' minutes
+            } else if (unit === 'hour') {
+                expression = `0 */${interval} * * *` // Cron expression for every 'interval' hours
+            }
 
-            const description = formatDistanceStrict(now, futureDate, { unit, addSuffix: false })
+            // Use the humanizeCron function to get a human-readable description
+            const description = humanizeCron(expression, node.locale, node.use24HourFormat)
 
-            // Return the interval description
-            return `Every ${description}`
+            // Return the human-readable description
+            return description
         }
 
         // Need to improve this to handle more schedule types
@@ -1979,7 +2159,7 @@ module.exports = function (RED) {
                         task.node_opt.solarEvents,
                         task.node_opt.time,
                         task.node_opt,
-                        node.use24HourFormat
+                        node.use24HourFormat, node.locale
                     ).description,
                     ...(task.isStatic && { isStatic: true }) // Conditionally add isStatic
                 }
@@ -2152,7 +2332,7 @@ module.exports = function (RED) {
             if (task) {
                 indicator = node.nextIndicator || 'dot'
             }
-            node.status({ fill: 'green', shape: indicator, text: 'Done: ' + formatShortDateTimeWithTZ(Date.now(), node.timeZone, node.use24HourFormat) })
+            node.status({ fill: 'green', shape: indicator, text: RED._('ui-scheduler.label.done') + ': ' + formatShortDateTimeWithTZ(Date.now(), node.timeZone, node.use24HourFormat, node.locale) })
             // node.nextDate = getNextTask(node.tasks);
             const now = new Date()
             updateNodeNextInfo(node, now)
@@ -2180,8 +2360,13 @@ module.exports = function (RED) {
             msg.scheduledEvent = !msg.manualTrigger
             const taskType = task.isDynamic ? 'dynamic' : 'static'
 
-            const index = node.topics.findIndex(topic => topic === schedule.topic || task.node_topic)
-
+            const index = node.topics.findIndex(topic => {
+                if (schedule.topic) {
+                    return topic === schedule.topic
+                } else {
+                    return topic === task.node_topic
+                }
+            })
             if (index === -1) {
                 // Handle the case where the topic is not found
                 node.error(`Topic "${schedule.topic || task.node_topic}" not found for ${schedule.name || task.name}`)
@@ -2228,15 +2413,15 @@ module.exports = function (RED) {
         }
 
         /**
-         * Sends messages for active or inactive tasks based on the provided topics and node schedules.
-         *
-         * @param {Object} node - The node object containing schedules and configuration for message sending.
-         * @param {number} timestamp - The timestamp to include in the message.
-         * @param {Array} [topics=[]] - An optional array of topics to filter which tasks to process.
-         *
-         * Iterates through the node's schedules to determine active and inactive tasks for the specified topics.
-         * Sends messages for tasks that are currently running and match the active state configuration of the node.
-         */
+             * Sends messages for active or inactive tasks based on the provided topics and node schedules.
+             *
+             * @param {Object} node - The node object containing schedules and configuration for message sending.
+             * @param {number} timestamp - The timestamp to include in the message.
+             * @param {Array} [topics=[]] - An optional array of topics to filter which tasks to process.
+             *
+             * Iterates through the node's schedules to determine active and inactive tasks for the specified topics.
+             * Sends messages for tasks that are currently running and match the active state configuration of the node.
+             */
         function sendTopicMsg (node, timestamp, topics = []) {
             const schedules = node.schedules || []
             const topicTasks = {}
@@ -2514,7 +2699,7 @@ module.exports = function (RED) {
                         {
                             const exp = (cmd.expressionType === 'solar') ? cmd.location : cmd.expression
                             applyOptionDefaults(node, cmd)
-                            newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, { includeSolarStateOffset: true, locationType: node.node_locationType }, node.use24HourFormat)
+                            newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, { includeSolarStateOffset: true, locationType: node.node_locationType }, node.use24HourFormat, node.locale)
                             sendCommandResponse(newMsg)
                         }
                         break
@@ -2744,12 +2929,12 @@ module.exports = function (RED) {
         }
 
         /**
-         * Retrieves a schedule object for a given schedule ID from a node's schedules.
-         *
-         * @param {Object} node - The node containing the schedules array.
-         * @param {string|number} id - The unique identifier of the schedule to retrieve.
-         * @returns {Object|undefined} The schedule object with the matching ID, or undefined if not found.
-         */
+             * Retrieves a schedule object for a given schedule ID from a node's schedules.
+             *
+             * @param {Object} node - The node containing the schedules array.
+             * @param {string|number} id - The unique identifier of the schedule to retrieve.
+             * @returns {Object|undefined} The schedule object with the matching ID, or undefined if not found.
+             */
         function getSchedule (node, id) {
             const schedule = node.schedules.find(function (schedule) {
                 return schedule.id === id
@@ -2758,12 +2943,12 @@ module.exports = function (RED) {
         }
 
         /**
-         * Retrieves a schedule object for a given schedule name from a node's schedules.
-         *
-         * @param {Object} node - The node object containing the schedules array.
-         * @param {string} name - The name of the schedule to retrieve.
-         * @returns {Object|undefined} The schedule object with the matching name, or undefined if not found.
-         */
+             * Retrieves a schedule object for a given schedule name from a node's schedules.
+             *
+             * @param {Object} node - The node object containing the schedules array.
+             * @param {string} name - The name of the schedule to retrieve.
+             * @returns {Object|undefined} The schedule object with the matching name, or undefined if not found.
+             */
         function getScheduleByName (node, name) {
             const schedule = node.schedules.find(function (schedule) {
                 return schedule.name === name
@@ -2772,12 +2957,12 @@ module.exports = function (RED) {
         }
 
         /**
-         * Retrieves the schedule ID for a given schedule name from a node's schedules.
-         *
-         * @param {Object} node - The node containing the schedules.
-         * @param {string} name - The name of the schedule to find.
-         * @returns {string|null} The ID of the schedule if found, otherwise null.
-         */
+             * Retrieves the schedule ID for a given schedule name from a node's schedules.
+             *
+             * @param {Object} node - The node containing the schedules.
+             * @param {string} name - The name of the schedule to find.
+             * @returns {string|null} The ID of the schedule if found, otherwise null.
+             */
         function getScheduleId (node, name) {
             const schedule = node.schedules.find(function (schedule) {
                 return schedule.name === name
@@ -2786,12 +2971,12 @@ module.exports = function (RED) {
         }
 
         /**
-         * Determines if a schedule is enabled for a given node and schedule ID.
-         *
-         * @param {Object} node - The node object containing schedules.
-         * @param {string} id - The ID of the schedule to check.
-         * @returns {boolean|null} - Returns true if the schedule is enabled, false if disabled, or null if not found.
-         */
+             * Determines if a schedule is enabled for a given node and schedule ID.
+             *
+             * @param {Object} node - The node object containing schedules.
+             * @param {string} id - The ID of the schedule to check.
+             * @returns {boolean|null} - Returns true if the schedule is enabled, false if disabled, or null if not found.
+             */
         function isScheduleEnabled (node, id) {
             const schedule = node.schedules.find(function (schedule) {
                 return schedule.id === id
@@ -2868,14 +3053,14 @@ module.exports = function (RED) {
         }
 
         /**
-         * Determines if a given schedule matches a specified filter criteria.
-         *
-         * @param {Object} schedule - The schedule object to be evaluated.
-         * @param {Object} filter - The filter criteria containing type and topic.
-         * @param {string} filter.type - The type of filter to apply (e.g., 'all', 'static', 'dynamic', 'topic', 'active', 'inactive', 'active-dynamic', 'active-static', 'inactive-dynamic', 'inactive-static').
-         * @param {string|null} filter.topic - The topic to match against the schedule's topic.
-         * @returns {boolean} - Returns true if the schedule matches the filter criteria, otherwise false.
-         */
+             * Determines if a given schedule matches a specified filter criteria.
+             *
+             * @param {Object} schedule - The schedule object to be evaluated.
+             * @param {Object} filter - The filter criteria containing type and topic.
+             * @param {string} filter.type - The type of filter to apply (e.g., 'all', 'static', 'dynamic', 'topic', 'active', 'inactive', 'active-dynamic', 'active-static', 'inactive-dynamic', 'inactive-static').
+             * @param {string|null} filter.topic - The topic to match against the schedule's topic.
+             * @returns {boolean} - Returns true if the schedule matches the filter criteria, otherwise false.
+             */
         function scheduleFilterMatch (schedule, filter) {
             if (!schedule) return false
             const { type, topic } = filter
@@ -3170,12 +3355,16 @@ module.exports = function (RED) {
         }
 
         function generateUiSchedule (schedule) {
-            // Create a shallow copy of the schedule object
-            const uiSchedule = { ...schedule }
+            // Create a shallow copy of the schedule object with deep clones for nested objects
+            const uiSchedule = {
+                ...schedule,
+                primaryTask: schedule.primaryTask ? { ...schedule.primaryTask } : undefined,
+                endTask: schedule.endTask ? { ...schedule.endTask } : undefined
+            }
 
             // Remove only the necessary properties
-            // delete uiSchedule.primaryTask?.task
-            // delete uiSchedule.endTask?.task
+            delete uiSchedule.primaryTask?.task
+            delete uiSchedule.endTask?.task
 
             return uiSchedule
         }
@@ -3334,10 +3523,10 @@ module.exports = function (RED) {
             task.stop()
             task.on('run', (timestamp) => {
                 const now = new Date()
-                node.status({ fill: 'green', shape: 'dot', text: formatShortDateTimeWithTZ(timestamp, node.timeZone, node.use24HourFormat) })
+                node.status({ fill: 'green', shape: 'dot', text: formatShortDateTimeWithTZ(timestamp, node.timeZone, node.use24HourFormat, node.locale) })
                 node.debug(`running '${task.name}' ~ '${task.node_topic}'\n now time ${new Date()}\n crontime ${new Date(timestamp)}`)
                 const indicator = task.isDynamic ? 'ring' : 'dot'
-                node.status({ fill: 'green', shape: indicator, text: 'Running ' + formatShortDateTimeWithTZ(timestamp, node.timeZone, node.use24HourFormat) })
+                node.status({ fill: 'green', shape: indicator, text: 'Running ' + formatShortDateTimeWithTZ(timestamp, node.timeZone, node.use24HourFormat, node.locale) })
 
                 let schedule = getScheduleById(node, task.scheduleId)
                 if (schedule) {
@@ -3729,12 +3918,12 @@ module.exports = function (RED) {
                 }
 
                 /* if(!dynNodesExp || !dynNodesExp.length){
-                        //FUTURE TODO: Sanity check before deletion
-                        //and only if someone asks for it :)
-                        //other wise, file clean up is a manual task
-                        fs.unlinkSync(filePath);
-                        return;
-                    } */
+                            //FUTURE TODO: Sanity check before deletion
+                            //and only if someone asks for it :)
+                            //other wise, file clean up is a manual task
+                            fs.unlinkSync(filePath);
+                            return;
+                        } */
             } catch (e) {
                 node.error(`Error saving persistence data. ${e.message}`)
             } finally {
@@ -3961,7 +4150,7 @@ module.exports = function (RED) {
             if (node.schedules && node.schedules.length) {
                 const indicator = node.nextIndicator || 'dot'
                 if (node.nextDate) {
-                    const d = formatShortDateTimeWithTZ(node.nextDate, node.timeZone, node.use24HourFormat) || 'Never'
+                    const d = formatShortDateTimeWithTZ(node.nextDate, node.timeZone, node.use24HourFormat, node.locale) || 'Never'
                     node.status({ fill: 'blue', shape: indicator, text: (node.nextEvent || 'Next') + ': ' + d })
                 } else if (node.schedules && node.schedules.length) {
                     node.status({ fill: 'grey', shape: indicator, text: 'All stopped' })
@@ -4008,15 +4197,15 @@ module.exports = function (RED) {
         }
 
         /**
-         * Retrieves the next schedule from a node's schedules.
-         *
-         * This function iterates over the schedules of a given node to find the
-         * schedule with the closest upcoming date. It returns the schedule with
-         * the nearest future date compared to the current time.
-         *
-         * @param {Object} node - The node containing schedules to evaluate.
-         * @returns {Object|null} The schedule with the closest future date, or null if no valid schedule is found.
-         */
+             * Retrieves the next schedule from a node's schedules.
+             *
+             * This function iterates over the schedules of a given node to find the
+             * schedule with the closest upcoming date. It returns the schedule with
+             * the nearest future date compared to the current time.
+             *
+             * @param {Object} node - The node containing schedules to evaluate.
+             * @returns {Object|null} The schedule with the closest future date, or null if no valid schedule is found.
+             */
         function getNextSchedule (node) {
             if (node && node.schedules && Array.isArray(node.schedules)) {
                 const now = new Date()
@@ -4046,15 +4235,15 @@ module.exports = function (RED) {
         }
 
         /**
-         * Retrieves the next scheduled task from a node's schedule list.
-         *
-         * This function checks both primary and end tasks within each schedule
-         * to determine the closest upcoming task based on the current time.
-         *
-         * @param {Object} node - The node containing schedules to evaluate.
-         * @returns {Object|null} An object containing the closest schedule and its type ('primary' or 'end'),
-         * or null if no valid schedules are found.
-         */
+             * Retrieves the next scheduled task from a node's schedule list.
+             *
+             * This function checks both primary and end tasks within each schedule
+             * to determine the closest upcoming task based on the current time.
+             *
+             * @param {Object} node - The node containing schedules to evaluate.
+             * @returns {Object|null} An object containing the closest schedule and its type ('primary' or 'end'),
+             * or null if no valid schedules are found.
+             */
         function getNextScheduleTask (node) {
             if (node.schedules && Array.isArray(node.schedules)) {
                 const now = new Date()
@@ -4108,15 +4297,6 @@ module.exports = function (RED) {
             // Determine payloads for start command
             const { payload: startPayload, payloadType: startPayloadType } =
                 getPayloadAndType(schedule, 'payloadValue', true)
-
-            // Helper to abbreviate days in a description string using dayMapping.
-            const abbreviateDays = (description) =>
-                description
-                    ? description.replace(
-                        /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/g,
-                        (day) => dayMapping[day] || day
-                    )
-                    : ''
 
             // A helper to create a command object and apply default options.
             function createCommand (expression, expressionType, additionalOptions = {}) {
@@ -4235,7 +4415,7 @@ module.exports = function (RED) {
                         // Use an interval description for minute or hourly schedules.
                         const interval = schedule.period === 'hourly' ? schedule.hourlyInterval : schedule.minutesInterval
                         const unit = schedule.period === 'hourly' ? 'hour' : 'minute'
-                        description = generateIntervalDescription(interval, unit)
+                        description = generateIntervalDescription(node, interval, unit)
                     } else {
                         description = generateDescription(node, startCmd).description
                     }
@@ -4289,10 +4469,7 @@ module.exports = function (RED) {
                     // Use createCommand for a cron command.
                     const cronCmd = createCommand(schedule.startCronExpression, 'cron')
                     const description = generateDescription(node, cronCmd).description
-                    schedule.description = description.replace(
-                        /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/g,
-                        (match) => dayMapping[match]
-                    )
+                    schedule.description = abbreviateDays(description)
                     cmd = cronCmd
                 } else {
                     console.error('Invalid startCronExpression', schedule.startCronExpression)
@@ -4323,10 +4500,7 @@ module.exports = function (RED) {
                 }
                 applyOptionDefaults(node, datesCmd)
                 const description = generateDescription(node, datesCmd).description
-                schedule.description = description.replace(
-                    /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/g,
-                    (match) => dayMapping[match]
-                )
+                schedule.description = abbreviateDays(description)
                 cmd = datesCmd
                 if (schedule.timespan === false) {
                     removeEndTask(node, schedule.id)
@@ -4337,14 +4511,14 @@ module.exports = function (RED) {
         }
 
         /**
-         * Generates an array of messages to be sent to the specified output pin.
-         *
-         * @param {Object} node - The node object containing configuration details.
-         * @param {Object} msg - The message object to be sent.
-         * @param {string} type - The type of message, which can be 'static', 'dynamic', or 'command-response'.
-         * @param {number} index - The index of the output pin, used when fan-out is enabled.
-         * @returns {Array} An array with the message placed at the appropriate index, based on the node configuration.
-         */
+             * Generates an array of messages to be sent to the specified output pin.
+             *
+             * @param {Object} node - The node object containing configuration details.
+             * @param {Object} msg - The message object to be sent.
+             * @param {string} type - The type of message, which can be 'static', 'dynamic', or 'command-response'.
+             * @param {number} index - The index of the output pin, used when fan-out is enabled.
+             * @returns {Array} An array with the message placed at the appropriate index, based on the node configuration.
+             */
         function generateSendMsg (node, msg, type, index) {
             const outputCount = node.outputs
             const fanOut = node.fanOut
@@ -4383,15 +4557,15 @@ module.exports = function (RED) {
         // #region UI Actions
 
         /**
-        * Submits a schedule by processing and updating the node's schedules.
-        *
-        * @param {Object} msg - The message object containing the payload with schedules.
-        * @returns {void}
-        *
-        * Processes the schedules from the message payload, updates the node's schedules,
-        * and emits UI updates. If there are schedule commands, they are handled asynchronously.
-        * In case of an error, logs the error and reports it to the node.
-        */
+            * Submits a schedule by processing and updating the node's schedules.
+            *
+            * @param {Object} msg - The message object containing the payload with schedules.
+            * @returns {void}
+            *
+            * Processes the schedules from the message payload, updates the node's schedules,
+            * and emits UI updates. If there are schedule commands, they are handled asynchronously.
+            * In case of an error, logs the error and reports it to the node.
+            */
         async function submitSchedule (msg) {
             if (!msg?.payload?.schedules) return
 
@@ -4415,18 +4589,18 @@ module.exports = function (RED) {
         }
 
         /**
-         * Handles schedule commands by updating tasks and schedules.
-         *
-         * This function processes the given schedule commands by updating the task
-         * associated with the schedule and the provided message. It then updates the
-         * next status of the node and requests serialization. For each schedule ID
-         * in the message payload, it retrieves the corresponding schedule and updates
-         * its next status. If a schedule is not found for a given ID, a warning is logged.
-         *
-         * @param {Object} scheduleCommands - The commands to update the schedule.
-         * @param {Object} msg - The message containing the payload with schedule IDs.
-         * @throws Will throw an error if processing the schedule commands fails.
-         */
+             * Handles schedule commands by updating tasks and schedules.
+             *
+             * This function processes the given schedule commands by updating the task
+             * associated with the schedule and the provided message. It then updates the
+             * next status of the node and requests serialization. For each schedule ID
+             * in the message payload, it retrieves the corresponding schedule and updates
+             * its next status. If a schedule is not found for a given ID, a warning is logged.
+             *
+             * @param {Object} scheduleCommands - The commands to update the schedule.
+             * @param {Object} msg - The message containing the payload with schedule IDs.
+             * @throws Will throw an error if processing the schedule commands fails.
+             */
         async function handleScheduleCommands (scheduleCommands, msg) {
             try {
                 await updateTask(node, scheduleCommands, msg)
@@ -4448,12 +4622,12 @@ module.exports = function (RED) {
         }
 
         /**
-         * Processes an array of schedule objects, generating commands and updating the schedules list.
-         *
-         * @param {Array} scheduleArray - An array of schedule objects to be processed.
-         * @param {Array} schedules - A list of existing schedules to be updated or appended to.
-         * @returns {Array} An array of command objects generated from the schedules.
-         */
+             * Processes an array of schedule objects, generating commands and updating the schedules list.
+             *
+             * @param {Array} scheduleArray - An array of schedule objects to be processed.
+             * @param {Array} schedules - A list of existing schedules to be updated or appended to.
+             * @returns {Array} An array of command objects generated from the schedules.
+             */
         function processSchedules (scheduleArray, schedules) {
             const commands = []
             scheduleArray.forEach(schedule => {
@@ -4466,7 +4640,8 @@ module.exports = function (RED) {
 
                 const existingSchedule = getSchedule(node, schedule.id)
                 if (existingSchedule) {
-                    Object.assign(existingSchedule, schedule)
+                    // Directly overwrite existingSchedule object
+                    schedules[schedules.indexOf(existingSchedule)] = schedule
                 } else {
                     schedules.push(schedule)
                 }
@@ -4475,12 +4650,12 @@ module.exports = function (RED) {
         }
 
         /**
-         * Emits a UI update event for a specific node.
-         *
-         * @param {Object} node - The node object for which the UI update is emitted.
-         * @param {Array} uiSchedules - An array of UI schedules to be included in the update.
-         * @param {string} eventType - The type of event triggering the UI update.
-         */
+             * Emits a UI update event for a specific node.
+             *
+             * @param {Object} node - The node object for which the UI update is emitted.
+             * @param {Array} uiSchedules - An array of UI schedules to be included in the update.
+             * @param {string} eventType - The type of event triggering the UI update.
+             */
         function emitUiUpdate (node, uiSchedules, eventType) {
             const updateMessage = {
                 ui_update: { schedules: uiSchedules },
@@ -4490,16 +4665,16 @@ module.exports = function (RED) {
         }
 
         /**
-         * Removes a schedule based on the provided message payload.
-         *
-         * @param {Object} msg - The message object containing the schedule ID.
-         * @param {Object} msg.payload - The payload of the message.
-         * @param {string} msg.payload.id - The ID of the schedule to be removed.
-         *
-         * Logs a warning if no schedule ID is provided. Deletes the schedule,
-         * updates the next status, requests serialization, updates the UI schedules,
-         * and emits a UI update event.
-         */
+             * Removes a schedule based on the provided message payload.
+             *
+             * @param {Object} msg - The message object containing the schedule ID.
+             * @param {Object} msg.payload - The payload of the message.
+             * @param {string} msg.payload.id - The ID of the schedule to be removed.
+             *
+             * Logs a warning if no schedule ID is provided. Deletes the schedule,
+             * updates the next status, requests serialization, updates the UI schedules,
+             * and emits a UI update event.
+             */
         function removeSchedule (msg) {
             if (!msg?.payload?.id) {
                 console.warn('No schedule ID provided for removal.')
@@ -4516,42 +4691,42 @@ module.exports = function (RED) {
         }
 
         /**
-         * Toggles the scheduling state of tasks based on the provided message payload.
-         *
-         * @param {Object} msg - The message object containing scheduling information.
-         * @param {Object} msg.payload - The payload of the message.
-         * @param {Array|string} msg.payload.names - An array of task names or a single task name to be processed.
-         * @param {boolean} msg.payload.enabled - A flag indicating whether to enable or disable the schedule.
-         *
-         * The function iterates over the task names provided in the payload and either starts or stops
-         * the schedule for each task based on the 'enabled' flag. It also updates the next status
-         * and requests serialization after processing.
-         */
+             * Toggles the scheduling state of tasks based on the provided message payload.
+             *
+             * @param {Object} msg - The message object containing scheduling information.
+             * @param {Object} msg.payload - The payload of the message.
+             * @param {Array|string} msg.payload.names - An array of task names or a single task name to be processed.
+             * @param {boolean} msg.payload.enabled - A flag indicating whether to enable or disable the schedule.
+             *
+             * The function iterates over the task names provided in the payload and either starts or stops
+             * the schedule for each task based on the 'enabled' flag. It also updates the next status
+             * and requests serialization after processing.
+             */
         function setScheduleEnabled (msg) {
             const handleTask = (id, enabled) => {
                 enabled ? startSchedule(node, id) : stopSchedule(node, id)
                 updateNextStatus(node, true)
             }
 
-            if (Array.isArray(msg?.payload?.names)) {
-                msg.payload.names.forEach(name => handleTask(name, msg.payload.enabled))
-            } else if (msg?.payload?.name) {
-                handleTask(msg.payload.name, msg.payload.enabled)
+            if (Array.isArray(msg?.payload?.ids)) {
+                msg.payload.ids.forEach(id => handleTask(id, msg.payload.enabled))
+            } else if (msg?.payload?.id) {
+                handleTask(msg.payload.id, msg.payload.enabled)
             }
             sendTopicMsg(node, new Date())
             requestSerialisation()
         }
 
         /**
-         * Handles a request to update the status of a schedule based on a message payload.
-         *
-         * @param {Object} msg - The message object containing the payload.
-         * @param {Object} msg.payload - The payload of the message.
-         * @param {string} msg.payload.id - The ID of the schedule to update.
-         *
-         * Logs a warning if the schedule ID is not provided or if the schedule is not found.
-         * Updates the schedule status if a valid schedule is retrieved.
-         */
+             * Handles a request to update the status of a schedule based on a message payload.
+             *
+             * @param {Object} msg - The message object containing the payload.
+             * @param {Object} msg.payload - The payload of the message.
+             * @param {string} msg.payload.id - The ID of the schedule to update.
+             *
+             * Logs a warning if the schedule ID is not provided or if the schedule is not found.
+             * Updates the schedule status if a valid schedule is retrieved.
+             */
         function requestScheduleStatus (msg) {
             if (!msg?.payload?.id) {
                 console.warn('No schedule ID provided for status request.')
@@ -4568,17 +4743,17 @@ module.exports = function (RED) {
         }
 
         /**
-         * Asynchronously describes a cron expression from the message payload.
-         *
-         * @param {Object} msg - The message object containing the payload with the cron expression.
-         * @returns {void} Emits a message with the detailed description of the cron expression.
-         *
-         * The function checks for the presence of a cron expression in the message payload.
-         * It applies default options, retrieves a detailed description of the cron expression,
-         * and formats the next execution dates. The day names in the description are replaced
-         * with localized versions. The results are emitted back with the original expression included.
-         * Logs a warning if no cron expression is found and handles any errors during processing.
-         */
+             * Asynchronously describes a cron expression from the message payload.
+             *
+             * @param {Object} msg - The message object containing the payload with the cron expression.
+             * @returns {void} Emits a message with the detailed description of the cron expression.
+             *
+             * The function checks for the presence of a cron expression in the message payload.
+             * It applies default options, retrieves a detailed description of the cron expression,
+             * and formats the next execution dates. The day names in the description are replaced
+             * with localized versions. The results are emitted back with the original expression included.
+             * Logs a warning if no cron expression is found and handles any errors during processing.
+             */
         async function describeExpression (msg) {
             if (!msg?.payload?.cronExpression) {
                 console.warn('No cronExpression found in the payload.')
@@ -4604,15 +4779,12 @@ module.exports = function (RED) {
                     cmd.solarEvents,
                     null,
                     cmd,
-                    node.use24HourFormat
+                    node.use24HourFormat, node.locale
                 )
 
                 // Replace day names with localized versions if a description exists
                 if (cronExpression.description) {
-                    cronExpression.description = cronExpression.description.replace(
-                        /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/g,
-                        match => dayMapping[match]
-                    )
+                    cronExpression.description = abbreviateDays(cronExpression.description)
                 }
 
                 // Include the original expression in the response
@@ -4622,7 +4794,7 @@ module.exports = function (RED) {
                 if (Array.isArray(cronExpression.nextDates) && cronExpression.nextDates.length > 0) {
                     cronExpression.nextDates = cronExpression.nextDates.map(dateString => {
                         const date = new Date(dateString)
-                        return formatShortDateTimeWithTZ(date, node.timeZone, node.use24HourFormat)
+                        return formatShortDateTimeWithTZ(date, node.timeZone, node.use24HourFormat, node.locale)
                     })
                 }
 
@@ -4897,8 +5069,8 @@ module.exports = function (RED) {
 }
 
 /**
-         * Array of timezones
-         */
+             * Array of timezones
+             */
 const timeZones = [
     { code: 'CI', latLon: '+0519-00402', tz: 'Africa/Abidjan', UTCOffset: '+00:00', UTCDSTOffset: '+00:00' },
     { code: 'GH', latLon: '+0533-00013', tz: 'Africa/Accra', UTCOffset: '+00:00', UTCDSTOffset: '+00:00' },

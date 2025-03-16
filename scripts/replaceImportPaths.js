@@ -8,7 +8,9 @@ function replaceImportPaths (filePathToUpdate) {
 
         // Replace the specified import paths
         fileContent = fileContent.map(line =>
-            line.replace(/ from '\.\.\/\.\.\/components\//g, " from './")
+            line
+                .replace(/ from '\.\.\/\.\.\/components\//g, " from './")
+                .replace(/ from '\.\.\/\.\.\/locales\//g, " from '../locales/")
         )
 
         // Write updated content back to the file
