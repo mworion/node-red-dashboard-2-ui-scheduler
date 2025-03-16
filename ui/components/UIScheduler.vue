@@ -351,9 +351,7 @@
                                                 class="prepend-icon-spacing" @click="requestStatus(item)"
                                             >
                                                 <template #prepend>
-                                                    <v-icon
-                                                        :color="item.timespan ? 'green' : ''"
-                                                    >
+                                                    <v-icon :color="item.timespan ? 'green' : ''">
                                                         mdi-calendar-text
                                                     </v-icon>
                                                 </template>
@@ -372,9 +370,7 @@
                                                         @click="handleNextDatesExpand(isOpen)"
                                                     >
                                                         <template #prepend>
-                                                            <v-icon
-                                                                :color="item.timespan ? 'green' : undefined"
-                                                            >
+                                                            <v-icon :color="item.timespan ? 'green' : undefined">
                                                                 mdi-calendar-arrow-right
                                                             </v-icon>
                                                         </template>
@@ -437,8 +433,14 @@
                     <div class="d-flex align-items-center">
                         <v-switch
                             v-model="enabled" :label="enabled ? t('enabled') : t('disabled')"
-                            :color="enabled ? 'primary' : 'default'" required class="mr-2"
+                            :color="enabled ? 'green' : 'default'" required class="mr-2"
                         />
+                        <v-btn v-if="isEditing" icon variant="plain" color="blue" @click="openExportDialog()">
+                            <v-icon>mdi-export</v-icon>
+                        </v-btn>
+                        <v-btn v-if="!isEditing" icon variant="plain" color="green" @click="openImportDialog()">
+                            <v-icon>mdi-import</v-icon>
+                        </v-btn>
                         <v-btn v-if="isEditing" icon color="red-lighten-1" @click="openDeleteDialog()">
                             <v-icon>mdi-delete</v-icon>
                         </v-btn>
@@ -1036,6 +1038,59 @@
                 </v-card-actions>
             </v-card>
         </v-dialog>
+        <!-- Export Dialog -->
+        <v-dialog v-model="showExportDialog" max-width="500">
+            <v-card>
+                <!-- Notification Alert: Displays copy status (or error messages) -->
+                <v-row v-if="copiedAlert">
+                    <v-alert v-model="copiedAlert" min-height="fit-content" type="success" color="green" closable>
+                        {{ t('copiedToClipboard') }}
+                    </v-alert>
+                </v-row>
+                <v-card-title class="text-h5"> {{ t('exportSchedule') }}</v-card-title>
+                <v-card-text>
+                    <div v-if="exportLoading" class="text-center">
+                        <v-progress-circular indeterminate color="blue" size="40" />
+                        <div style="margin-top: 10px;"> {{ t('loadingScheduleExport') }}</div>
+                    </div>
+                    <div v-else-if="exportError">
+                        <v-alert type="error" density="compact" variant="outlined">{{ exportError }}</v-alert>
+                    </div>
+                    <div v-else>
+                        <v-textarea
+                            v-model="exportedScheduleJSON" :label="t('exportedSchedule')" rows="10" auto-grow
+                            readonly
+                        />
+                    </div>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn variant="outlined" @click="closeExportDialog">
+                        {{ t('close') }}
+                    </v-btn>
+                    <v-btn variant="outlined" color="primary" :disabled="!exportedScheduleJSON" @click="copyExport">
+                        {{ t('copy') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- Import Dialog -->
+        <v-dialog v-model="showImportDialog" max-width="500">
+            <v-card>
+                <v-card-title class="text-h5"> {{ t('importSchedule') }}</v-card-title>
+                <v-card-text>
+                    <v-textarea v-model="importText" :label="t('pasteJSONSchedule')" rows="10" auto-grow />
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn variant="outlined" @click="closeImportDialog">{{ t('cancel') }}</v-btn>
+                    <v-btn variant="outlined" color="primary" :disabled="!isValidJson" @click="handleImport">
+                        {{ t('import') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </v-container>
 </template>
 
@@ -1147,6 +1202,7 @@ export default {
                 alert: false,
                 message: ''
             },
+            copiedAlert: false,
 
             // Scheduling options
             scheduleId: null,
@@ -1222,11 +1278,24 @@ export default {
                 'nightStart',
                 'nadir'],
 
-            // Modal controls
+            // Dialog visibility
             modalTime: false,
             modalEndTime: false,
+
             dialog: false,
             dialogDelete: false,
+
+            showExportDialog: false,
+            showImportDialog: false,
+
+            // Export dialog states
+            exportLoading: false,
+            exportedSchedule: '',
+            exportError: '',
+            exportTimeout: null,
+
+            // Import dialog state
+            importText: '',
 
             // Datatable
             expanded: [],
@@ -1324,6 +1393,15 @@ export default {
                 return [...new Set(topics)]
             } else {
                 return [] // Or handle the case where schedules are undefined
+            }
+        },
+
+        isValidJson () {
+            try {
+                JSON.parse(this.importText)
+                return true
+            } catch (e) {
+                return false
             }
         },
         filteredSchedules () {
@@ -1432,6 +1510,22 @@ export default {
         // Localized solar events
         solarEvents () {
             return this.solarEventNames.map(event => ({ title: this.t(event), value: event }))
+        },
+        // JSON representation of the exported schedule
+        exportedScheduleJSON () {
+            if (!this.exportedSchedule) return ''
+            try {
+                // Ensure we work with an object.
+                const scheduleObject =
+                    typeof this.exportedSchedule === 'object'
+                        ? this.exportedSchedule
+                        : JSON.parse(this.exportedSchedule)
+                // Return a prettified JSON string.
+                return JSON.stringify(scheduleObject, null, 2)
+            } catch (error) {
+                console.error('Error prettifying JSON:', error)
+                return this.exportedSchedule
+            }
         }
     },
 
@@ -1605,6 +1699,13 @@ export default {
                     }
                 }
             }
+            if (msg.payload?.exportResult) {
+                if (this.showExportDialog && this.exportLoading) {
+                    clearTimeout(this.exportTimeout)
+                    this.exportLoading = false
+                    this.exportedSchedule = msg.payload?.exportResult
+                }
+            }
         },
         onDynamicProperties (msg) {
             const updates = msg.ui_update
@@ -1632,7 +1733,7 @@ export default {
             if (item) {
                 switch (item.value) {
                 case 'reportIssue':
-                    window.open('https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/issues/new?labels=bug', '_blank')
+                    window.open('https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/issues/new?template=bug-report.md', '_blank')
                     break
                 case 'featureRequest':
                     window.open('https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/issues/new?labels=enhancement', '_blank')
@@ -2273,6 +2374,128 @@ export default {
                 this.closeDialog()
             }
             this.dialogDelete = false
+        },
+
+        // Opens the export dialog and initiates the export request.
+        openExportDialog () {
+            this.showExportDialog = true
+            this.exportLoading = true
+            this.exportError = ''
+            this.exportedSchedule = ''
+
+            // Start a timeout so that if the schedule isn't received in 5s, show error.
+            this.exportTimeout = setTimeout(() => {
+                if (this.exportLoading) {
+                    this.exportLoading = false
+                    this.exportError = this.t('exportTimeout')
+                }
+            }, 5000)
+
+            // Send the export request via socket.
+            // (Adjust the action and payload as necessary.)
+            this.$socket.emit('widget-action', this.id, {
+                action: 'exportSchedule',
+                payload: { id: this.scheduleId }
+            })
+        },
+        // Copies the exported schedule text to the clipboard.
+        copyExport () {
+            navigator.clipboard
+                .writeText(this.exportedScheduleJSON)
+                .then(() => {
+                    this.copiedAlert = true
+                    // Auto-dismiss after 3 seconds.
+                    setTimeout(() => {
+                        this.copiedAlert = false
+                    }, 3000)
+                })
+                .catch((err) => {
+                    console.error('Failed to copy:', err)
+                })
+        },
+        closeExportDialog () {
+            this.showExportDialog = false
+            // Remove the socket listener for cleanliness.
+            // this.$socket.off('exported-schedule')
+        },
+        // Opens the import dialog.
+        openImportDialog () {
+            this.showImportDialog = true
+            this.importText = ''
+        },
+        closeImportDialog () {
+            this.showImportDialog = false
+        },
+        // Handles the import action: parses the text, iterates through keys,
+        // and calls editSchedule() for each schedule item.
+        handleImport () {
+            let parsedData
+            try {
+                parsedData = JSON.parse(this.importText)
+            } catch (e) {
+                // Shouldn't happen because the button is disabled if JSON is invalid.
+                return
+            }
+
+            // If parsedData is an object with multiple schedule entries,
+            // get its keys and import only the first schedule.
+            if (Array.isArray(parsedData)) {
+                parsedData = parsedData[0]
+            }
+
+            const item = parsedData
+            this.closeImportDialog()
+            console.log(item)
+            this.scheduleId = item.id || this.scheduleId
+            this.name = item.name || this.name
+            this.enabled = item.enabled !== undefined ? item.enabled : this.enabled
+            this.topic = item.topic || this.topic
+            this.scheduleType = item.scheduleType || this.scheduleType
+            this.period = item.period || this.period
+            if (item.period === 'daily') {
+                this.dailyDays = item.days || this.dailyDays
+            } else if (item.period === 'weekly') {
+                this.weeklyDays = item.days || this.weeklyDays
+            } else if (item.period === 'monthly') {
+                this.monthlyDays = item.days ? item.days.map(day => day === 'Last' ? 'Last' : Number(day)) : this.monthlyDays
+            } else if (item.period === 'yearly') {
+                this.yearlyDay = item.days ? item.days[0] : this.yearlyDay
+            }
+            this.time = item.time || this.time
+            this.minutesInterval = item.minutesInterval || this.minutesInterval
+            this.timespan = item.timespan !== undefined ? item.timespan : this.timespan
+            this.duration = item.duration || this.duration
+            this.hourlyInterval = item.hourlyInterval || this.hourlyInterval
+            this.yearlyMonth = item.month || this.yearlyMonth
+            this.endTime = item.endTime || this.endTime
+            this.solarEvent = item.solarEvent || this.solarEvent
+            this.solarDays = item.solarDays || this.solarDays
+            const length = this.solarDays?.length
+            this.solarShowMore = length > 0 && length < 7 ? ['moreOptions'] : []
+            this.offset = item.offset || this.offset
+            this.solarEventTimespanTime = item.solarEventTimespanTime || this.solarEventTimespanTime
+            this.solarEventStart = item.solarEventStart !== undefined ? item.solarEventStart : this.solarEventStart
+
+            if (this.scheduleType === 'cron') {
+                this.cronValue = item.startCronExpression || this.cronValue
+            }
+
+            if (this.scheduleType === 'cron') {
+                this.cronValue = item.startCronExpression || this.cronValue
+            }
+            this.payloadValue = item.payloadValue !== undefined ? item.payloadValue : this.payloadValue
+            this.payloadType = item.payloadType !== undefined ? item.payloadType : this.payloadType
+            if (item.payloadType !== undefined && item.payloadType === 'custom') {
+                if (item.payloadValue !== undefined) {
+                    const payload = this.props.customPayloads.find(payload => payload.id === item.payloadValue)
+                    this.customPayloadStart = payload || null
+                }
+
+                if (item.endPayloadValue !== undefined) {
+                    const payload = this.props.customPayloads.find(payload => payload.id === item.endPayloadValue)
+                    this.customPayloadEnd = payload || null
+                }
+            }
         },
 
         copyToClipboard (item) {

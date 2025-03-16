@@ -4722,6 +4722,29 @@ module.exports = function (RED) {
             }
         }
 
+        function exportUISchedule (msg) {
+            if (!msg?.payload?.id) {
+                console.warn('No schedule ID provided for status request.')
+                return
+            }
+
+            const schedule = getSchedule(node, msg.payload.id)
+            if (schedule) {
+                const exportedSchedule = exportSchedule(schedule)
+                if (exportedSchedule) {
+                    // Remove the id properties from the exported schedule
+                    const modifiedSchedule = { ...exportedSchedule }
+                    delete modifiedSchedule.id
+                    delete modifiedSchedule.primaryTaskId
+                    delete modifiedSchedule.endTaskId
+
+                    const m = { payload: { exportResult: modifiedSchedule }, event: 'export-schedule' }
+                    base.emit(`msg-input:${node.id}`, m, node)
+                }
+            } else {
+                console.warn(`Schedule not found for ID: ${msg.payload.id}`)
+            }
+        }
         /**
              * Asynchronously describes a cron expression from the message payload.
              *
@@ -4812,6 +4835,8 @@ module.exports = function (RED) {
                                 console.log('Failed to check for updates.')
                             }
                         })
+                    } else if (msg.action === 'exportSchedule') {
+                        exportUISchedule(msg)
                     } else { console.log('Unknown action', msg.action) }
 
                     if (msg.ui_update) {
