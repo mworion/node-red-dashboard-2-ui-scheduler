@@ -1819,7 +1819,7 @@ export default {
             return this.schedules
                 ? this.schedules.some(
                     schedule =>
-                        schedule.name.toLowerCase() === this.name.toLowerCase() &&
+                        schedule.name.toLowerCase() === this.name.toLowerCase().trim() &&
                         schedule !== this.currentSchedule &&
                         !this.isEditing
                 )
