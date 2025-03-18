@@ -5117,6 +5117,12 @@ module.exports = function (RED) {
                     delete modifiedSchedule.id
                     delete modifiedSchedule.primaryTaskId
                     delete modifiedSchedule.endTaskId
+                    if (modifiedSchedule.payloadType === 'custom') {
+                        modifiedSchedule.payloadValue = getCustomPayload(node, modifiedSchedule.payloadValue)
+                        if (modifiedSchedule.endPayloadValue) {
+                            modifiedSchedule.endPayloadValue = getCustomPayload(node, modifiedSchedule.endPayloadValue)
+                        }
+                    }
 
                     const m = { payload: { exportResult: modifiedSchedule }, event: 'export-schedule' }
                     base.emit(`msg-input:${node.id}`, m, node)
