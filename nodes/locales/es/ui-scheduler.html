@@ -1,0 +1,535 @@
+<script type="text/javascript">
+    function _popoutSchedulerHelp (tag) {
+        const startTag = (name) => `<${name}>`
+        const endTag = (name) => `</${name}>`
+        const winHtml = `
+            ${startTag('html')}
+                ${startTag('head')}
+                    ${startTag('title')}ui-scheduler ayuda${endTag('title')}
+                    ${startTag('style')}
+                    .fade-in {
+                        transition: opacity 1.5s ease-in-out;
+                    }
+                    .hidden {
+                        opacity: 0;
+                        visibility: hidden;
+                    }
+                    ${endTag('style')}
+                ${endTag('head')}
+                ${startTag('body')}
+                    ${startTag('script')}
+                        const styles = ${JSON.stringify([].map.call(document.querySelectorAll('[rel="stylesheet"]'), e => e.href))}
+                        const head = document.head || document.getElementsByTagName('head')[0]
+                        styles.forEach(href => {
+                            const el = document.createElement('link');
+                            el.rel="stylesheet"
+                            el.href = href
+                            head.appendChild(el);
+                        })
+                    ${endTag('script')}
+                    <div class="red-ui-editor help-content hidden" style="height: 100%">
+                        <div class="red-ui-sidebar-info">
+                            <div class="red-ui-sidebar-help-stack red-ui-panels" style="height: 100%;">
+                                <div class="red-ui-panel" style="overflow-y: auto;height: 100%;">
+                                    <div class="red-ui-help" style="padding: 6px;height: 100%;">
+                                        <h1 class="red-ui-help-title">ui-scheduler</h1>
+                                        <div class="red-ui-help">
+                                            <span class="red-ui-text-bidi-aware">
+                                                ${RED.nodes.getNodeHelp('ui-scheduler')}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    ${startTag('script')}
+                        if (navigator.clipboard) {
+                            document.querySelector('.ui-scheduler-link-button').classList.add('hidden')
+                            const content = document.querySelector('.help-content');
+                            content.classList.add('hidden')
+                            content.classList.remove('hidden')
+                            content.classList.add('fade-in')
+                            const copyButtonLabel = "Copiar"
+                            const blocks = document.querySelectorAll("pre.ui-scheduler-code")
+                            blocks.forEach((block) => {
+                                const button = document.createElement("button")
+                                button.innerText = copyButtonLabel
+                                button.classList.add('ui-scheduler-copy-button')
+                                button.addEventListener("click", copyCode)
+                                block.appendChild(button)
+                            })
+                        }
+                        async function copyCode(event) {
+                            const button = event.srcElement
+                            const pre = button.parentElement
+                            const code = pre.querySelector("code")
+                            const text = code.innerText
+                            await navigator.clipboard.writeText(text)
+                        }
+                    ${endTag('script')}
+                ${endTag('body')}
+            ${endTag('html')}`
+
+        const BOM = new Uint8Array([0xEF, 0xBB, 0xBF])
+        const winUrl = URL.createObjectURL(
+            new Blob([BOM, winHtml], { encoding: 'UTF-8', type: 'text/html;charset=UTF-8' })
+        )
+        const win = window.open(
+            winUrl + (tag ? '#' + tag : ''),
+            'win',
+            'width=800,height=600'
+        )
+    }
+</script>
+
+<script type="text/markdown" data-help-name="ui-scheduler">
+    
+    # 🕙 UI Scheduler Ayuda Documentación
+
+Este documento proporciona una guía completa para configurar los ajustes del nodo UI Scheduler, el uso en la interfaz de usuario del panel de control y información adicional. El UI Scheduler permite a los usuarios automatizar tareas basadas en el tiempo, eventos solares o expresiones cron.
+
+## 👆 Usar el UI Scheduler en el Dashboard 2.0
+
+#### 🖥️ Interfaz principal
+
+- **🛠️ Barra de herramientas**: 
+  - **🔍 Selector de temas**: Filtrar planes por tema.
+  - **➕ Botón Agregar plan**: Abrir el cuadro de diálogo para crear un nuevo plan.
+  - **☰ Menú**: Acceder a opciones adicionales como verificar actualizaciones o reportar problemas.
+
+- **📋 Tabla de planes**: Muestra todos los planes con detalles como nombre, descripción y estado. Puede expandir las filas para ver más detalles.
+
+#### 🗓️ Crear un plan
+
+1. **🖱️ Abrir el cuadro de diálogo de plan**: Haga clic en el botón ➕ en la barra de herramientas.
+2. **✏️ Ingresar detalles del plan**:
+   - **🏷️ Nombre**: Ingrese un nombre único para el plan.
+   - **📂 Tema**: Seleccione un tema del menú desplegable. Los temas se definen en **Node Settings**
+   - **⏲️ Tipo**: Elija entre Tiempo, Solar o Cron.
+   - **🔄 Período**: Para planes basados en el tiempo, seleccione el período de repetición.
+   - **🕒 Hora/Fecha**: Establezca la hora de inicio y, si corresponde, la hora de finalización o la duración.
+   - **📦 Payload**: Elija el tipo de payload y defina payloads personalizados si es necesario.
+3. **💾 Guardar el plan**: Haga clic en "Guardar" para agregar el plan.
+
+#### ✏️ Editar un plan
+
+- **🖊️ Editar**: Haga clic en el plan en la tabla para expandir las filas y ver más detalles. Haga clic en el icono de lápiz para abrir el cuadro de diálogo de edición. Realice cambios y guarde.
+- **🗑️ Eliminar**: Haga clic en el icono de eliminación para eliminar un plan.
+
+#### 🔄 Importar y exportar planes
+
+- **📤 Exportar**: Haga clic en el icono de exportación para copiar el JSON del plan en su portapapeles. _Disponible solo al editar un plan._
+- **📥 Importar**: Haga clic en el icono de importación y pegue el JSON para importar un plan. _Disponible solo al crear un plan._
+
+#### ⚙️ Gestionar planes
+
+- **🔄 Activar/Desactivar**: Use el interruptor para activar o desactivar los planes.
+
+### 🚀 Funciones avanzadas
+
+#### 🌞 Eventos solares
+
+- Ajuste los planes en función de eventos solares con compensaciones.
+- Los eventos admitidos incluyen el amanecer, el atardecer y varias fases del crepúsculo.
+
+#### ⏰ Expresiones Cron
+
+- Use la sintaxis cron para necesidades de planificación complejas.
+- Admite campos cron estándar y caracteres especiales.
+
+#### 📦 Payloads personalizados
+
+- Use payloads personalizados para la salida de planes. Los payloads se definen en **Node Settings**
+- Admite JSON y otros formatos de datos.
+
+## 🛠️ Configuración del nodo
+
+#### 🏷️ Nombre
+- **Campo**: `Nombre`
+- **Descripción**: Ingrese un nombre único para el scheduler. Este nombre se utiliza para identificar el scheduler en el sistema.
+- **Tipo de entrada**: Texto (string)
+
+#### 👥 Grupo
+- **Campo**: `Grupo`
+- **Descripción**: Seleccione el grupo al que pertenece este scheduler. Los grupos ayudan a organizar los widgets dentro de la interfaz de usuario.
+- **Tipo de entrada**: Menú desplegable (string)
+
+#### 📏 Tamaño
+- **Campo**: `Tamaño`
+- **Descripción**: Ajuste el tamaño del widget del scheduler dentro de la interfaz de usuario. Esto se puede configurar manualmente o utilizando el ajustador de tamaño de elemento.
+- **Tipo de entrada**: Botón (Ajustador de tamaño de elemento)
+
+#### 🏷️ Etiqueta
+- **Campo**: `Etiqueta`
+- **Descripción**: Establezca una etiqueta para el scheduler que se mostrará en la interfaz de usuario.
+- **Tipo de entrada**: Texto (string)
+
+### 🌍 Configuración de localización
+
+#### 🌐 Idioma
+- **Campo**: `Idioma`
+- **Descripción**: Seleccione el idioma para la interfaz del scheduler. 
+  - Los idiomas admitidos incluyen inglés, alemán, francés, italiano, holandés y español.
+  - También edite <code>~/.node-red/settings.js</code> y agregue/descomente la siguiente línea: <code>lang: 'en'</code>. 
+Los códigos de idioma disponibles son: <code>en</code>, <code>de</code>, <code>fr</code>, <code>it</code>, <code>nl</code>, <code>es</code>
+Esto establece el idioma utilizado en el nodo UI Scheduler en el servidor Node-Red.
+- **Tipo de entrada**: Menú desplegable (string)
+
+#### ⏰ Zona horaria
+- **Campo**: `Zona horaria`
+- **Descripción**: Especifique la zona horaria para el scheduler. Esto afecta cómo se calculan y muestran las horas.
+  - Deje en blanco para la zona horaria del sistema. 
+  - Alternativamente, ingrese UTC o una zona horaria en el formato Región/Área ([lista](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)).
+- **Tipo de entrada**: Texto Autocompletar (string)
+
+#### 🕒 Formato de 24 horas
+- **Campo**: `Usar formato de 24 horas`
+- **Descripción**: Cambiar entre formatos de hora de 24 horas y 12 horas.
+- **Tipo de entrada**: Casilla de verificación (boolean)
+
+### 📍 Configuración de ubicación
+
+#### 🌐 Ubicación
+- **Campo**: `Ubicación`
+- **Descripción**: Establezca una ubicación geográfica predeterminada para los cálculos de eventos solares. Esto puede ser una ubicación fija o una variable de entorno.
+- **Tipo de entrada**: Entrada tipada (string)
+
+### 📤 Configuración de salida
+
+#### 📬 Salida de mensaje de respuesta de comando
+- **Campo**: `Salida de mensaje de respuesta de comando`
+- **Descripción**: Elija cómo se emiten las respuestas de comando. Las opciones incluyen:
+  - 1 salida: Todos los mensajes a la salida 1 (planes + respuestas de comando)
+  - 2 salidas: Respuestas de comando a la salida 1, Mensajes de planes a la salida 2
+  - Fan out: Salidas separadas para mensajes de comando y cada tema
+- **Tipo de entrada**: Menú desplegable (string)
+
+#### 📝 Propiedad de salida
+- **Campo**: `Campo de salida`
+- **Descripción**: Especifique la propiedad en el objeto de mensaje donde se almacena la salida.
+  - por ejemplo, si 'Campo de salida' está configurado en **data.value** entonces `msg.data.value` contendrá el valor del *payload*
+  - `msg.topic` contendrá el nombre del tema. Esto simplifica la separación de qué evento de plan se activó
+  - También se agregan propiedades adicionales al objeto msg. Verifique la salida de depuración (use mostrar msg completo)
+
+- **Tipo de entrada**: Entrada tipada (string)
+
+### 📊 Configuración de estado
+
+#### 📅 Enviar estado de los planes
+- **Campo**: `Enviar estado de los planes`
+- **Descripción**: Configure la frecuencia de envío del estado de los planes y si se deben enviar estados activos o inactivos.
+  - Esto se agrupa por tema, por lo que si dos planes están `activos` (dentro del rango de horas de inicio y fin) para el mismo tema, solo se envía un mensaje con payload `true`. 
+  - De manera similar, si un plan para un tema está `inactivo`, y el otro `activo`, solo se envía un mensaje con payload `true`. 
+  - Si ambos planes están `inactivos`, solo se envía un mensaje con payload `false`.
+- **Tipo de entrada**: Número (Intervalo), Casilla de verificación (Estado Activo/Inactivo) (número, boolean)
+
+### 💾 Configuración de almacenamiento
+
+#### 🗄️ Nombre de almacenamiento
+- **Campo**: `Nombre de almacenamiento`
+- **Descripción**: Seleccione el método de almacenamiento para conservar los planes. Las opciones incluyen:
+  - Ninguno: No almacenar planes. Los planes se pierden cuando el nodo se vuelve a implementar
+  - Sistema de archivos local: Almacenar planes en el sistema de archivos local. Los planes se almacenan en un directorio llamado `schedulerdata` bajo su carpeta node-red
+  - Node Context Stores: Almacenar planes en el contexto del nodo. Estos almacenes se cargan automáticamente desde su archivo de configuración node-red. Consulte la documentación [Node-RED Contexts](https://nodered.org/docs/user-guide/context) para obtener más información.
+- **Tipo de entrada**: Menú desplegable (string)
+
+### 📨 Temas y Payloads
+
+#### 🗂️ Temas
+- **Campo**: `Temas`
+- **Descripción**: Defina temas para el scheduler. Los temas ayudan a categorizar y gestionar los planes.
+  - Estos temas se pueden usar en el campo `Tema` de los planes, y se pueden seleccionar en la interfaz de usuario del panel de control Node-Red 2.0. 
+  - En modo Fan Out, los mensajes de planes se envían a la salida que corresponde al tema.
+- **Tipo de entrada**: Lista editable (string)
+
+#### 📦 Payloads personalizados
+- **Campo**: `Payloads personalizados`
+- **Descripción**: Defina payloads personalizados que se envían cuando se activa un plan. 
+  - Los payloads pueden ser de diferentes tipos, incluidos string, número, boolean y JSON.
+  - Los payloads definidos aquí se pueden seleccionar en la interfaz de usuario del panel de control.
+  - Cambiar el valor del payload aquí actualizará automáticamente los valores de payload de todos los planes que usan el payload 
+- **Tipo de entrada**: Lista editable con entrada tipada (string, número, boolean, JSON)
+
+### ⚙️ Configuración avanzada
+
+#### 🕰️ Usar nuevo selector de tiempo
+- **Campo**: `Usar nuevo selector de tiempo`
+- **Descripción**: Activar o desactivar la nueva interfaz del selector de tiempo.
+- **Tipo de entrada**: Casilla de verificación (boolean)
+
+## 🔧 Entradas (Uso avanzado)
+
+#### Tema
+La mayoría de los comandos se pueden proporcionar en el tema con el nombre del plan en el payload (donde corresponda). Temas de comando admitidos...
+
+- trigger
+- status
+- export
+- remove
+- pause
+- stop
+- start
+
+Esto incluye los temas de comando `-all`, `-all-dynamic`, `-all-static`, `-topic`, `-active`,  `-active-dynamic`,  `-active-static`, `-inactive`, `-inactive-dynamic` y `-inactive-static` (por ejemplo, export-all, stop-all-dynamic, start-all-static, remove-inactive-dynamic). Consulte [comandos](#ui-scheduler-commands-info) a continuación para obtener más detalles.
+
+#### 📦 Payload
+Es posible agregar, eliminar y controlar dinámicamente planes inyectando un payload en el nodo. El formato del objeto payload (o matriz de objetos) depende de la operación. Consulte a continuación para obtener más detalles. También puede exportar planes desde la interfaz de usuario del panel de control en la ventana de edición y pegar el JSON resultante.
+
+#### ➕ Agregar uno o más planes
+Ejemplo...
+```json
+payload: {
+  "command": "add",
+  "schedule": [
+    {
+      "name": "Plan",
+      "topic": "Tema 1",
+      "enabled": true,
+      "scheduleType": "time",
+      "period": "daily",
+      "time": "00:00",
+      "endTime": null,
+      "days": [
+        "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday"
+      ],
+      "payloadType": true,
+      "payloadValue": true
+    },
+    {
+      "name": "Plan 2",
+      "topic": "Tema 1",
+      "enabled": true,
+      "scheduleType": "solar",
+      "timespan": "time",
+      "solarEvent": "sunrise",
+      "offset": 5,
+      "solarEventStart": false,
+      "solarEventTimespanTime": "21:00",
+      "payloadType": "true_false",
+      "payloadValue": true,
+      "endPayloadValue": false
+    },
+    {
+      "name": "Plan 3",
+      "topic": "Tema 1",
+      "enabled": true,
+      "scheduleType": "time",
+      "period": "minutes",
+      "duration": 1,
+      "timespan": "duration",
+      "minutesInterval": 7,
+      "payloadType": "true_false",
+      "payloadValue": true,
+      "endPayloadValue": false
+    }
+  ]
+}
+```
+
+### 📊 Obtener el estado de un plan o eliminar / detener / pausar / iniciar un plan
+
+#### Método Tema
+```json
+msg.topic = "command"; // nombre del comando - *ver detalles a continuación*,
+msg.payload = "name"; //  nombre del plan
+```
+
+#### Método Payload
+```json
+payload: {
+  "command": "*ver detalles a continuación*",
+  "name": "* nombre del plan",
+}
+```
+
+#### Detalles
+- command: (string|requerido) La operación a realizar - esto puede ser uno de los siguientes...
+  - "trigger"
+  - "status"
+  - "export"
+  - "remove"
+  - "stop"
+  - "pause"
+  - "start"
+- name: (string|opcional) El nombre del plan a afectar (no requerido al usar los filtros -all, -active o -inactive)
+
+#### 📝 Notas
+- `trigger` activa el plan nombrado en `msg.payload`
+- `status` devuelve un objeto con la configuración y el estado del plan nombrado
+- `export` devuelve un objeto con la configuración del plan nombrado
+- `remove` detiene y elimina el plan. Esta opción no tiene salida.
+- `stop` detiene el plan especificado por `name` y restablece su contador interno. Esta opción no tiene salida.
+- `pause` detiene el plan especificado por `name` pero no restablece su contador interno. Esta opción no tiene salida.
+- `start` reiniciará todos los planes. Cualquier plan que haya alcanzado su límite comenzará de nuevo. Los planes en pausa se reanudarán. Esta opción no tiene salida.
+- FILTRO: agregar `-all` a cualquiera de estos comandos afectará a todos los planes. por ejemplo, `status-all` devuelve el estado de todos los planes
+- FILTRO: agregar `-all-dynamic` a cualquiera de estos comandos solo afectará a los planes dinámicos, por ejemplo, `remove-all-dynamic` elimina todos los planes dinámicos
+- FILTRO: agregar `-all-static` a cualquiera de estos comandos solo afectará a los planes estáticos, por ejemplo, `stop-all-static`
+- FILTRO: agregar `-topic` a cualquiera de estos comandos solo afectará a los planes cuyo tema coincida con el tema especificado en el payload, por ejemplo, `stop-topic`
+- FILTRO: agregar `-active` a los comandos status, export y remove afectará a todos los planes activos. por ejemplo, `status-active`
+- FILTRO: agregar `-active-static` a los comandos status, export y remove afectará a todos los planes estáticos que estén activos. por ejemplo, `status-active-static`
+- FILTRO: agregar `-active-dynamic` a los comandos status, export y remove afectará a todos los planes dinámicos que estén activos. por ejemplo, `status-active-dynamic`
+- FILTRO: agregar `-inactive` a los comandos status, export y remove afectará a todos los planes inactivos. por ejemplo, `status-inactive`
+- FILTRO: agregar `-inactive-static` a los comandos status, export y remove afectará a todos los planes estáticos que estén inactivos. por ejemplo, `status-inactive-static`
+- FILTRO: agregar `-inactive-dynamic` a los comandos status, export y remove afectará a todos los planes dinámicos que estén inactivos. por ejemplo, `status-inactive-dynamic`
+
+#### 📖 Ejemplos
+- Usar un comando de tema simple para activar manualmente un plan llamado "plan1"
+  ```json
+  msg: {
+    "topic": "trigger",
+    "payload": "plan1"
+  }
+  ```
+- Usar un comando de tema simple con un tema en el payload para iniciar todos los planes con el tema especificado
+  ```json
+  msg: {
+    "topic": "start-topic",
+    "payload": { "topic": "Tema 1" }
+  }
+  ```
+- Usar un comando de tema simple para exportar todos los planes agregados dinámicamente...
+  ```json
+  msg: {
+    "topic": "export-all-dynamic"
+  }
+  ```
+- Usar un comando de tema simple para eliminar un plan llamado "plan1"
+  ```json
+  msg: {
+    "topic": "remove",
+    "payload": "plan1"
+  }
+  ```
+- Usar un payload cmd para pausar todos los planes...
+  ```json
+  payload: {
+    "command": "pause-all"
+  }
+  ```
+- Usar un comando de tema simple para eliminar todos los planes dinámicos que se han completado
+  ```json
+  msg: {
+    "topic": "remove-inactive-dynamic"
+  }
+  ```
+
+### 🔍 Describir
+
+#### Ejemplo: payload cmd para describir una expresión cron
+```json
+{
+  "command": "describe",
+  "expressionType": "cron",
+  "expression": "0 */5 * * * MON *",
+  "timeZone": "Europe/Madrid"
+}
+```
+
+#### Ejemplo: payload cmd para obtener todas las horas de eventos solares + estado solar en este momento
+```json
+{
+  "command": "describe",
+  "expressionType": "solar",
+  "location": "40.4168,-3.7038",
+  "solarType": "all",
+  "timeZone": "Europe/Madrid"
+}
+```
+
+#### Ejemplo: payload cmd para obtener 4 horas de eventos solares + solar para un momento específico
+```json
+{
+  "command": "describe",
+  "expressionType": "solar",
+  "time": "2020-03-22 18:40",
+  "location": "40.4168,-3.7038",
+  "solarType": "selected",
+  "solarEvents": "civilDawn,sunrise,sunset,civilDusk",
+  "timeZone": "Europe/Madrid"
+}
+```
+
+#### Detalles
+Devuelve un objeto en el payload con información legible para la expresión dada.
+
+- command: (string|requerido) La operación a realizar
+- expression: (string|requerido) La expresión a describir
+- timeZone: (string|opcional) Una zona horaria para usar. Deje en blanco para la zona horaria del sistema. Alternativamente, ingrese UTC o una zona horaria en el formato Región/Área ([lista](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones))
+
+## Información adicional
+
+### ⏰ CronExpression
+Una expresión CRON, una fecha, una lista de fechas separadas por comas o una matriz de fechas.
+
+##### 📅 Formato de fecha o secuencia de fechas
+Cuando desee utilizar una fecha fija o una secuencia de fechas, la expresión puede ser una fecha en forma de cadena, una lista de fechas separadas por comas o una matriz de fechas (La matriz puede contener una mezcla de cadenas, objetos de fecha y marcas de tiempo). Al especificar una fecha en forma de cadena, puede usar la zona horaria, por ejemplo, "2020-01-01 00:00 GMT+2". Incluso puede mezclar zonas horarias, por ejemplo, "2020-01-01 00:00 GMT+2, 2020-01-01 00:00 GMT-7".
+
+##### ⏲️ Formato CRON
+```
+* * * * * * *    Campo              Valores permitidos    Caracteres especiales
+| | | | | | |    -----------------  ---------------   ---------------
+`-|-|-|-|-|-|->  Segundo (opcional)  0-59              * / , -
+  `-|-|-|-|-|->  Minuto             0-59              * / , -
+    `-|-|-|-|->  Hora               0-23              * / , -
+      `-|-|-|->  Día del mes        1-31              * / , - ? L W
+        `-|-|->  Mes                1-12 o JAN-DEC    * / , -
+          `-|->  Día de la semana   0-7 o SUN-SAT     * / , - ? L #
+            `->  Año (opcional)     1970-2099         * / , -
+```
+
+##### 📝 Notas
+- `*` Los asteriscos indican que la expresión cron coincide con todos los valores del campo. Por ejemplo, "*" en el campo de minutos significa cada minuto.
+- `?` Los signos de interrogación se utilizan para indicar 'ningún valor específico' y están permitidos para los campos día-del-mes y día-de-la-semana. Se utiliza en lugar del asterisco (*) para dejar en blanco el día-del-mes o el día-de-la-semana.
+- `-` Los guiones se utilizan para definir rangos. Por ejemplo, "10-12" en el campo de horas significa las horas de 10, 11 y 12.
+- `,` Las comas se utilizan para separar elementos de una lista. Por ejemplo, "MON,WED,FRI" en el campo día-de-la-semana significa los días lunes, miércoles y viernes.
+- `/` Las barras se utilizan para indicar incrementos. Por ejemplo, "0/15" en el campo de segundos significa los segundos 0, 15, 30 y 45. Además, "1/3" en el campo día-del-mes significa cada 3 días comenzando en el primer día del mes.
+- `L` Abreviatura de "último" y está permitido para los campos día-del-mes y día-de-la-semana. El carácter "L" tiene un significado diferente en cada uno de los dos campos. Por ejemplo, "L" en el campo día-del-mes significa el último día del mes. Si se utiliza en el campo día-de-la-semana, significa 7 o SAT. Sin embargo, si se utiliza en el campo día-de-la-semana después de otro valor, significa el último día xxx del mes. Por ejemplo, "6L" en el campo día-de-la-semana significa el último viernes del mes.
+- `W` Abreviatura de "día de la semana" y está permitido para el campo día-del-mes. El carácter "W" se utiliza para indicar el día de la semana más cercano al día dado. Por ejemplo, "15W" en el campo día-del-mes significa el día de la semana más cercano al 15 del mes. Por lo tanto, si el 15 es un sábado, el trabajo se realizará el viernes 14. Los caracteres "L" y "W" se pueden combinar en el campo día-del-mes. Por ejemplo, "LW" significa el último día de la semana del mes.
+- `#` Los signos de almohadilla especifican construcciones. Por ejemplo, "6#3" en el campo día-de-la-semana significa el tercer viernes del mes.
+
+##### 📖 Ejemplos
+- `* * * * * *` Cada segundo
+- `0 * * * * *` Cada minuto
+- `0 */10 * * * *` Cada 10 minutos
+- `0 */20 1 * * *` Cada 20 minutos, entre 01:00 y 01:59
+- `0 15,30,45 * * * *` A los 15, 30 y 45 minutos después de la hora
+- `0 0 12 * * *` Cada día a las 12 del mediodía
+- `0 0 2 29 FEB * 2020/4` A las 02:00, el 29 de febrero (años bisiestos)
+- `0 0 7 * * MON#1 *` A las 07:00, el primer lunes del mes
+- `0 0 12 * JAN,FEB,MAR,APR *` Cada día a las 12 del mediodía en enero, febrero, marzo y abril
+- `* * 1W * *` Cada minuto, el primer día de la semana del mes
+- `* * * * Tue#3` Cada minuto, el tercer martes del mes
+- `0 12 * * MONL` A las 12:00, el último lunes del mes
+
+Vea [aquí](https://github.com/jaclarke/cronosjs) para más ejemplos e información.
+
+#### 🌅 Eventos solares
+| ID del evento | Evento | Información |
+|----------|-------|-------------|
+| nightEnd | fin de la noche / amanecer astronómico | la noche termina, el amanecer astronómico comienza (-18°) |
+| nauticalDawn | amanecer náutico | el amanecer astronómico termina, el amanecer náutico comienza (-12°) |
+| civilDawn | amanecer civil / hora dorada | el amanecer náutico termina, el amanecer civil y la hora dorada comienzan (-6°) |
+| sunrise | amanecer | el borde superior del sol aparece en el horizonte (-0.833°) |
+| sunriseEnd | fin del amanecer | el borde inferior del sol toca el horizonte (-0.3°) |
+| morningGoldenHourEnd | fin de la hora dorada de la mañana | cuando el sol está a 6 grados sobre el horizonte (6°) |
+| solarNoon | mediodía solar | el sol está en su punto más alto |
+| eveningGoldenHourStart | inicio de la hora dorada de la tarde | cuando el sol está a 6 grados sobre el horizonte (6°) |
+| sunsetStart | inicio del atardecer | el borde inferior del sol toca el horizonte (-0.3°) |
+| sunset | atardecer | el crepúsculo civil comienza, el sol desaparece bajo el horizonte (-0.833°) |
+| civilDusk | crepúsculo civil / fin de la hora dorada | el crepúsculo civil y la hora dorada terminan, el crepúsculo náutico comienza (-6°) |
+| nauticalDusk | crepúsculo náutico | el crepúsculo náutico termina, el crepúsculo astronómico comienza (-12°) |
+| nightStart | crepúsculo astronómico / inicio de la noche | el crepúsculo astronómico termina, la noche comienza (-18°) |
+| nadir | medianoche solar | cuando el sol está más cerca del nadir y la noche está equidistante del amanecer y el crepúsculo |
+
+#### 📝 Notas generales
+- Agregar un plan con el mismo nombre que un plan existente reemplazará al existente
+- Cuando un nodo ui-scheduler emite un msg en respuesta a un comando, `msg.commandResponse` será `true` para indicar que el mensaje es una respuesta a un comando y no un evento programado
+- Cuando un nodo ui-scheduler emite un msg para un evento cron/solar, `msg.scheduledEvent` será `true` para indicar que el mensaje se debe a un evento programado y no a una respuesta de control
+</script>

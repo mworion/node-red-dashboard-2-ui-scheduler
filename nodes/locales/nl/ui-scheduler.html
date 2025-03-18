@@ -1,0 +1,535 @@
+<script type="text/javascript">
+    function _popoutSchedulerHelp (tag) {
+        const startTag = (name) => `<${name}>`
+        const endTag = (name) => `</${name}>`
+        const winHtml = `
+            ${startTag('html')}
+                ${startTag('head')}
+                    ${startTag('title')}ui-scheduler help${endTag('title')}
+                    ${startTag('style')}
+                    .fade-in {
+                        transition: opacity 1.5s ease-in-out;
+                    }
+                    .hidden {
+                        opacity: 0;
+                        visibility: hidden;
+                    }
+                    ${endTag('style')}
+                ${endTag('head')}
+                ${startTag('body')}
+                    ${startTag('script')}
+                        const styles = ${JSON.stringify([].map.call(document.querySelectorAll('[rel="stylesheet"]'), e => e.href))}
+                        const head = document.head || document.getElementsByTagName('head')[0]
+                        styles.forEach(href => {
+                            const el = document.createElement('link');
+                            el.rel="stylesheet"
+                            el.href = href
+                            head.appendChild(el);
+                        })
+                    ${endTag('script')}
+                    <div class="red-ui-editor help-content hidden" style="height: 100%">
+                        <div class="red-ui-sidebar-info">
+                            <div class="red-ui-sidebar-help-stack red-ui-panels" style="height: 100%;">
+                                <div class="red-ui-panel" style="overflow-y: auto;height: 100%;">
+                                    <div class="red-ui-help" style="padding: 6px;height: 100%;">
+                                        <h1 class="red-ui-help-title">ui-scheduler</h1>
+                                        <div class="red-ui-help">
+                                            <span class="red-ui-text-bidi-aware">
+                                                ${RED.nodes.getNodeHelp('ui-scheduler')}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    ${startTag('script')}
+                        if (navigator.clipboard) {
+                            document.querySelector('.ui-scheduler-link-button').classList.add('hidden')
+                            const content = document.querySelector('.help-content');
+                            content.classList.add('hidden')
+                            content.classList.remove('hidden')
+                            content.classList.add('fade-in')
+                            const copyButtonLabel = "Kopiëren"
+                            const blocks = document.querySelectorAll("pre.ui-scheduler-code")
+                            blocks.forEach((block) => {
+                                const button = document.createElement("button")
+                                button.innerText = copyButtonLabel
+                                button.classList.add('ui-scheduler-copy-button')
+                                button.addEventListener("click", copyCode)
+                                block.appendChild(button)
+                            })
+                        }
+                        async function copyCode(event) {
+                            const button = event.srcElement
+                            const pre = button.parentElement
+                            const code = pre.querySelector("code")
+                            const text = code.innerText
+                            await navigator.clipboard.writeText(text)
+                        }
+                    ${endTag('script')}
+                ${endTag('body')}
+            ${endTag('html')}`
+
+        const BOM = new Uint8Array([0xEF, 0xBB, 0xBF])
+        const winUrl = URL.createObjectURL(
+            new Blob([BOM, winHtml], { encoding: 'UTF-8', type: 'text/html;charset=UTF-8' })
+        )
+        const win = window.open(
+            winUrl + (tag ? '#' + tag : ''),
+            'win',
+            'width=800,height=600'
+        )
+    }
+</script>
+
+<script type="text/markdown" data-help-name="ui-scheduler">
+    
+    # 🕙 UI Scheduler Help Documentatie
+
+Dit document biedt een uitgebreide gids voor het configureren van de instellingen voor de UI Scheduler-knooppunt, gebruik in de Dashboard UI en aanvullende informatie. De UI Scheduler stelt gebruikers in staat om taken te automatiseren op basis van tijd, zonne-evenementen of cron-uitdrukkingen.
+
+## 👆 De UI Scheduler gebruiken in Dashboard 2.0
+
+#### 🖥️ Hoofdinterface
+
+- **🛠️ Werkbalk**: 
+  - **🔍 Onderwerpselector**: Filter schema's op onderwerp.
+  - **➕ Schema toevoegen knop**: Open de dialoog om een nieuw schema te maken.
+  - **☰ Menu**: Toegang tot extra opties zoals het controleren op updates of het melden van problemen.
+
+- **📋 Schema Tabel**: Toont alle schema's met details zoals naam, beschrijving en status. U kunt rijen uitvouwen om meer details te bekijken.
+
+#### 🗓️ Een schema maken
+
+1. **🖱️ Open de schema dialoog**: Klik op de ➕ knop in de werkbalk.
+2. **✏️ Voer schema details in**:
+   - **🏷️ Naam**: Voer een unieke naam in voor het schema.
+   - **📂 Onderwerp**: Selecteer een onderwerp uit de vervolgkeuzelijst. Onderwerpen worden gedefinieerd in **Node Settings**
+   - **⏲️ Type**: Kies tussen Tijd, Zonne- of Cron-planning.
+   - **🔄 Periode**: Voor tijdgebaseerde schema's, selecteer de herhalingsperiode.
+   - **🕒 Tijd/Datum**: Stel de starttijd in en, indien van toepassing, de eindtijd of duur.
+   - **📦 Payload**: Kies het payloadtype en definieer indien nodig aangepaste payloads.
+3. **💾 Sla het schema op**: Klik op "Opslaan" om het schema toe te voegen.
+
+#### ✏️ Een schema bewerken
+
+- **🖊️ Bewerken**: Klik op schema in tabel om rijen uit te vouwen om meer details te bekijken. Klik op het potloodpictogram om de bewerkingsdialoog te openen. Breng wijzigingen aan en sla op.
+- - **🗑️ Verwijderen**: Klik op het verwijderpictogram om een schema te verwijderen.
+
+#### 🔄 Schema's importeren en exporteren
+
+- **📤 Exporteren**: Klik op het exportpictogram om de schema JSON naar uw klembord te kopiëren. _Alleen beschikbaar bij het bewerken van een schema._
+- **📥 Importeren**: Klik op het importpictogram en plak de JSON om een schema te importeren. _Alleen beschikbaar bij het maken van een schema._
+
+#### ⚙️ Schema's beheren
+
+- **🔄 Inschakelen/Uitschakelen**: Gebruik de schakelaar om schema's in of uit te schakelen.
+
+### 🚀 Geavanceerde functies
+
+#### 🌞 Zonne-evenementen
+
+- Pas schema's aan op basis van zonne-evenementen met offsets.
+- Ondersteunde evenementen zijn onder andere zonsopgang, zonsondergang en verschillende schemerfasen.
+
+#### ⏰ Cron-uitdrukkingen
+
+- Gebruik cron-syntaxis voor complexe planningsbehoeften.
+- Ondersteunt standaard cron-velden en speciale tekens.
+
+#### 📦 Aangepaste payloads
+
+- Gebruik aangepaste payloads voor schema-uitvoer. Payloads worden gedefinieerd in **Node Settings**
+- Ondersteunt JSON en andere gegevensformaten.
+
+## 🛠️ Node-instellingen
+
+#### 🏷️ Naam
+- **Veld**: `Naam`
+- **Beschrijving**: Voer een unieke naam in voor de scheduler. Deze naam wordt gebruikt om de scheduler binnen het systeem te identificeren.
+- **Invoertype**: Tekst (string)
+
+#### 👥 Groep
+- **Veld**: `Groep`
+- **Beschrijving**: Selecteer de groep waartoe deze scheduler behoort. Groepen helpen widgets binnen de UI te organiseren.
+- **Invoertype**: Vervolgkeuzelijst (string)
+
+#### 📏 Grootte
+- **Veld**: `Grootte`
+- **Beschrijving**: Pas de grootte van de scheduler-widget binnen de UI aan. Dit kan handmatig worden ingesteld of met behulp van de elementgrootte-aanpassing.
+- **Invoertype**: Knop (Elementgrootte-aanpassing)
+
+#### 🏷️ Label
+- **Veld**: `Label`
+- **Beschrijving**: Stel een label in voor de scheduler dat in de UI wordt weergegeven.
+- **Invoertype**: Tekst (string)
+
+### 🌍 Lokalisatie-instellingen
+
+#### 🌐 Taal
+- **Veld**: `Taal`
+- **Beschrijving**: Selecteer de taal voor de scheduler-interface. 
+  - Ondersteunde talen zijn onder andere Engels, Duits, Frans, Italiaans, Nederlands en Spaans.
+  - Bewerk ook <code>~/.node-red/settings.js</code> en voeg de volgende regel toe/haal deze uit commentaar: <code>lang: 'en'</code>. 
+Beschikbare taalcodes zijn: <code>en</code>, <code>de</code>, <code>fr</code>, <code>it</code>, <code>nl</code>, <code>es</code>
+Dit stelt de taal in die wordt gebruikt in de UI Scheduler-knooppunt op de Node-Red-server.
+- **Invoertype**: Vervolgkeuzelijst (string)
+
+#### ⏰ Tijdzone
+- **Veld**: `Tijdzone`
+- **Beschrijving**: Specificeer de tijdzone voor de scheduler. Dit beïnvloedt hoe tijden worden berekend en weergegeven.
+  - Laat leeg voor systeemtijdzone. 
+  - Voer eventueel UTC of een tijdzone in het formaat van Regio/Gebied in ([lijst](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)).
+- **Invoertype**: Autocomplete Tekst (string)
+
+#### 🕒 24-uurs formaat
+- **Veld**: `Gebruik 24-uurs formaat`
+- **Beschrijving**: Schakel tussen 24-uurs en 12-uurs tijdformaten.
+- **Invoertype**: Checkbox (boolean)
+
+### 📍 Locatie-instellingen
+
+#### 🌐 Locatie
+- **Veld**: `Locatie`
+- **Beschrijving**: Stel een standaard geografische locatie in voor zonne-evenementberekeningen. Dit kan een vaste locatie of een omgevingsvariabele zijn.
+- **Invoertype**: Getypte invoer (string)
+
+### 📤 Uitvoerinstellingen
+
+#### 📬 Commando Antwoordbericht Uitvoer
+- **Veld**: `Commando Antwoordbericht Uitvoer`
+- **Beschrijving**: Kies hoe commando-antwoorden worden uitgevoerd. Opties zijn onder andere:
+  - 1 uitvoer: Alle berichten naar uitvoer 1 (schema's + commando-antwoorden)
+  - 2 uitvoeren: Commando-antwoorden naar uitvoer 1, Schema-berichten naar uitvoer 2
+  - Fan out: Gescheiden uitvoeren voor commando-berichten en elk onderwerp
+- **Invoertype**: Vervolgkeuzelijst (string)
+
+#### 📝 Uitvoer eigenschap
+- **Veld**: `Uitvoer Veld`
+- **Beschrijving**: Specificeer de eigenschap in het berichtobject waar de uitvoer wordt opgeslagen.
+  - bijv. als 'Uitvoer eigenschap' is ingesteld op **data.value** dan bevat `msg.data.value` de waarde van de *payload*
+  - `msg.topic` bevat de naam van het onderwerp. Dit vereenvoudigt het scheiden van welk schema is geactiveerd
+  - Extra eigenschappen worden ook toegevoegd aan het msg-object. Controleer de debug-uitvoer (gebruik volledige msg weergeven)
+
+- **Invoertype**: Getypte invoer (string)
+
+### 📊 Statusinstellingen
+
+#### 📅 Stuur status van schema's
+- **Veld**: `Stuur status van schema's`
+- **Beschrijving**: Configureer hoe vaak de status van schema's wordt verzonden en of actieve of inactieve statussen moeten worden verzonden.
+  - Dit is gegroepeerd per onderwerp, dus als twee schema's `actief` zijn (binnen het bereik van start- en eindtijden) voor hetzelfde onderwerp, wordt slechts één bericht verzonden met payload `true`. 
+  - Evenzo, als één schema voor een onderwerp `inactief` is, en de andere `actief`, wordt slechts één bericht verzonden met payload `true`. 
+  - Als beide schema's `inactief` zijn, wordt slechts één bericht verzonden met payload `false`.
+- **Invoertype**: Nummer (Interval), Checkbox (Actieve/Inactieve Status) (nummer, boolean)
+
+### 💾 Opslaginstellingen
+
+#### 🗄️ Opslagnaam
+- **Veld**: `Opslagnaam`
+- **Beschrijving**: Selecteer de opslagmethode voor het bewaren van schema's. Opties zijn onder andere:
+  - Geen: Bewaar schema's niet. Schema's gaan verloren wanneer het knooppunt opnieuw wordt ingezet
+  - Lokaal bestandssysteem: Bewaar schema's in het lokale bestandssysteem. De schema's worden opgeslagen in een directory genaamd `schedulerdata` onder uw node-red map
+  - Node Context Stores: Bewaar schema's in de node context. Deze stores worden automatisch geladen vanuit uw node-red instellingenbestand. Zie de [Node-RED Contexts](https://nodered.org/docs/user-guide/context) documentatie voor meer informatie.
+- **Invoertype**: Vervolgkeuzelijst (string)
+
+### 📨 Onderwerpen en Payloads
+
+#### 🗂️ Onderwerpen
+- **Veld**: `Onderwerpen`
+- **Beschrijving**: Definieer onderwerpen voor de scheduler. Onderwerpen helpen schema's te categoriseren en te beheren.
+  - Deze onderwerpen kunnen worden gebruikt in het `Onderwerp` veld van schema's, en kunnen worden geselecteerd in de Node-Red Dashboard 2.0 UI. 
+  - In Fan Out-modus worden schema-berichten verzonden naar de uitvoer die overeenkomt met het onderwerp.
+- **Invoertype**: Bewerkbare lijst (string)
+
+#### 📦 Aangepaste payloads
+- **Veld**: `Aangepaste payloads`
+- **Beschrijving**: Definieer aangepaste payloads die worden verzonden wanneer een schema wordt geactiveerd. 
+  - Payloads kunnen van verschillende typen zijn, waaronder string, nummer, boolean en JSON.
+  - Payloads die hier zijn gedefinieerd, kunnen worden geselecteerd in de Dashboard UI.
+  - Het wijzigen van de payloadwaarde hier zal automatisch de payloadwaarden van alle schema's die de payload gebruiken bijwerken 
+- **Invoertype**: Bewerkbare lijst met getypte invoer (string, nummer, boolean, JSON)
+
+### ⚙️ Geavanceerde instellingen
+
+#### 🕰️ Gebruik nieuwe tijdkiezer
+- **Veld**: `Gebruik nieuwe tijdkiezer`
+- **Beschrijving**: Schakel de nieuwe tijdkiezerinterface in of uit.
+- **Invoertype**: Checkbox (boolean)
+
+## 🔧 Ingangen (Geavanceerd gebruik)
+
+#### Onderwerp
+De meeste commando's kunnen worden verstrekt in het onderwerp met de naam van het schema in de payload (waar van toepassing). Ondersteunde commando-onderwerpen...
+
+- trigger
+- status
+- export
+- remove
+- pause
+- stop
+- start
+
+Dit omvat de `-all`, `-all-dynamic`, `-all-static`, `-topic`, `-active`,  `-active-dynamic`,  `-active-static`, `-inactive`, `-inactive-dynamic` en `-inactive-static` commando-onderwerpen (bijv. export-all, stop-all-dynamic, start-all-static, remove-inactive-dynamic). Zie [commando's](#ui-scheduler-commands-info) hieronder voor details.
+
+#### 📦 Payload
+Het is mogelijk om schema's dynamisch toe te voegen, te verwijderen en te beheren door een payload in het knooppunt te injecteren. Het formaat van het payload-object (of array van objecten) hangt af van de operatie. Zie hieronder voor details. U kunt ook schema's exporteren vanuit de Dashboard UI in het bewerkingsvenster en de resulterende JSON plakken.
+
+#### ➕ Een of meer schema's toevoegen
+Voorbeeld...
+```json
+payload: {
+  "command": "add",
+  "schedule": [
+    {
+      "name": "Schema",
+      "topic": "Onderwerp 1",
+      "enabled": true,
+      "scheduleType": "time",
+      "period": "daily",
+      "time": "00:00",
+      "endTime": null,
+      "days": [
+        "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday"
+      ],
+      "payloadType": true,
+      "payloadValue": true
+    },
+    {
+      "name": "Schema 2",
+      "topic": "Onderwerp 1",
+      "enabled": true,
+      "scheduleType": "solar",
+      "timespan": "time",
+      "solarEvent": "sunrise",
+      "offset": 5,
+      "solarEventStart": false,
+      "solarEventTimespanTime": "21:00",
+      "payloadType": "true_false",
+      "payloadValue": true,
+      "endPayloadValue": false
+    },
+    {
+      "name": "Schema 3",
+      "topic": "Onderwerp 1",
+      "enabled": true,
+      "scheduleType": "time",
+      "period": "minutes",
+      "duration": 1,
+      "timespan": "duration",
+      "minutesInterval": 7,
+      "payloadType": "true_false",
+      "payloadValue": true,
+      "endPayloadValue": false
+    }
+  ]
+}
+```
+
+### 📊 Status van een schema opvragen of een schema verwijderen / stoppen / pauzeren / starten
+
+#### Onderwerp Methode
+```json
+msg.topic = "command"; // commando naam - *zie details hieronder*,
+msg.payload = "name"; //  naam van het schema
+```
+
+#### Payload Methode
+```json
+payload: {
+  "command": "*zie details hieronder*",
+  "name": "* naam van schema",
+}
+```
+
+#### Details
+- command: (string|vereist) De uit te voeren operatie - dit kan een van de volgende zijn...
+  - "trigger"
+  - "status"
+  - "export"
+  - "remove"
+  - "stop"
+  - "pause"
+  - "start"
+- name: (string|optioneel) De naam van het schema dat moet worden beïnvloed (niet vereist bij gebruik van de -all, -active of -inactive filters)
+
+#### 📝 Opmerkingen
+- `trigger` activeert schema genoemd in `msg.payload`
+- `status` retourneert een object met de configuratie en status van het genoemde schema
+- `export` retourneert een object met de configuratie van het genoemde schema
+- `remove` stopt en verwijdert het schema. Deze optie heeft geen uitvoer.
+- `stop` stopt het schema dat is gespecificeerd door `name` en reset de interne teller. Deze optie heeft geen uitvoer.
+- `pause` stopt het schema dat is gespecificeerd door `name` maar reset de interne teller niet. Deze optie heeft geen uitvoer.
+- `start` zal alle schema's (opnieuw) starten. Elk schema dat zijn limiet heeft bereikt, begint opnieuw. Gepauzeerde schema's worden hervat. Deze optie heeft geen uitvoer.
+- FILTER: het toevoegen van `-all` aan een van deze commando's zal werken op alle schema's. bijv. `status-all` retourneert de status van alle schema's
+- FILTER: het toevoegen van `-all-dynamic` aan een van deze commando's zal alleen invloed hebben op dynamische schema's bijv. `remove-all-dynamic` verwijdert alle dynamische schema's
+- FILTER: het toevoegen van `-all-static` aan een van deze commando's zal alleen invloed hebben op statische schema's bijv. `stop-all-static`
+- FILTER: het toevoegen van `-topic` aan een van deze commando's zal alleen invloed hebben op schema's waarvan het onderwerp overeenkomt met het onderwerp dat is gespecificeerd in payload bijv. `stop-topic`
+- FILTER: het toevoegen van `-active` aan status, export en verwijder commando's zal werken op alle actieve schema's. bijv. `status-active`
+- FILTER: het toevoegen van `-active-static` aan status, export en verwijder commando's zal werken op alle statische schema's die actief zijn. bijv. `status-active-static`
+- FILTER: het toevoegen van `-active-dynamic` aan status, export en verwijder commando's zal werken op alle dynamische schema's die actief zijn. bijv. `status-active-dynamic`
+- FILTER: het toevoegen van `-inactive` aan status, export en verwijder commando's zal werken op alle inactieve schema's. bijv. `status-inactive`
+- FILTER: het toevoegen van `-inactive-static` aan status, export en verwijder commando's zal werken op alle statische schema's die inactief zijn. bijv. `status-inactive-static`
+- FILTER: het toevoegen van `-inactive-dynamic` aan status, export en verwijder commando's zal werken op alle dynamische schema's die inactief zijn. bijv. `status-inactive-dynamic`
+
+#### 📖 Voorbeelden
+- Een eenvoudig onderwerpcommando gebruiken om een schema met de naam "schema1" handmatig te activeren
+  ```json
+  msg: {
+    "topic": "trigger",
+    "payload": "schema1"
+  }
+  ```
+- Een eenvoudig onderwerpcommando gebruiken met een onderwerp in payload om alle schema's met het opgegeven onderwerp te starten
+  ```json
+  msg: {
+    "topic": "start-topic",
+    "payload": { "topic": "Onderwerp 1" }
+  }
+  ```
+- Een eenvoudig onderwerpcommando gebruiken om alle dynamisch toegevoegde schema's te exporteren...
+  ```json
+  msg: {
+    "topic": "export-all-dynamic"
+  }
+  ```
+- Een eenvoudig onderwerpcommando gebruiken om een schema met de naam "schema1" te verwijderen
+  ```json
+  msg: {
+    "topic": "remove",
+    "payload": "schema1"
+  }
+  ```
+- Een cmd payload gebruiken om alle schema's te pauzeren...
+  ```json
+  payload: {
+    "command": "pause-all"
+  }
+  ```
+- Een eenvoudig onderwerpcommando gebruiken om alle dynamische schema's te verwijderen die zijn voltooid
+  ```json
+  msg: {
+    "topic": "remove-inactive-dynamic"
+  }
+  ```
+
+### 🔍 Beschrijven
+
+#### Voorbeeld: cmd payload om een cron-uitdrukking te beschrijven
+```json
+{
+  "command": "describe",
+  "expressionType": "cron",
+  "expression": "0 */5 * * * MON *",
+  "timeZone": "Europe/Amsterdam"
+}
+```
+
+#### Voorbeeld: cmd payload om alle zonne-evenementtijden + zonne-status op dit moment te krijgen
+```json
+{
+  "command": "describe",
+  "expressionType": "solar",
+  "location": "52.3676,4.9041",
+  "solarType": "all",
+  "timeZone": "Europe/Amsterdam"
+}
+```
+
+#### Voorbeeld: cmd payload om 4 zonne-evenementtijden + zonne voor een specifiek tijdstip te krijgen
+```json
+{
+  "command": "describe",
+  "expressionType": "solar",
+  "time": "2020-03-22 18:40",
+  "location": "52.3676,4.9041",
+  "solarType": "selected",
+  "solarEvents": "civilDawn,sunrise,sunset,civilDusk",
+  "timeZone": "Europe/Amsterdam"
+}
+```
+
+#### Details
+Retourneert een object in payload met leesbare informatie voor de gegeven uitdrukking.
+
+- command: (string|vereist) De uit te voeren operatie
+- expression: (string|vereist) De uitdrukking om te beschrijven
+- timeZone: (string|optioneel) Een tijdzone om te gebruiken. Laat leeg voor systeemtijdzone. Voer eventueel UTC of een tijdzone in het formaat van Regio/Gebied in ([lijst](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones))
+
+## Aanvullende informatie
+
+### ⏰ CronExpression
+Een CRON-uitdrukking, een datum, een door komma's gescheiden lijst van datums of een array van datums.
+
+##### 📅 Datum- of datumreeksformaat
+Wanneer u een vaste datum of reeks datums wilt gebruiken, kan de uitdrukking een stringdatum, door komma's gescheiden lijst van datums of een array van datums zijn (De array kan een mix van string, datumobjecten en tijdstempels bevatten). Bij het specificeren van een stringdatum kunt u de tijdzone gebruiken, bijv. "2020-01-01 00:00 GMT+2". U kunt zelfs tijdzones mixen, bijv. "2020-01-01 00:00 GMT+2, 2020-01-01 00:00 GMT-7".
+
+##### ⏲️ CRON-formaat
+```
+* * * * * * *    Veld              Toegestane waarden    Speciale symbolen
+| | | | | | |    -----------------  ---------------   ---------------
+`-|-|-|-|-|-|->  Seconde (optioneel)  0-59              * / , -
+  `-|-|-|-|-|->  Minuut             0-59              * / , -
+    `-|-|-|-|->  Uur               0-23              * / , -
+      `-|-|-|->  Dag van de maand     1-31              * / , - ? L W
+        `-|-|->  Maand              1-12 of JAN-DEC   * / , -
+          `-|->  Dag van de week        0-7 of SUN-SAT    * / , - ? L #
+            `->  Jaar (optioneel)    1970-2099         * / , -
+```
+
+##### 📝 Opmerkingen
+- `*` Sterretjes geven aan dat de cron-uitdrukking overeenkomt met alle waarden van het veld. Bijvoorbeeld, "*" in het minutenveld betekent elke minuut.
+- `?` Vraagtekens worden gebruikt om 'geen specifieke waarde' op te geven en zijn toegestaan voor de velden dag-van-de-maand en dag-van-de-week. Het wordt gebruikt in plaats van het sterretje (*) om ofwel dag-van-de-maand of dag-van-de-week leeg te laten.
+- `-` Koppelteken worden gebruikt om bereiken te definiëren. Bijvoorbeeld, "10-12" in het uurveld betekent de uren van 10, 11 en 12.
+- `,` Komma's worden gebruikt om items van een lijst te scheiden. Bijvoorbeeld, "MON,WED,FRI" in het dag-van-de-week veld betekent de dagen maandag, woensdag en vrijdag.
+- `/` Schuine strepen worden gebruikt om incremente aan te geven. Bijvoorbeeld. "0/15" in het secondenveld betekent de seconden 0, 15, 30 en 45. Bovendien betekent "1/3" in het dag-van-de-maand veld elke 3 dagen beginnend op de eerste dag van de maand.
+- `L` Afkorting voor "laatste" en is toegestaan voor de velden dag-van-de-maand en dag-van-de-week. Het "L"-teken heeft een andere betekenis in elk van de twee velden. Bijvoorbeeld, "L" in het dag-van-de-maand veld betekent de laatste dag van de maand. Als het wordt gebruikt in het dag-van-de-week veld, betekent het 7 of SAT. Als het echter wordt gebruikt in het dag-van-de-week veld na een andere waarde, betekent het de laatste xxx dag van de maand. Bijvoorbeeld, "6L" in het dag-van-de-week veld betekent de laatste vrijdag van de maand.
+- `W` Afkorting voor "weekdag" en is toegestaan voor het dag-van-de-maand veld. Het "W"-teken wordt gebruikt om de weekdag aan te geven die het dichtst bij de gegeven dag ligt. Bijvoorbeeld, "15W" in het dag-van-de-maand veld betekent de dichtstbijzijnde weekdag bij de 15e van de maand. Daarom, als de 15e een zaterdag is, wordt de taak uitgevoerd op vrijdag de 14e. De tekens "L" en "W" kunnen worden gecombineerd in het dag-van-de-maand veld. Bijvoorbeeld, "LW" betekent de laatste weekdag van de maand.
+- `#` Hekjes specificeren constructies. Bijvoorbeeld, "6#3' in het dag-van-de-week veld betekent de derde vrijdag van de maand.
+
+##### 📖 Voorbeelden
+- `* * * * * *` Elke seconde
+- `0 * * * * *` Elke minuut
+- `0 */10 * * * *` Elke 10 minuten
+- `0 */20 1 * * *` Elke 20 minuten, tussen 01:00 en 01:59
+- `0 15,30,45 * * * *` Om 15, 30 en 45 minuten na het uur
+- `0 0 12 * * *` Elke dag om 12 uur 's middags
+- `0 0 2 29 FEB * 2020/4` Om 02:00, op dag 29 van februari (schrikkeljaren)
+- `0 0 7 * * MON#1 *` Om 07:00, op de eerste maandag van de maand
+- `0 0 12 * JAN,FEB,MAR,APR *` Elke dag om 12 uur 's middags in januari, februari, maart en april
+- `* * 1W * *` Elke minuut, op de eerste weekdag van de maand
+- `* * * * Tue#3` Elke minuut, op de derde dinsdag van de maand
+- `0 12 * * MONL` Om 12:00, op de laatste maandag van de maand
+
+Zie [hier](https://github.com/jaclarke/cronosjs) voor meer voorbeelden en informatie.
+
+#### 🌅 Zonne-evenementen
+| Evenement ID | Evenement | Informatie |
+|----------|-------|-------------|
+| nightEnd | einde van de nacht / astronomische dageraad | nacht eindigt, astronomische schemering begint (-18°) |
+| nauticalDawn | nautische dageraad | astronomische schemering eindigt, nautische schemering begint (-12°) |
+| civilDawn | burgerlijke dageraad / gouden uur | nautische schemering eindigt, burgerlijke schemering en gouden uur begint (-6°) |
+| sunrise | zonsopgang | bovenrand van de zon verschijnt aan de horizon (-0.833°) |
+| sunriseEnd | einde van de zonsopgang | onderrand van de zon raakt de horizon (-0.3°) |
+| morningGoldenHourEnd | einde van het gouden uur in de ochtend | wanneer de zon 6 graden boven de horizon staat (6°) |
+| solarNoon | zonne-middag | zon staat op zijn hoogste positie |
+| eveningGoldenHourStart | begin van het gouden uur in de avond | wanneer de zon 6 graden boven de horizon staat (6°) |
+| sunsetStart | begin van de zonsondergang | onderrand van de zon raakt de horizon (-0.3°) |
+| sunset | zonsondergang | burgerlijke schemering begint, zon verdwijnt onder de horizon (-0.833°) |
+| civilDusk | burgerlijke schemering / einde van het gouden uur | burgerlijke schemering en gouden uur eindigen, nautische schemering begint (-6°) |
+| nauticalDusk | nautische schemering | nautische schemering eindigt, astronomische schemering begint (-12°) |
+| nightStart | astronomische schemering / begin van de nacht | astronomische schemering eindigt, nacht begint (-18°) |
+| nadir | zonne-middernacht | wanneer de zon het dichtst bij het nadir is en de nacht even ver van schemering en dageraad is |
+
+#### 📝 Algemene opmerkingen
+- Het toevoegen van een schema met dezelfde naam als een bestaand schema zal het bestaande vervangen
+- Wanneer een ui-scheduler knooppunt een msg uitvoert als reactie op een commando, zal `msg.commandResponse` `true` zijn om aan te geven dat het bericht een reactie is op een commando en geen gepland evenement
+- Wanneer een ui-scheduler knooppunt een msg uitvoert voor een cron/zonne-evenement, zal `msg.scheduledEvent` `true` zijn om aan te geven dat het bericht te wijten is aan een gepland evenement en geen controle reactie
+</script>

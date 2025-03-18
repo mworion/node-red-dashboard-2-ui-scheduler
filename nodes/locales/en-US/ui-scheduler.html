@@ -83,385 +83,369 @@
     }
 </script>
 
-<script type="text/html" data-help-name="ui-scheduler">
+<script type="text/markdown" data-help-name="ui-scheduler">
     
-    <p>Schedule the injection of a payload to start a flow <span style="float: right"><button class="ui-scheduler-link-button" onclick="_popoutSchedulerHelp()">pop out <i class="fa fa-external-link"></i></button></span></p>
-    <h3>Properties</h3>
-    <dl class="message-properties">
-        <h4>Timezone (optional)</h4>
-        <div style="padding-left: 15px">
-            A timezone to use. Leave blank for system timezone. Alternatively, enter UTC or a timezone in the format of Region/Area (<a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">list</a>)
-            <br>
-            TIP: Timezone should be perceived from your own perspective. See the <a href="#understanding-timezone">Understanding Timezone</a> example below.
-        </div>
-        <h4>24 Hour Format</h4>
-        <div style="padding-left: 15px">
-            Sets what time format is used for displaying the time. If set to <code>true</code>, the time will be displayed in 24 hour format. If set to <code>false</code>, the time will be displayed in 12 hour format.
-        </div>    
-        <h4>Location (optional)</h4>
-        <div style="padding-left: 15px">
-            Here you can chose to set a common location for all solar events (optional)
-        </div>    
-        <h4>Outputs</h4>
-        <div style="padding-left: 15px">
-            <ul>
-                <li>1 output: All messages to output 1 (schedules + command responses)</li>
-                <li>2 outputs: Command responses to output 1, Schedule messages to output 2</li>
-                <li>Fan out: Separate outputs for command messages and each topic</li>
-            </ul>
-        </div>
-        <h4>Send State of Schedules</h4>
-        <div style="padding-left: 15px">
-            Send the current state of enabled schedules with a timespan to the output. This is grouped by topic, so if two schedules are <code>active</code> (in range of start and end times) for the same topic, only one message will be sent with payload <code>true</code>.
-            Likewise, if one schedule for a topic is <code>inactive</code>, and the other is <code>active</code>, only one message will be sent with payload <code>true</code>.
-            If both schedules are <code>inactive</code>, only one message will be sent with payload <code>false</code>.
-            <ul>
-                <li>Interval: Set the interval in seconds between messages</li>
-                <li>Active State: Send a message with payload <code>true</code> when a schedule is active</li>
-                <li>Inactive State: Send a message with payload <code>false</code> when all schedules are inactive</li>
-            </ul>
-        </div>    
-        <h4>Persist Schedules</h4>
-        <div style="padding-left: 15px">
-            Set whether to save the schedules to disk or memory.
-            <ul>
-                <li>None: Don't persist schedules. Schedules will be lost when the node is redeployed</li>
-                <li>Local File System: Persist schedules to local file system. The schedules are saved in a directory called <code>schedulerdata</code> under your node-red folder</li>
-                <li>Node Context Stores: Persist schedules to the node context. These stores will be automatically loaded from your node-red settings file. See the <a href="https://nodered.org/docs/user-guide/context">Node-RED Contexts</a> documentation for more information.</li>
-            </ul>
-        </div>
-        <h4>Topics</h4>
-        <div style="padding-left: 15px">
-            A table of predefined topics. These topics can be used in the <code>Topic</code> field of schedules, and can be selected in Node-Red Dashboard 2.0 UI.
-            In Fan Out mode, schedule messages will be sent to the output corresponding to the topic.
-        </div>    
-        <h4>Schedules</h4>
-        <div style="padding-left: 15px">
-            A table of schedules. Entries here are considered static and will be reloaded when node-red starts or the ui-scheduler node is (re)deployed. 
-            These cannot be edited in the Node-Red Dashboard 2.0 UI.
-        </div>
-        <h4>Schedules - Name</h4>
-        <div style="padding-left: 15px">
-            The name is used to identify the schedule. Dynamic adjustments to an individual schedule will need to specify this name.
-        </div>
-        <h4>Schedules - Topic</h4>
-        <div style="padding-left: 15px">
-            The topic will be sent in <code>msg.topic</code> when the schedule triggers. This is to permit the flow to act on the triggered schedule. Topics are defined in the the config above. 
-        </div>
-        <h4>Schedules - Payload</h4>
-        <div style="padding-left: 15px">
-            The value to send in the payload when the schedule triggers. (NOTE: the property that the payload gets written to is determined by "Output property").
-        </div>
-        <h4>Schedules - Type</h4>
-        <div style="padding-left: 15px">
-            The type determines what type of schedule. Options are <code>cron</code>, <code>dates sequence</code> or <code>solar events</code>
-        </div>
-        <h4 id="ui-scheduler-expression-info">Schedules - Expression</h4>
-        <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>cron</b> or <b>date sequence</b></i><br>
-            A CRON expression, a date, a comma separated list of dates or an array of dates<br><br>
-            <p> Date or Date Sequence Format...<br>
-                When you wish to use a fixed date or sequence of dates, the expression can be a string date, comma separated list of dates, an array of dates (The array can contain a mix of string, date objects and timestamps).
-                When specifying a string date, you can use timezone e.g. "2020-01-01 00:00 GMT+2".
-                You can even mix time zones e.g. "2020-01-01 00:00 GMT+2, 2020-01-01 00:00 GMT-7"
-            </p>
-            <p>CRON Format...</p>
-            <pre style="white-space: pre; padding: 0px; font-size: smaller;"> * * * * * * *    Field              Allowed values    Special symbols
- | | | | | | |    -----------------  ---------------   ---------------
- `-|-|-|-|-|-|->  Second (optional)  0-59              * / , -
-   `-|-|-|-|-|->  Minute             0-59              * / , -
-     `-|-|-|-|->  Hour               0-23              * / , -
-       `-|-|-|->  Day of Month       1-31              * / , - ? L W
-         `-|-|->  Month              1-12 or JAN-DEC   * / , -
-           `-|->  Day of Week        0-7 or SUN-SAT    * / , - ? L #
-             `->  Year (optional)    1970-2099         * / , -</pre>
-            <p>Notes...</p>
-            <ul>
-                <li><code>*</code> Asterisks indicate that the cron expression matches for all values of the field. For example, "*" in the minute field means every minute</li>
-                <li><code>?</code> Question marks are used to specify 'no specific value' and is allowed for the day-of-month and day-of-week fields. It is used instead of the asterisk (*) for leaving either day-of-month or day-of-week blank.</li>
-                <li><code>-</code> Hyphens are used to define ranges. For example, "10-12" in the hour field means the hours of 10, 11, and 12.</li>
-                <li><code>,</code> Commas are used to separate items of a list. For example, "MON,WED,FRI" in the day-of-week field means the days Monday, Wednesday, and Friday.</li>
-                <li><code>/</code> Forward slash are used to indicate increments. For example. "0/15" in the seconds field means the seconds 0, 15, 30, and 45. Additionally, "1/3" in the day-of-month field means every 3 days starting on the first day of the month.</li>
-                <li><code>L</code> Short-hand for "last" and is allowed for the day-of-month and day-of-week fields. The "L" character has a different meaning in each of the two fields. For example, "L" in the day-of-month field means the last day of the month. If used in the day-of-week field, it means 7 or SAT. However, if used in the day-of-week field after another value, it means the last xxx day of the month. For example, "6L" in the day-of-week field means the last Friday of the month</li>
-                <li><code>W</code> Short-hand for "weekday" and is allowed for the day-of-month field. The "W" character is used to specify the weekday nearest the given day. For example, "15W" in the day-of-month field means the nearest weekday to the 15th of the month. Therefore, if the 15th is a Saturday, the job runs on Friday the 14th. The "L" and "W" characters can be combined in the day-of-month field. For example, "LW" means the last weekday of the month.</li>
-                <li><code>#</code> Hash marks specify constructs. For example, "6#3' in the day-of-week field means the third Friday of the month.</li>
-            </ul>        
-            <p>Examples...</p>
-            <ul>
-                <li><code>* * * * * *</code> Every Second</li>
-                <li><code>0 * * * * *</code> Every minute</li>
-                <li><code>0 */10 * * * *</code> Every 10 minutes</li>
-                <li><code>0 */20 1 * * *</code> Every 20 minutes, between 01:00 AM and 01:59 AM</li>
-                <li><code>0 15,30,45 * * * *</code> At 15, 30, and 45 minutes past the hour</li>
-                <li><code>0 0 12 * * *</code> Every day at noon - 12pm</li>
-                <li><code>0 0 2 29 FEB * 2020/4</code> At 02:00 AM, on day 29 of February (leap years)</li>
-                <li><code>0 0 7 * * MON#1 *</code> At 07:00 AM, on the first Monday of the month</li>
-                <li><code>0 0 12 * JAN,FEB,MAR,APR *</code> Every day at noon in January, February, March and April</li>
-                <li><code>* * 1W * *</code> Every minute, on the first weekday of the month</li>
-                <li><code>* * * * Tue#3</code> Every minute, on the third Tuesday of the month</li>
-                <li><code>0 12 * * MONL</code> At 12:00 PM, on the last Monday of the month</li>
-                <li>See <a href="https://github.com/jaclarke/cronosjs">here</a> for more examples and info</li>
-            </ul>
-        </div>
-        <h4 id="ui-scheduler-solar-events-info">Schedules - Solar Events</h4>
-        <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
-            The Solar Events field permits you to chose which solar events you want a schedule to fire upon.<br>
-            Solar Events...
-            <table class="ui-scheduler-solar-events-table">
-                <tr><th>Event ID</th><th>Event</th><th>Information</th></tr>
-                <tr><td>nightEnd</td><td>night end / astronomical dawn</td><td>night ends, astronomical twilight starts (-18°)</td></tr>
-                <!-- <tr><td>astronomicalDawn</td><td>astronomical dawn</td><td>night ends, astronomical twilight starts (-18°)")</td></tr> -->
-                <tr><td>nauticalDawn</td><td>nautical dawn</td><td>astronomical twilight ends, nautical twilight starts (-12°)</td></tr>
-                <tr><td>civilDawn</td><td>civil dawn / golden hour</td><td>nautical twilight ends, civil twilight and golden hour starts (-6°)</td></tr>
-                <!-- <tr><td>morningGoldenHourStart</td><td>golden hour starts</td><td>when the sun is 6 degrees below the horizon (-6°)")</td></tr> -->
-                <tr><td>sunrise</td><td>sunrise</td><td>top edge of the sun appears on the horizon (-0.833°)</td></tr>
-                <tr><td>sunriseEnd</td><td>sunrise end</td><td>bottom edge of the sun touches the horizon (-0.3°)</td></tr>
-                <tr><td>morningGoldenHourEnd</td><td>morning golden hour ends</td><td>when the sun is 6 degrees above the horizon (6°)</td></tr>
-                <tr><td>solarNoon</td><td>solar noon</td><td>sun is at its highest position</td></tr>
-                <tr><td>eveningGoldenHourStart</td><td>evening golden hour start</td><td>when the sun is 6 degrees above the horizon (6°)</td></tr>
-                <tr><td>sunsetStart</td><td>sunset start</td><td>bottom edge of the sun touches the horizon (-0.3°)</td></tr>
-                <tr><td>sunset</td><td>sunset</td><td>civil twilight starts, sun disappears below the horizon (-0.833°)</td></tr>
-                <!-- <tr><td>eveningGoldenHourEnd</td><td>evening golden hour end</td><td>golden hour ends (-6°)")</td></tr> -->
-                <tr><td>civilDusk</td><td>civil dusk / golden hour end</td><td>civil twilight and golden hour ends, nautical twilight starts (-6°)</td></tr>
-                <tr><td>nauticalDusk</td><td>nautical dusk</td><td>nautical twilight ends, astronomical twilight starts (-12°)</td></tr>
-                <!-- <tr><td>astronomicalDusk</td><td>astronomical dusk</td><td>astronomical twilight ends, night starts (-18°)</td></tr> -->
-                <tr><td>nightStart</td><td>astronomical dusk / night start</td><td>astronomical twilight ends, night starts (-18°)</td></tr>
-                <tr><td>nadir</td><td>solar midnight</td><td>when the sun is closest to nadir and the night is equidistant from dusk and dawn</td></tr>
-            </table>
-        </div>
-        <h4>Schedules - Location</h4>
-        <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
-            The location field is expected to contain longitude and latitude coordinates for the calculation of solar events.<br>
-            Accepted formats...
-            <ul>
-                <li>Decimal Degrees E.g: <code class="ui-scheduler-coordinates">54.9992500,-1.4170300</code> or <code class="ui-scheduler-coordinates">54.9992500° N 1.4170300° W</code></li>
-                <li>Degrees Minutes Seconds E.g: <code class="ui-scheduler-coordinates">54° 59' 57.3'' N 1° 25' 1.308'' W</code></li>
-                <li>Decimal Minutes E.g: <code class="ui-scheduler-coordinates">54° 59.955' , -1° 25.0218'</code></li>
-                <li>GPS E.g: <code class="ui-scheduler-coordinates">N54°59'57.3, W1°25'1.308"</code>, <code class="ui-scheduler-coordinates">54°59'57.3"N, 1°25'1.308"W</code>, <code class="ui-scheduler-coordinates">54d 59' 57" N 1d 25' 1" W</code> or <code class="ui-scheduler-coordinates">54:59:57.3N 1:25:1.308W</code></li>
-            </ul>
-        </div>        
-        <h4>Schedules - Offset</h4>
-        <div style="padding-left: 15px">
-            <i>NOTE: Only displayed when the type is set to <b>solar events</b></i><br>
-            The offset field can be used to add a positive or negative offset in minutes to the sunrise or sunset time.
-        </div>        
+    # 🕙 UI Scheduler Help Documentation
 
-    </dl>
-    <h3>Output</h3>
-    <dl class="message-properties">
-        <dt><i>payload (see 'Output property')</i> <span class="property-type">number|string|boolean|object|buffer</span></dt>
-        <dd>msg.[Output property] will contain whatever is configured in 'payload'</dd>
-        <dd>e.g. if 'Output property' is set to <b>data.value</b> then <code>msg.data.value</code> will contain the value of the <i>payload</i></dd>
-        <dd>msg.topic will contain the name of the topic. This simplifies separating out which schedule has triggered</dd>
-        <dd>Additional properties are also added to the msg object. Check the debug output (use show complete msg)</dd>
-    </dl>
+This document provides a comprehensive guide to configuring the settings for the UI Scheduler node, usage in the Dashboard UI, and additional info. The UI Scheduler allows users to automate tasks based on time, solar events, or cron expressions.
 
-    <h4>Output property</h4>
-    <div style="padding-left: 15px">
-        The <code>msg.</code> property to send the payload to. Typically this would be payload.
-    </div>
+## 👆 Using the UI Scheduler in Dashboard 2.0
 
-    <!-- <h3>Inputs <i>(Advanced Usage)</i></h3>
-    <dl class="message-properties">
-        <dt><i>topic</i> <span class="property-type">string</span></dt>
-        <dd>Most of the commands can be provided in the topic with the name of schedule in the payload (where appropriate). <br>Supported command topics... 
-                    <ul>
-                        <li>trigger</li>
-                        <li>status</li>
-                        <li>export</li>
-                        <li>remove</li>
-                        <li>pause</li>
-                        <li>stop</li>
-                        <li>start</li>
-            </ul>
-            This includes the <code>-all</code>, <code>-all-dynamic</code>, <code>-all-static</code>, <code>-active</code>,  <code>-active-dynamic</code>,  <code>-active-static</code>, <code>-inactive</code>, <code>-inactive-dynamic</code> and <code>-inactive-static</code> command topics (e.g. export-all, stop-all-dynamic, start-all-static, remove-inactive-dynamic)<br>
-            See <a href="#ui-scheduler-commands-info">commands</a> below for details.
-        </dd>
-    </dl>
-    <dl class="message-properties">
-        <dt><i>payload</i> <span class="property-type">string|object|Array</span></dt>
-        <dd>It is possible to dynamically add, remove and control schedules by injecting a payload into the node. The format of the payload object (or array of objects) depends on the operation. See below for details.</dd>
-        <dd>
-            <p><b>Adding one (or more) schedules</b><br>
-                Example...<br>
-                <pre class="ui-scheduler-code"><code>payload: [
-  {
-    "command": "add",
-    "name": "every 6",
-    "expression": "*/6 * * * * * *",
-    "expressionType": "cron",
-    "payloadType": "default",
-    "limit": 3 
-  },
-  {
-    "command": "add",
-    "name": "new years eve 2030",
-    "expression": "2030-01-01",
-    "expressionType": "dates",
-    "payloadType": "default"
-  },
-  {
-    "command": "add",
-    "name": "alarm1",
-    "expressionType": "solar",
-    "solarType": "selected",
-    "solarEvents": "civilDawn,sunrise,sunset",
-    "location": "54.999320540937035 -1.417407989501953",
-    "offset": "-60",
-    "payloadType": "str",
-    "payload": "In 60 mins, it will be a great time to take photographs",
-    "limit": null
-  }
-]</code></pre>
-                
-                <p><i>Details...</i><br>
-                    Adding a CRON expression
-                    <ul>
-                        <li>Multiple schedules can be added if the payload is an array of objects</li>
-                        <li>command: (string|required) The operation to perform - in this case "add"</li>
-                        <li>name: (string|required) This will identify schedule</li>
-                        <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
-                        <li>expression: (string|required) A CRON expression, a date, a comma separated list of dates or an array of dates</li>
-                        <li>expressionType: (string|optional) specify the schedule type. (if omitted, "cron" is the default)</li>
-                        <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
-                        <li>payload: (any|optional) What to send when schedule triggers</li>
-                        <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
-                    </ul><br>
-                    Adding a date sequence
-                    <ul>
-                        <li>Multiple schedules can be added if the payload is an array of objects</li>
-                        <li>command: (string|required) The operation to perform - in this case "add"</li>
-                        <li>name: (string|required) This will identify schedule</li>
-                        <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
-                        <li>expression: (string|array|required) A date, a comma separated list of dates or an array of dates</li>
-                        <li>expressionType: (string|required) specify the schedule type - in this case "dates"</li>
-                        <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
-                        <li>payload: (any|optional) What to send when schedule triggers</li>
-                        <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
-                    </ul><br>
-                    Adding a solar event schedule
-                    <ul>
-                        <li>Multiple schedules can be added if the payload is an array of objects</li>
-                        <li>command: (string|required) The operation to perform - in this case "add"</li>
-                        <li>name: (string|required) This will identify schedule</li>
-                        <li>topic: (string|required) This will be used as the topic when the schedule triggers</li>
-                        <li>expressionType: (string|required) specify the schedule type. Set to "solar" for solar events</li>
-                        <li>solarType: (string|required) specify the events to fire.  Accepted values are "all" or "selected"</li>
-                        <li>solarEvents: (string|optional) specify the events to fire. Only required when solarType == "selected". Accepted values are listed under <b>Schedules - Solar Events</b> <a href="#ui-scheduler-solar-events-info">see above</a> </li>
-                        <li>location: (string|required) longitude latitude, DNS, DMM or GPS coordinates for sunrise or sunset</li>
-                        <li>offset: (number|optional) number of minutes to offset a sunrise or sunset</li>
-                        <li>payloadType: (string|optional) The payload type (e.g. 'default', 'flow', 'global', 'str', 'num', 'bool', 'json', 'bin', 'date' or 'env')</li>
-                        <li>payload: (any|optional) What to send when schedule triggers</li>
-                        <li>limit: (number|optional) Maximum number of times the schedule should trigger</li>
-                    </ul>
-                </p>
-            </p>
-            <p><i>Notes...</i><br>
-                <ul>
-                    <li>This option has no output.</li>
-                </ul>
-            </p> -->
+#### 🖥️ Main Interface
 
-            <p id="ui-scheduler-commands-info"><b>Getting status of a schedule or removing / stopping / pausing / starting a schedule</b><br><br>
-                Topic Method...<br>
-                <pre class="ui-scheduler-code"><code>msg.topic = "command"; // command name - *see details below*,
-msg.payload = "name"; //  name of the schedule</code></pre>
-                Payload Method...<br>
-                <pre class="ui-scheduler-code"><code>payload: {
+- **🛠️ Toolbar**: 
+  - **🔍 Topic Selector**: Filter schedules by topic.
+  - **➕ Add Schedule Button**: Open the dialog to create a new schedule.
+  - **☰ Menu**: Access additional options like checking for updates or reporting issues.
+
+- **📋 Schedule Table**: Displays all schedules with details such as name, description, and status. You can expand rows to view more details.
+
+#### 🗓️ Creating a Schedule
+
+1. **🖱️ Open the Schedule Dialog**: Click the ➕ button in the toolbar.
+2. **✏️ Enter Schedule Details**:
+   - **🏷️ Name**: Enter a unique name for the schedule.
+   - **📂 Topic**: Select a topic from the dropdown. Topics are defined in **Node Settings**
+   - **⏲️ Type**: Choose between Time, Solar, or Cron scheduling.
+   - **🔄 Period**: For time-based schedules, select the recurrence period.
+   - **🕒 Time/Date**: Set the start time and, if applicable, the end time or duration.
+   - **📦 Payload**: Choose the payload type and define custom payloads if needed.
+3. **💾 Save the Schedule**: Click "Save" to add the schedule.
+
+#### ✏️ Editing a Schedule
+
+- **🖊️ Edit**: Click on schedule in table to expand rows to view more details. Click the pencil icon  to open the edit dialog. Make changes and save.
+- - **🗑️ Delete**: Click the delete icon to remove a schedule.
+
+#### 🔄 Importing and Exporting Schedules
+
+- **📤 Export**: Click the export icon to copy the schedule JSON to your clipboard. _Only available when editing a schedule._
+- **📥 Import**: Click the import icon and paste the JSON to import a schedule. _Only available when creating a schedule._
+
+#### ⚙️ Managing Schedules
+
+- **🔄 Enable/Disable**: Use the toggle switch to enable or disable schedules.
+
+### 🚀 Advanced Features
+
+#### 🌞 Solar Events
+
+- Customize schedules based on solar events with offsets.
+- Supported events include sunrise, sunset, and various twilight phases.
+
+#### ⏰ Cron Expressions
+
+- Use cron syntax for complex scheduling needs.
+- Supports standard cron fields and special characters.
+
+#### 📦 Custom Payloads
+
+- Use custom payloads for schedule output. Payloads are defined in **Node Settings**
+- Supports JSON and other data formats.
+
+## 🛠️ Node Settings
+
+#### 🏷️ Name
+- **Field**: `Name`
+- **Description**: Enter a unique name for the scheduler. This name will be used to identify the scheduler within the system.
+- **Input Type**: Text (string)
+
+#### 👥 Group
+- **Field**: `Group`
+- **Description**: Select the group to which this scheduler belongs. Groups help organize widgits within the UI.
+- **Input Type**: Dropdown (string)
+
+#### 📏 Size
+- **Field**: `Size`
+- **Description**: Adjust the size of the scheduler widget within the UI. This can be set manually or using the element sizer.
+- **Input Type**: Button (Element Sizer)
+
+#### 🏷️ Label
+- **Field**: `Label`
+- **Description**: Set a label for the scheduler that will be displayed in the UI.
+- **Input Type**: Text (string)
+
+### 🌍 Localization Settings
+
+#### 🌐 Language
+- **Field**: `Language`
+- **Description**: Select the language for the scheduler interface. 
+  - Supported languages include English, Deutsch, Français, Italiano, Nederlands, and Español.
+  - Also edit <code>~/.node-red/settings.js</code> and add/uncomment the following line: <code>lang: 'en'</code>. 
+Available languages codes are: <code>en</code>, <code>de</code>, <code>fr</code>, <code>it</code>, <code>nl</code>, <code>es</code>
+This will set the language used in the UI Scheduler node on the Node-Red server.
+- **Input Type**: Dropdown (string)
+
+#### ⏰ Time Zone
+- **Field**: `Time Zone`
+- **Description**: Specify the time zone for the scheduler. This affects how times are calculated and displayed.
+  - Leave blank for system timezone. 
+  - Alternatively, enter UTC or a timezone in the format of Region/Area ([list](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)).
+- **Input Type**: Autocomplete Text (string)
+
+#### 🕒 24-Hour Format
+- **Field**: `Use 24-Hour Format`
+- **Description**: Toggle between 24-hour and 12-hour time formats.
+- **Input Type**: Checkbox (boolean)
+
+### 📍 Location Settings
+
+#### 🌐 Location
+- **Field**: `Location`
+- **Description**: Set a default geographical location for solar event calculations. This can be a fixed location or an environment variable.
+- **Input Type**: Typed Input (string)
+
+### 📤 Output Settings
+
+#### 📬 Command Response Message Output
+- **Field**: `Command Response Message Output`
+- **Description**: Choose how command responses are output. Options include:
+  - 1 output: All messages to output 1 (schedules + command responses)
+  - 2 outputs: Command responses to output 1, Schedule messages to output 2
+  - Fan out: Separate outputs for command messages and each topic
+- **Input Type**: Dropdown (string)
+
+#### 📝 Output property
+- **Field**: `Output Field`
+- **Description**: Specify the property in the message object where the output will be stored.
+  - e.g. if 'Output property' is set to **data.value** then `msg.data.value` will contain the value of the *payload*
+  - `msg.topic` will contain the name of the topic. This simplifies separating out which schedule has triggered
+  - Additional properties are also added to the msg object. Check the debug output (use show complete msg)
+
+- **Input Type**: Typed Input (string)
+
+### 📊 State Settings
+
+#### 📅 Send State of Schedules
+- **Field**: `Send State of Schedules`
+- **Description**: Configure how often the state of schedules is sent and whether to send active or inactive states.
+  - This is grouped by topic, so if two schedules are `active` (in range of start and end times) for the same topic, only one message will be sent with payload `true`. 
+  - Likewise, if one schedule for a topic is `inactive`, and the other is `active`, only one message will be sent with payload `true`. 
+  - If both schedules are `inactive`, only one message will be sent with payload `false`.
+- **Input Type**: Number (Interval), Checkbox (Active/Inactive State) (number, boolean)
+
+### 💾 Storage Settings
+
+#### 🗄️ Store Name
+- **Field**: `Store Name`
+- **Description**: Select the storage method for persisting schedules. Options include:
+  - None: Don't persist schedules. Schedules will be lost when the node is redeployed
+  - Local File System: Persist schedules to local file system. The schedules are saved in a directory called `schedulerdata` under your node-red folder
+  - Node Context Stores: Persist schedules to the node context. These stores will be automatically loaded from your node-red settings file. See the [Node-RED Contexts](https://nodered.org/docs/user-guide/context) documentation for more information.
+- **Input Type**: Dropdown (string)
+
+### 📨 Topics and Payloads
+
+#### 🗂️ Topics
+- **Field**: `Topics`
+- **Description**: Define topics for the scheduler. Topics help categorize and manage schedules.
+  - These topics can be used in the `Topic` field of schedules, and can be selected in Node-Red Dashboard 2.0 UI. 
+  - In Fan Out mode, schedule messages will be sent to the output corresponding to the topic.
+- **Input Type**: Editable List (string)
+
+#### 📦 Custom Payloads
+- **Field**: `Custom Payloads`
+- **Description**: Define custom payloads to be sent when a schedule is triggered. 
+  - Payloads can be of various types including string, number, boolean, and JSON.
+  - Payloads defined here can be selected in the Dashboard UI.
+  - Changing payload value here will automatically update the payload values of all schedules using the payload 
+- **Input Type**: Editable List with Typed Input (string, number, boolean, JSON)
+
+### ⚙️ Advanced Settings
+
+#### 🕰️ Use New Time Picker
+- **Field**: `Use New Time Picker`
+- **Description**: Enable or disable the new time picker interface.
+- **Input Type**: Checkbox (boolean)
+
+## 🔧 Inputs (Advanced Usage)
+
+#### Topic
+Most of the commands can be provided in the topic with the name of schedule in the payload (where appropriate). Supported command topics...
+
+- trigger
+- status
+- export
+- remove
+- pause
+- stop
+- start
+
+This includes the `-all`, `-all-dynamic`, `-all-static`, `-topic`, `-active`,  `-active-dynamic`,  `-active-static`, `-inactive`, `-inactive-dynamic` and `-inactive-static` command topics (e.g. export-all, stop-all-dynamic, start-all-static, remove-inactive-dynamic). See [commands](#ui-scheduler-commands-info) below for details.
+
+#### 📦 Payload
+It is possible to dynamically add, remove and control schedules by injecting a payload into the node. The format of the payload object (or array of objects) depends on the operation. See below for details. You can also export schedules from Dashboard UI in edit window and paste the resulting JSON.
+
+#### ➕ Adding one (or more) schedules
+Example...
+```json
+payload: {
+  "command": "add",
+  "schedule": [
+    {
+      "name": "Schedule",
+      "topic": "Topic 1",
+      "enabled": true,
+      "scheduleType": "time",
+      "period": "daily",
+      "time": "00:00",
+      "endTime": null,
+      "days": [
+        "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday"
+      ],
+      "payloadType": true,
+      "payloadValue": true
+    },
+    {
+      "name": "Schedule 2",
+      "topic": "Topic 1",
+      "enabled": true,
+      "scheduleType": "solar",
+      "timespan": "time",
+      "solarEvent": "sunrise",
+      "offset": 5,
+      "solarEventStart": false,
+      "solarEventTimespanTime": "21:00",
+      "payloadType": "true_false",
+      "payloadValue": true,
+      "endPayloadValue": false
+    },
+    {
+      "name": "Schedule 3",
+      "topic": "Topic 1",
+      "enabled": true,
+      "scheduleType": "time",
+      "period": "minutes",
+      "duration": 1,
+      "timespan": "duration",
+      "minutesInterval": 7,
+      "payloadType": "true_false",
+      "payloadValue": true,
+      "endPayloadValue": false
+    }
+  ]
+}
+```
+
+### 📊 Getting status of a schedule or removing / stopping / pausing / starting a schedule
+
+#### Topic Method
+```json
+msg.topic = "command"; // command name - *see details below*,
+msg.payload = "name"; //  name of the schedule
+```
+
+#### Payload Method
+```json
+payload: {
   "command": "*see details below*",
   "name": "* name of schedule",
-}</code></pre>
-                <p><i>Details...</i><br>
-                    <ul>
-                        <li>command: (string|required) The operation to perform - this can be one of the following...
-                            <ul>
-                                <li>"trigger"</li>
-                                <li>"status"</li>
-                                <li>"export"</li>
-                                <li>"remove"</li>
-                                <li>"stop"</li>
-                                <li>"pause"</li>
-                                <li>"start"</li>
-                            </ul>
-                        </li>
-                        <li>name: (string|optional) The name of the schedule to affect (not required when using the -all, -active or -inactive filters)</li>
-                    </ul>
-                </p>
-                <p><i>Notes...</i><br>
-                    <ul>
-                        <li><code>trigger</code> fires schedule named in <code>msg.payload</code> </li>
-                        <li><code>status</code> returns an object with the config and status of the named schedule</li>
-                        <li><code>export</code> returns an object with the config of the named schedule</li>
-                        <li><code>remove</code> will stop and remove the schedule. This option has no output.</li>
-                        <li><code>stop</code> will stop the schedule specified by <code>name</code> and reset its internal counter. This option has no output.</li>
-                        <li><code>pause</code> will stop the schedule specified by <code>name</code> but will not reset its internal counter. This option has no output.</li>
-                        <li><code>start</code> will (re)start all schedules. Any schedule that reached its limit will start from the beginning. Paused schedules will resume. This option has no output.</li>
-                        <li>FILTER: adding <code>-all</code> to any of these commands will operate on all schedules. e.g. <code>status-all</code> will return the status of all schedules</li>
-                        <li>FILTER: adding <code>-all-dynamic</code> to any of these commands will only affect dynamic schedules e.g. <code>remove-all-dynamic</code> will remove all dynamic schedules</li>
-                        <li>FILTER: adding <code>-all-static</code> to any of these commands will only affect static schedules e.g. <code>stop-all-static</code></li>
-                        <li>FILTER: adding <code>-topic</code> to any of these commands will only affect schedules whose topic matches the topic specified in payload e.g. <code>stop-topic</code></li>
-                        <li>FILTER: adding <code>-active</code> to status, export and remove commands will operate on all active schedules. e.g. <code>status-active</code> </li>
-                        <li>FILTER: adding <code>-active-static</code> to status, export and remove commands will operate on all static schedules that are active. e.g. <code>status-active-static</code></li>
-                        <li>FILTER: adding <code>-active-dynamic</code> to status, export and remove commands will operate on all dynamic schedules that are active. e.g. <code>status-active-dynamic</code></li>
-                        <li>FILTER: adding <code>-inactive</code> to status, export and remove commands will operate on all inactive schedules. e.g. <code>status-inactive</code> </li>
-                        <li>FILTER: adding <code>-inactive-static</code> to status, export and remove commands will operate on all static schedules that are inactive. e.g. <code>status-inactive-static</code></li>
-                        <li>FILTER: adding <code>-inactive-dynamic</code> to status, export and remove commands will operate on all dynamic schedules that are inactive. e.g. <code>status-inactive-dynamic</code></li>
-                    </ul>
-                </p>
-                <p><i>Examples...</i><br>
-                    Example : Using a simple topic command to manually trigger a schedule named "schedule1"<br>
-                    <pre class="ui-scheduler-code"><code>msg: {
-  "topic": "trigger",
-  "payload": "schedule1"
-}</code></pre>      
-                    Example : Using a simple topic command with a topic in payload to start all schedules with specified topic"<br>
-                    <pre class="ui-scheduler-code"><code>msg: {
+}
+```
+
+#### Details
+- command: (string|required) The operation to perform - this can be one of the following...
+  - "trigger"
+  - "status"
+  - "export"
+  - "remove"
+  - "stop"
+  - "pause"
+  - "start"
+- name: (string|optional) The name of the schedule to affect (not required when using the -all, -active or -inactive filters)
+
+#### 📝 Notes
+- `trigger` fires schedule named in `msg.payload`
+- `status` returns an object with the config and status of the named schedule
+- `export` returns an object with the config of the named schedule
+- `remove` will stop and remove the schedule. This option has no output.
+- `stop` will stop the schedule specified by `name` and reset its internal counter. This option has no output.
+- `pause` will stop the schedule specified by `name` but will not reset its internal counter. This option has no output.
+- `start` will (re)start all schedules. Any schedule that reached its limit will start from the beginning. Paused schedules will resume. This option has no output.
+- FILTER: adding `-all` to any of these commands will operate on all schedules. e.g. `status-all` will return the status of all schedules
+- FILTER: adding `-all-dynamic` to any of these commands will only affect dynamic schedules e.g. `remove-all-dynamic` will remove all dynamic schedules
+- FILTER: adding `-all-static` to any of these commands will only affect static schedules e.g. `stop-all-static`
+- FILTER: adding `-topic` to any of these commands will only affect schedules whose topic matches the topic specified in payload e.g. `stop-topic`
+- FILTER: adding `-active` to status, export and remove commands will operate on all active schedules. e.g. `status-active`
+- FILTER: adding `-active-static` to status, export and remove commands will operate on all static schedules that are active. e.g. `status-active-static`
+- FILTER: adding `-active-dynamic` to status, export and remove commands will operate on all dynamic schedules that are active. e.g. `status-active-dynamic`
+- FILTER: adding `-inactive` to status, export and remove commands will operate on all inactive schedules. e.g. `status-inactive`
+- FILTER: adding `-inactive-static` to status, export and remove commands will operate on all static schedules that are inactive. e.g. `status-inactive-static`
+- FILTER: adding `-inactive-dynamic` to status, export and remove commands will operate on all dynamic schedules that are inactive. e.g. `status-inactive-dynamic`
+
+#### 📖 Examples
+- Using a simple topic command to manually trigger a schedule named "schedule1"
+  ```json
+  msg: {
+    "topic": "trigger",
+    "payload": "schedule1"
+  }
+  ```
+- Using a simple topic command with a topic in payload to start all schedules with specified topic
+  ```json
+  msg: {
     "topic": "start-topic",
     "payload": { "topic": "Topic 1" }
-}</code></pre>            
-                    Example : Using a simple topic command to export all dynamically added schedules...<br>
-                    <pre class="ui-scheduler-code"><code>msg: {
-  "topic": "export-all-dynamic"
-}</code></pre>                    
-                    Example : Using a simple topic command to delete a schedule named "schedule1"<br>
-                    <pre class="ui-scheduler-code"><code>msg: {
-  "topic": "remove",
-  "payload": "schedule1"
-}</code></pre>                    
-                    Example : Using a cmd payload to pause all schedules...<br>
-                    <pre class="ui-scheduler-code"><code>payload: {
-  "command": "pause-all"
-}</code></pre> 
-                    Example : Using a simple topic command to delete all dynamic schedules that have finished <br>
-                    <pre class="ui-scheduler-code"><code>msg: {
-  "topic": "remove-inactive-dynamic"
-}</code></pre>                    
-                </p>
-            </p>
-            </p>
+  }
+  ```
+- Using a simple topic command to export all dynamically added schedules...
+  ```json
+  msg: {
+    "topic": "export-all-dynamic"
+  }
+  ```
+- Using a simple topic command to delete a schedule named "schedule1"
+  ```json
+  msg: {
+    "topic": "remove",
+    "payload": "schedule1"
+  }
+  ```
+- Using a cmd payload to pause all schedules...
+  ```json
+  payload: {
+    "command": "pause-all"
+  }
+  ```
+- Using a simple topic command to delete all dynamic schedules that have finished
+  ```json
+  msg: {
+    "topic": "remove-inactive-dynamic"
+  }
+  ```
 
-                 
+### 🔍 Describe
 
-            <p><b>Describe</b><br>
-                Example : cmd payload to describe a cron expression...<br>
-                <pre class="ui-scheduler-code"><code>{
+#### Example: cmd payload to describe a cron expression
+```json
+{
   "command": "describe",
   "expressionType": "cron",
   "expression": "0 */5 * * * MON *",
   "timeZone": "Europe/London"
-}</code></pre>
-                Example : cmd payload to get all solar event times + solar state at this time...<br>
-<pre class="ui-scheduler-code"><code>{
+}
+```
+
+#### Example: cmd payload to get all solar event times + solar state at this time
+```json
+{
   "command": "describe",
   "expressionType": "solar",
   "location": "54.9992500,-1.4170300",
   "solarType": "all",
   "timeZone": "Europe/London"
-}</code></pre>
-                Example : cmd payload to get 4 solar event times + solar for a specific point in time...<br>
-    <pre class="ui-scheduler-code"><code>{
+}
+```
+
+#### Example: cmd payload to get 4 solar event times + solar for a specific point in time
+```json
+{
   "command": "describe",
   "expressionType": "solar",
   "time": "2020-03-22 18:40",
@@ -469,149 +453,83 @@ msg.payload = "name"; //  name of the schedule</code></pre>
   "solarType": "selected",
   "solarEvents": "civilDawn,sunrise,sunset,civilDusk",
   "timeZone": "Europe/London"
-}</code></pre>
-                <p><i>Details...</i><br>
-                    Returns an object in payload containing human readable info for the given expression.
-                    <ul>
-                        <li>command: (string|required) The operation to perform</li>
-                        <li>expression: (string|required) The expression to describe</li>
-                        <li>timeZone: (string|optional) A timezone to use. Leave blank for system timezone. Alternatively, enter UTC or a timezone in the format of Region/Area (<a target="_blank" href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">list</a>) </li>
-                    </ul>
-                </p>
-            </p>                
-        </dd>
-        <dd>GENERAL NOTES...<br>
-            <ul>
-                <li>Adding a schedule with the same name as an existing schedule will replace the existing one</li>
-                <li>When a ui-scheduler node outputs a msg in response to a command, <code>msg.commandResponse</code> will be <code>true</code> to indicate the message is in response to a command and not a scheduled event</li>
-                <li>When a ui-scheduler node outputs a msg for a cron/solar event, <code>msg.scheduledEvent</code> will be <code>true</code> to indicate the message is due to a scheduled event and not a control response</li>
-                <li>The status indicator will be shown as a "ring" for dynamic schedules or shown as a "dot" for static schedules</li>
-                <li>if the payload is set to "Default Payload", then the content of <code>msg.ui-scheduler</code> is moved to <code>msg.payload</code></li>
-            </ul>
-        </dd>
-    </dl>
+}
+```
 
-    <h3 id="understanding-timezone">Understanding Timezone...</h3>
-    <dl class="message-properties">
-        <h4>Foreword</h4>
-        <p>Timezone should be perceived from your current point of view. For example, regardless of where your node-red runs, you can "fake it" by setting the Timezone entry to your own Timezone location where/when you expect the event to occur.
-        </p>
+#### Details
+Returns an object in payload containing human readable info for the given expression.
 
-        <h4><b>Example 1...</b></h4>
-        <p>Trigger a flow when the NYSE stock exchange starts and stops trading.
-        </p>
+- command: (string|required) The operation to perform
+- expression: (string|required) The expression to describe
+- timeZone: (string|optional) A timezone to use. Leave blank for system timezone. Alternatively, enter UTC or a timezone in the format of Region/Area ([list](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones))
 
-        <h4 id="notes">NOTES</h4>
-        <ul>
-            <li>This example will work all year around but was written on 15th Apr with <code>GMT+1 / BST</code> and <code>GMT-4 / EDT</code> as a point of reference</li>
-            <li>Server is in London (GMT+1 / BST)</li>
-            <li>NYSE Stock exchange runs 09:30 ~ 16:00 Monday to Friday</li>
-        </ul>
+## Additional Info
 
-        <h4 id="details">DETAILS</h4>
-        <ul>
-            <li>NY time 09:30 (GMT-4 / EDT) - this is the time the market opens in New York</li>
-            <li>Server time 14:30 (GMT+1 / BST equivalent) - the start event will happen at this time in london</li>
-            <li>NY time 16:00 (GMT-4 / EDT) - this is the time the market closes in New York</li>
-            <li>Server time 21:00 (GMT+1 / BST equivalent) - the stop event will happen at this time in london</li>
-        </ul>
+### ⏰ CronExpression
+A CRON expression, a date, a comma separated list of dates or an array of dates.
 
-        <h4 id="setup">SETUP</h4>
-        <ul>
-            <li>Enter <code>America/New_York</code> in the <code>Timezone</code> field</li>
-            <li>Add a new schedule...
-                <ul>
-                    <li>Field 1 (name)      : Enter &quot;NYSEOPEN &quot;</li>
-                    <li>Field 2 (topic)     : Enter &quot;stocks/nyse/trading&quot;</li>
-                    <li>Field 3 (payload)   : Select boolean - true</li>
-                    <li>Field 4 (type)      : Select &quot;cron&quot;</li>
-                    <li>Field 5 (expression): Enter the expression <code>0 30 9 * * 1-5</code></li>                    
-                </ul>
-            </li>
-            <li>Add a new schedule...
-                <ul>
-                    <li>Field 1 (name)      : Enter &quot;NYSECLOSE &quot;</li>
-                    <li>Field 2 (topic)     : Enter &quot;stocks/nyse/trading&quot;</li>
-                    <li>Field 3 (payload)   : Select boolean - false</li>
-                    <li>Field 4 (type)      : Select &quot;cron&quot;</li>
-                    <li>Field 5 (expression): Enter the expression <code>0 0 16 * * 1-5</code></li>
-                </ul>
-            </li>
-        </ul>  
-        
-        <p></p>         
+##### 📅 Date or Date Sequence Format
+When you wish to use a fixed date or sequence of dates, the expression can be a string date, comma separated list of dates, an array of dates (The array can contain a mix of string, date objects and timestamps). When specifying a string date, you can use timezone e.g. "2020-01-01 00:00 GMT+2". You can even mix time zones e.g. "2020-01-01 00:00 GMT+2, 2020-01-01 00:00 GMT-7".
 
-        <h4><b>Example 2...</b></h4>
-        <p>Get an reminder (in Moscow) to call my wife 30 mins after the sun rises in Cairo.</p>
+##### ⏲️ CRON Format
+```
+* * * * * * *    Field              Allowed values    Special symbols
+| | | | | | |    -----------------  ---------------   ---------------
+`-|-|-|-|-|-|->  Second (optional)  0-59              * / , -
+  `-|-|-|-|-|->  Minute             0-59              * / , -
+    `-|-|-|-|->  Hour               0-23              * / , -
+      `-|-|-|->  Day of Month       1-31              * / , - ? L W
+        `-|-|->  Month              1-12 or JAN-DEC   * / , -
+          `-|->  Day of Week        0-7 or SUN-SAT    * / , - ? L #
+            `->  Year (optional)    1970-2099         * / , -
+```
 
-        <h4 id="notes">NOTES</h4>
-        <ul>
-            <li>This example will work all year around but was written on 15th Apr as a point of reference</li>
-            <li>Server is in London (GMT+1 / BST)</li>
-            <li>My wife is on holiday in Cairo (GMT+2)
-                <ul>
-                    <li>sunrise is at 05:27 in Cairo on 15-Apr</li>
-                </ul>
-            </li>
-            <li>I am away on business in Moscow (GMT+3)
-                <ul>
-                    <li>I need an alert to call wife 30 mins after Cairo sunrise</li>
-                </ul>
-            </li>
-        </ul>
+##### 📝 Notes
+- `*` Asterisks indicate that the cron expression matches for all values of the field. For example, "*" in the minute field means every minute.
+- `?` Question marks are used to specify 'no specific value' and is allowed for the day-of-month and day-of-week fields. It is used instead of the asterisk (*) for leaving either day-of-month or day-of-week blank.
+- `-` Hyphens are used to define ranges. For example, "10-12" in the hour field means the hours of 10, 11, and 12.
+- `,` Commas are used to separate items of a list. For example, "MON,WED,FRI" in the day-of-week field means the days Monday, Wednesday, and Friday.
+- `/` Forward slash are used to indicate increments. For example. "0/15" in the seconds field means the seconds 0, 15, 30, and 45. Additionally, "1/3" in the day-of-month field means every 3 days starting on the first day of the month.
+- `L` Short-hand for "last" and is allowed for the day-of-month and day-of-week fields. The "L" character has a different meaning in each of the two fields. For example, "L" in the day-of-month field means the last day of the month. If used in the day-of-week field, it means 7 or SAT. However, if used in the day-of-week field after another value, it means the last xxx day of the month. For example, "6L" in the day-of-week field means the last Friday of the month.
+- `W` Short-hand for "weekday" and is allowed for the day-of-month field. The "W" character is used to specify the weekday nearest the given day. For example, "15W" in the day-of-month field means the nearest weekday to the 15th of the month. Therefore, if the 15th is a Saturday, the job runs on Friday the 14th. The "L" and "W" characters can be combined in the day-of-month field. For example, "LW" means the last weekday of the month.
+- `#` Hash marks specify constructs. For example, "6#3' in the day-of-week field means the third Friday of the month.
 
-        <h4 id="details">DETAILS</h4>
-        <ul>
-            <li>Cairo sunrise time 05:27 (15-apr) - 30 mins later at 05:57, my wife expects a call.</li>
-            <li>Server time 04:57 (GMT+1 equivalent) - the event will happen at this time in london</li>
-            <li>Moscow time 06:57 (GMT+3 equivalent) - this is the time it will be in Moscow</li>
-        </ul>
+##### 📖 Examples
+- `* * * * * *` Every Second
+- `0 * * * * *` Every minute
+- `0 */10 * * * *` Every 10 minutes
+- `0 */20 1 * * *` Every 20 minutes, between 01:00 AM and 01:59 AM
+- `0 15,30,45 * * * *` At 15, 30, and 45 minutes past the hour
+- `0 0 12 * * *` Every day at noon - 12pm
+- `0 0 2 29 FEB * 2020/4` At 02:00 AM, on day 29 of February (leap years)
+- `0 0 7 * * MON#1 *` At 07:00 AM, on the first Monday of the month
+- `0 0 12 * JAN,FEB,MAR,APR *` Every day at noon in January, February, March and April
+- `* * 1W * *` Every minute, on the first weekday of the month
+- `* * * * Tue#3` Every minute, on the third Tuesday of the month
+- `0 12 * * MONL` At 12:00 PM, on the last Monday of the month
 
-        <h4 id="setup">SETUP</h4>
-        <ul>
-            <li>Enter <code>Europe/Moscow</code> in the <code>Timezone</code> field</li>
-            <li>Add a new schedule...
-                <ul>
-                    <li>Field 1 (name)    : Enter &quot;call reminder&quot;</li>
-                    <li>Field 2 (topic)   : Enter &quot;call/wife&quot;</li>
-                    <li>Field 3 (payload) : Select default</li>
-                    <li>Field 4 (type)    : Select &quot;solar events&quot;</li>
-                    <li>Field 5 (Events)  : Select &quot;sunrise&quot;</li>
-                    <li>Field 6 (location): Enter the coordinates for sunrise location (Cairo) <code>30.04905845622014 31.229496002197262</code></li>
-                    <li>Field 7 (offset)  : Enter an offset of 30 (allow her time to make a coffee)</li>
-                </ul>
-            </li>
-        </ul>   
+See [here](https://github.com/jaclarke/cronosjs) for more examples and info.
 
-    </dl>
+#### 🌅 Solar Events
+| Event ID | Event | Information |
+|----------|-------|-------------|
+| nightEnd | night end / astronomical dawn | night ends, astronomical twilight starts (-18°) |
+| nauticalDawn | nautical dawn | astronomical twilight ends, nautical twilight starts (-12°) |
+| civilDawn | civil dawn / golden hour | nautical twilight ends, civil twilight and golden hour starts (-6°) |
+| sunrise | sunrise | top edge of the sun appears on the horizon (-0.833°) |
+| sunriseEnd | sunrise end | bottom edge of the sun touches the horizon (-0.3°) |
+| morningGoldenHourEnd | morning golden hour ends | when the sun is 6 degrees above the horizon (6°) |
+| solarNoon | solar noon | sun is at its highest position |
+| eveningGoldenHourStart | evening golden hour start | when the sun is 6 degrees above the horizon (6°) |
+| sunsetStart | sunset start | bottom edge of the sun touches the horizon (-0.3°) |
+| sunset | sunset | civil twilight starts, sun disappears below the horizon (-0.833°) |
+| civilDusk | civil dusk / golden hour end | civil twilight and golden hour ends, nautical twilight starts (-6°) |
+| nauticalDusk | nautical dusk | nautical twilight ends, astronomical twilight starts (-12°) |
+| nightStart | astronomical dusk / night start | astronomical twilight ends, night starts (-18°) |
+| nadir | solar midnight | when the sun is closest to nadir and the night is equidistant from dusk and dawn |
 
-    <style>
-        .ui-scheduler-link-button {
-            background: none!important;
-            border: none!important;
-            padding: 0!important;
-            cursor: pointer!important;
-            color: var(--red-ui-primary-text-color);
-        }
-        pre.ui-scheduler-code button.ui-scheduler-copy-button {
-            position: absolute;
-            padding: 2px;
-            background-color: var(--red-ui-primary-text-color);
-            color: var(--red-ui-primary-background);
-            border: ridge 1px var(--red-ui-secondary-text-color);
-            border-radius: 15px;
-            opacity: 0.35;
-            top: 0px;
-            right: 4px;
-            scale: 70%;
-            transform-origin: right;
-        }
-        pre.ui-scheduler-code button.ui-scheduler-copy-button:hover{
-            cursor: pointer;
-            opacity: 0.9;
-        }
-        .red-ui-help pre.ui-scheduler-code {
-            position: relative;
-        }
-    </style>
+#### 📝 General Notes
+- Adding a schedule with the same name as an existing schedule will replace the existing one
+- When a ui-scheduler node outputs a msg in response to a command, `msg.commandResponse` will be `true` to indicate the message is in response to a command and not a scheduled event
+- When a ui-scheduler node outputs a msg for a cron/solar event, `msg.scheduledEvent` will be `true` to indicate the message is due to a scheduled event and not a control response
 </script>
