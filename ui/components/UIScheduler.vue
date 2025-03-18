@@ -998,6 +998,7 @@
                                 :item-title="getCustomPayloadTitle" item-value="id"
                                 :label="isTimespanSchedule ? (timespan !== 'time' ? t('customOutputStart') : (solarEventStart && scheduleType === 'solar' ? t('customOutputSolarEvent') : t('customOutputStart'))) : t('customOutput')"
                                 no-data-text="No custom payloads defined"
+                                :rules="rules.required"
                             >
                                 <template #prepend-inner>
                                     <v-icon
@@ -1020,6 +1021,7 @@
                                 :item-title="getCustomPayloadTitle" item-value="id"
                                 :label="isTimespanSchedule && timespan !== 'time' ? t('customOutputEnd') : (!solarEventStart && scheduleType === 'solar' ? t('customOutputSolarEvent') : t('customOutputEnd'))"
                                 no-data-text="No custom payloads defined"
+                                :rules="rules.required"
                             >
                                 <template #prepend-inner>
                                     <v-icon
@@ -2473,7 +2475,6 @@ export default {
 
             const item = parsedData
             this.closeImportDialog()
-            console.log(item)
             this.scheduleId = item.id || this.scheduleId
             this.name = item.name || this.name
             this.enabled = item.enabled !== undefined ? item.enabled : this.enabled

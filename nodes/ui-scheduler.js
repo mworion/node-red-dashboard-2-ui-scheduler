@@ -1,4 +1,4 @@
-const version = '3.1.1'
+const version = '3.2.0'
 const packageName = '@cgjgh/node-red-dashboard-2-ui-scheduler'
 /* eslint-disable no-unused-vars */
 
@@ -84,6 +84,31 @@ const daysOfWeek = [
 ]
 
 const allDaysOfWeek = daysOfWeek.map(day => day.value)
+
+const months = [
+    { title: 'January', value: 'january' },
+    { title: 'February', value: 'february' },
+    { title: 'March', value: 'march' },
+    { title: 'April', value: 'april' },
+    { title: 'May', value: 'may' },
+    { title: 'June', value: 'june' },
+    { title: 'July', value: 'july' },
+    { title: 'August', value: 'august' },
+    { title: 'September', value: 'september' },
+    { title: 'October', value: 'october' },
+    { title: 'November', value: 'november' },
+    { title: 'December', value: 'december' }
+]
+
+const allMonths = months.map(month => month.value)
+
+function getMaxDaysInMonth (monthName) {
+    const month = months.indexOf(monthName) + 1
+    if (month === 0) {
+        return 0
+    }
+    return month === 2 ? 29 : new Date(2024, month, 0).getDate()
+}
 
 /**
  * Abbreviates the day names in a given description string.
@@ -2967,10 +2992,13 @@ module.exports = function (RED) {
              * @returns {string|null} The ID of the schedule if found, otherwise null.
              */
         function getScheduleId (node, name) {
-            const schedule = node.schedules.find(function (schedule) {
-                return schedule.name === name
-            })
-            return schedule.id || null
+            if (Array.isArray(node.schedules)) {
+                const schedule = node.schedules.find(function (schedule) {
+                    return schedule.name === name
+                })
+                return schedule ? schedule.id : null
+            }
+            return null // Return null if node.schedules is not an array
         }
 
         /**
