@@ -67,14 +67,39 @@
             :expand="expandedItem" items-per-page @click:row="handleRowClick"
         >
             <template #item.rowNumber="{ item }">
-                <v-chip :color="item.active === undefined ? 'gray' : (item.active ? 'green' : 'red')" density="compact">
+                <v-badge
+                    v-if="item.invalid"
+                    color="error"
+                >
+                    <!-- Badge slot for the error icon -->
+                    <template #badge>
+                        <v-icon size="small">mdi-alert</v-icon>
+                    </template>
+                    <v-chip :color="item.active === undefined ? 'gray' : (item.active ? 'green' : 'red')" density="compact">
+                        {{ item.rowNumber }}
+                    </v-chip>
+                </v-badge>
+                <v-chip v-else :color="item.active === undefined ? 'gray' : (item.active ? 'green' : 'red')" density="compact">
                     {{ item.rowNumber }}
                 </v-chip>
             </template>
 
             <template #item.name="{ item }">
-                <div v-if="item.active === undefined">{{ item.name }}</div>
-                <v-chip v-else :color="item.active ? 'green' : 'red'">
+                <v-badge
+                    v-if="item.invalid"
+                    color="error"
+                >
+                    <!-- Badge slot for the error icon -->
+                    <template #badge>
+                        <v-icon size="small">mdi-alert</v-icon>
+                    </template>
+                    <v-chip :color="item.active ? 'green' : 'red'">
+                        {{ item.name }}
+                    </v-chip>
+                </v-badge>
+
+                <!-- Otherwise, simply render the chip without a badge -->
+                <v-chip v-else :color="item.active === undefined ? 'gray' : (item.active ? 'green' : 'red')">
                     {{ item.name }}
                 </v-chip>
             </template>
@@ -87,7 +112,7 @@
                     </template>
                     <template v-else>
                         <v-switch
-                            v-model="item.enabled" color="green" hide-details
+                            v-model="item.enabled" :disabled="item.invalid" color="green" hide-details
                             @click.stop="toggleSchedule(item)"
                         />
                     </template>
@@ -432,7 +457,7 @@
                     <span class="text-h5">{{ isEditing ? t('editSchedule') : t('newSchedule') }}</span>
                     <div class="d-flex align-items-center">
                         <v-switch
-                            v-model="enabled" :label="enabled ? t('enabled') : t('disabled')"
+                            v-model="enabled" :disabled="invalid" :label="enabled ? t('enabled') : t('disabled')"
                             :color="enabled ? 'green' : 'default'" required class="mr-2"
                         />
                         <v-btn v-if="isEditing" icon variant="plain" color="blue" @click="openExportDialog()">
@@ -1208,6 +1233,7 @@ export default {
             scheduleId: null,
             name: null,
             enabled: false,
+            invalid: false,
             topic: null,
             scheduleType: null,
             period: null,
@@ -2218,6 +2244,7 @@ export default {
             this.scheduleId = item.id || this.scheduleId
             this.name = item.name || this.name
             this.enabled = item.enabled !== undefined ? item.enabled : this.enabled
+            this.invalid = item.invalid !== undefined ? item.invalid : this.invalid
             this.topic = item.topic || this.topic
             this.scheduleType = item.scheduleType || this.scheduleType
             this.period = item.period || this.period
@@ -2293,6 +2320,7 @@ export default {
                 this.topic = null
             }
             this.enabled = true
+            this.invalid = false
             this.scheduleType = 'time'
             this.period = 'daily'
             this.dailyDays = [...this.daysOfWeek.map(day => day.value)]

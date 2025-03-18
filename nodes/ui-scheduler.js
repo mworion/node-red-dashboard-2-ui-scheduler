@@ -3122,21 +3122,26 @@ module.exports = function (RED) {
             const schedule = getSchedule(node, id)
 
             if (schedule) {
-                const primaryTask = schedule?.primaryTask?.task
-                const endTask = schedule?.endTask?.task
-                if (primaryTask) {
-                    if (isTaskFinished(primaryTask)) {
-                        primaryTask.node_count = 0
+                if (!schedule.invalid) {
+                    const primaryTask = schedule?.primaryTask?.task
+                    const endTask = schedule?.endTask?.task
+                    if (primaryTask) {
+                        if (isTaskFinished(primaryTask)) {
+                            primaryTask.node_count = 0
+                        }
+                        primaryTask.stop()// prevent bug where calling start without first calling stop causes events to bunch up
+                        primaryTask.start()
                     }
-                    primaryTask.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-                    primaryTask.start()
-                }
-                if (endTask) {
-                    if (isTaskFinished(endTask)) {
-                        endTask.node_count = 0
+                    if (endTask) {
+                        if (isTaskFinished(endTask)) {
+                            endTask.node_count = 0
+                        }
+                        endTask.stop()// prevent bug where calling start without first calling stop causes events to bunch up
+                        endTask.start()
                     }
-                    endTask.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-                    endTask.start()
+                } else {
+                    console.log('Schedule invalid', id)
+                    node.warn('Schedule invalid', id)
                 }
             } else {
                 console.log('Schedule not found for', id)
@@ -3935,6 +3940,11 @@ module.exports = function (RED) {
                             }
                             if (schedule.solarDays) {
                                 schedule.solarDays = schedule.solarDays.map(day => day.toLowerCase())
+                            const result = validateCustomPayload(schedule)
+                            if (result.valid === false) {
+                                schedule.invalid = true
+                                schedule.enabled = false
+                                node.warn(result.message)
                             }
 
                             // Generate task command
