@@ -2733,11 +2733,43 @@ module.exports = function (RED) {
                             sendCommandResponse(newMsg)
                         }
                         break
-                    case 'add': // single
-                    case 'update': // single
-                        await updateTask(node, cmd, msg)
-                        updateNextStatus(node, true)
-                        requestSerialisation()// update persistence
+                    case 'add':
+                    case 'update':
+                        console.log(cmd)
+                        if (cmd && cmd.schedule) {
+                            const schedules = []
+                            if (Array.isArray(cmd.schedule)) {
+                                cmd.schedule.forEach(schedule => {
+                                    if (schedule) {
+                                        const validationResult = validateSchedule(schedule)
+                                        if (validationResult.valid) {
+                                            const cleanedSchedule = cleanSchedule(schedule)
+                                            if (cleanedSchedule) {
+                                                schedules.push(cleanedSchedule)
+                                            }
+                                        } else {
+                                            node.warn(validationResult.message + ' for ' + JSON.stringify(schedule))
+                                        }
+                                    }
+                                })
+                            } else {
+                                const schedule = cmd.schedule
+                                if (schedule) {
+                                    const validationResult = validateSchedule(schedule)
+                                    if (validationResult.valid) {
+                                        const cleanedSchedule = cleanSchedule(schedule)
+                                        if (cleanedSchedule) {
+                                            schedules.push(cleanedSchedule)
+                                        }
+                                    } else {
+                                        node.warn(validationResult.message + ' for ' + JSON.stringify(schedule))
+                                    }
+                                }
+                            }
+                            if (schedules.length) {
+                                submitSchedule(schedules)
+                            }
+                        }
                         break
                     case 'clear':
                     case 'remove-': // multiple
@@ -4544,6 +4576,337 @@ module.exports = function (RED) {
             return arr
         }
 
+        // A helper to test time strings in HH:MM format (24h)
+        function isValidTimeFormat (timeStr) {
+            const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+            return timePattern.test(timeStr)
+        }
+
+        // Helper to validate timespan rules for "time" schedules (daily/weekly/monthly/yearly)
+        function validateTimeTimespan (schedule, allowedMessage) {
+            if (schedule.timespan === 'time') {
+                if (!schedule.time || !isValidTimeFormat(schedule.time)) {
+                    return { valid: false, message: RED._('ui-scheduler.error.startTimeInvalid') }
+                }
+                if (!schedule.endTime || !isValidTimeFormat(schedule.endTime)) {
+                    return { valid: false, message: RED._('ui-scheduler.error.endTimeInvalid') }
+                }
+            } else if (schedule.timespan !== false) {
+                return {
+                    valid: false,
+                    message: RED._('ui-scheduler.error.invalidTimespan', { allowed: allowedMessage })
+                }
+            }
+            return { valid: true }
+        }
+
+        // Helper to validate timespan rules for schedules that use duration (minutes, hourly, cron)
+        function validateDurationTimespan (schedule, durationErrorMessage) {
+            if (schedule.timespan === 'duration') {
+                if (typeof schedule.duration !== 'number') {
+                    return { valid: false, message: RED._(durationErrorMessage) }
+                }
+            } else if (schedule.timespan !== false) {
+                return {
+                    valid: false,
+                    message: RED._('ui-scheduler.error.invalidTimespan', { allowed: 'duration or false for minutes/hourly/cron' })
+                }
+            }
+            return { valid: true }
+        }
+
+        function validateCustomPayload (schedule) {
+            // Check if schedule payloadType is custom and that it exists
+            if (schedule.payloadType === 'custom') {
+                // Validate the start (or single) payload using parseCustomPayload
+                const startPayload = parseCustomPayload(node, schedule.payloadValue)
+                if (startPayload === null) {
+                    return {
+                        valid: false,
+                        invalidPayload: 'start',
+                        message: RED._('ui-scheduler.error.customOutputRequired', { field: 'start' })
+                    }
+                }
+
+                // When timespan requires two payloads, validate the end payload
+                if (['duration', 'time'].includes(schedule.timespan)) {
+                    const endPayload = parseCustomPayload(node, schedule.endPayloadValue)
+                    if (endPayload === null) {
+                        return {
+                            valid: false,
+                            invalidPayload: 'end',
+                            message: RED._('ui-scheduler.error.customOutputRequired', { field: 'end' })
+                        }
+                    }
+                }
+            }
+            return { valid: true }
+        }
+
+        function validateSchedule (schedule) {
+            // Assign a default timespan value if none is provided.
+            if (schedule.timespan === null || schedule.timespan === undefined) {
+                schedule.timespan = false
+            }
+            // Basic validations
+            if (!schedule.name || schedule.name.trim() === '') {
+                return { valid: false, message: RED._('ui-scheduler.error.scheduleNameRequired') }
+            }
+            if (!schedule.topic || !node.topics.includes(schedule.topic)) {
+                return { valid: false, message: RED._('ui-scheduler.error.topicInvalid') }
+            }
+            if (!['time', 'solar', 'cron'].includes(schedule.scheduleType)) {
+                return { valid: false, message: RED._('ui-scheduler.error.invalidScheduleType') }
+            }
+
+            if (schedule.scheduleType === 'time') {
+                // Validate period – must be one of the allowed ones.
+                const validPeriods = ['minutes', 'hourly', 'daily', 'weekly', 'monthly', 'yearly']
+                if (!schedule.period || !validPeriods.includes(schedule.period)) {
+                    return { valid: false, message: RED._('ui-scheduler.error.invalidPeriod') }
+                }
+
+                // Daily or weekly validation
+                if (['daily', 'weekly'].includes(schedule.period)) {
+                    if (!Array.isArray(schedule.days) || schedule.days.length === 0) {
+                        return { valid: false, message: RED._('ui-scheduler.error.daysRequiredForPeriod', { period: schedule.period }) }
+                    }
+                    for (const day of schedule.days) {
+                        if (typeof day !== 'string' || !allDaysOfWeek.includes(day)) {
+                            return { valid: false, message: RED._('ui-scheduler.error.invalidDay', { day }) }
+                        }
+                    }
+                    const result = validateTimeTimespan(schedule, 'time or false for daily/weekly')
+                    if (!result.valid) return result
+                } else if (schedule.period === 'monthly') {
+                // Monthly validation
+                    if (!Array.isArray(schedule.days) || schedule.days.length === 0) {
+                        return { valid: false, message: RED._('ui-scheduler.error.daysRequiredForPeriod', { period: schedule.period }) }
+                    }
+                    for (const day of schedule.days) {
+                        if (typeof day !== 'number' || day < 1 || day > 31) {
+                            return { valid: false, message: RED._('ui-scheduler.error.invalidDayForMonthly', { day }) }
+                        }
+                    }
+                    const result = validateTimeTimespan(schedule, 'time or false for monthly')
+                    if (!result.valid) return result
+                } else if (schedule.period === 'yearly') {
+                    // Yearly validation
+                    if (schedule.month === undefined || schedule.month === null) {
+                        return { valid: false, message: RED._('ui-scheduler.error.monthRequiredForYearly') }
+                    }
+                    let monthName
+                    if (typeof schedule.month === 'string') {
+                        if (!months.includes(schedule.month)) {
+                            return { valid: false, message: RED._('ui-scheduler.error.invalidMonth') }
+                        }
+                        monthName = schedule.month
+                    } else if (typeof schedule.month === 'number') {
+                        if (schedule.month < 1 || schedule.month > 12) {
+                            return { valid: false, message: RED._('ui-scheduler.error.invalidMonth') }
+                        }
+                        monthName = months[schedule.month - 1]
+                    } else {
+                        return { valid: false, message: RED._('ui-scheduler.error.invalidMonth') }
+                    }
+                    const maxDays = getMaxDaysInMonth(monthName)
+                    if (schedule.days < 1 || schedule.days > maxDays) {
+                        return { valid: false, message: RED._('ui-scheduler.error.invalidDayForYearly', { max: maxDays }) }
+                    }
+                    if (typeof schedule.days !== 'number') {
+                        return { valid: false, message: RED._('ui-scheduler.error.dayNumberRequiredForYearly') }
+                    }
+                    const result = validateTimeTimespan(schedule, 'time or false for yearly')
+                    if (!result.valid) return result
+                } else if (schedule.period === 'minutes') {
+                // Minutes validation
+                    if (typeof schedule.minutesInterval !== 'number') {
+                        return { valid: false, message: RED._('ui-scheduler.error.minutesIntervalRequired') }
+                    }
+                    const result = validateDurationTimespan(schedule, 'ui-scheduler.error.minutesDurationRequired')
+                    if (!result.valid) return result
+                } else if (schedule.period === 'hourly') {
+                // Hourly validation
+                    if (typeof schedule.hourlyInterval !== 'number') {
+                        return { valid: false, message: RED._('ui-scheduler.error.hourlyIntervalRequired') }
+                    }
+                    const result = validateDurationTimespan(schedule, 'ui-scheduler.error.hourlyDurationRequired')
+                    if (!result.valid) return result
+                }
+            } else if (schedule.scheduleType === 'solar') {
+                if (!node.defaultLocation || node.defaultLocation === '') {
+                    return { valid: false, message: RED._('ui-scheduler.error.solarLocationRequired') }
+                }
+                if (!schedule.solarEvent || !PERMITTED_SOLAR_EVENTS.includes(schedule.solarEvent)) {
+                    return { valid: false, message: RED._('ui-scheduler.error.solarEventRequired') }
+                }
+                if (typeof schedule.offset !== 'number') {
+                    return { valid: false, message: RED._('ui-scheduler.error.solarOffsetRequired') }
+                }
+                if (schedule.timespan === 'duration') {
+                    if (typeof schedule.duration !== 'number') {
+                        return { valid: false, message: RED._('ui-scheduler.error.solarDurationRequired') }
+                    }
+                } else if (schedule.timespan === 'time') {
+                    if (schedule.solarEventStart === null || typeof schedule.solarEventStart !== 'boolean') {
+                        return { valid: false, message: RED._('ui-scheduler.error.solarTimeDefinitionRequired') }
+                    }
+                    if (!schedule.solarEventTimespanTime || !isValidTimeFormat(schedule.solarEventTimespanTime)) {
+                        return { valid: false, message: RED._('ui-scheduler.error.solarTimeRequired') }
+                    }
+                } else if (schedule.timespan !== false) {
+                    // In solar, timespan must be 'time', 'duration', or false.
+                    return {
+                        valid: false,
+                        message: RED._('ui-scheduler.error.invalidTimespan', { allowed: '"time", "duration", or false for solar' })
+                    }
+                }
+                // Validate solarDays if provided (optional)
+                if (schedule.solarDays !== undefined && schedule.solarDays !== null) {
+                    if (!Array.isArray(schedule.solarDays)) {
+                        return { valid: false, message: RED._('ui-scheduler.error.invalidDay') }
+                    }
+                    for (const day of schedule.solarDays) {
+                        if (typeof day !== 'string' || !allDaysOfWeek.includes(day)) {
+                            return { valid: false, message: RED._('ui-scheduler.error.invalidDay', { day }) }
+                        }
+                    }
+                }
+            } else if (schedule.scheduleType === 'cron') {
+                if (!schedule.cronValue || !isCronLike(schedule.cronValue)) {
+                    return { valid: false, message: RED._('ui-scheduler.error.cronValidRequired') }
+                }
+                const result = validateDurationTimespan(schedule, 'ui-scheduler.error.cronDurationRequired')
+                if (!result.valid) return result
+            }
+
+            // Validate Payload Type based on timespan existence
+            if (schedule.payloadType === null || schedule.payloadType === undefined) {
+                return { valid: false, message: RED._('ui-scheduler.error.outputValueRequired') }
+            }
+            if (schedule.timespan === false) {
+                if (![true, false, 'custom'].includes(schedule.payloadType)) {
+                    return {
+                        valid: false,
+                        message: RED._('ui-scheduler.error.invalidPayloadTypeForNoTimespan', {
+                            allowed: 'true, false, or custom'
+                        })
+                    }
+                }
+            } else if (['duration', 'time'].includes(schedule.timespan)) {
+                if (!['true_false', 'custom'].includes(schedule.payloadType)) {
+                    return {
+                        valid: false,
+                        message: RED._('ui-scheduler.error.invalidPayloadTypeForTimespan', {
+                            allowed: '"true_false" or "custom"'
+                        })
+                    }
+                }
+            }
+            const result = validateCustomPayload(schedule)
+            if (result.valid === false) {
+                return { ...result }
+            }
+
+            return { valid: true, message: '' }
+        }
+
+        function cleanSchedule (schedule) {
+            const scheduleId = getScheduleId(node, schedule.name)
+            const newSchedule = {
+
+                id: scheduleId,
+                name: schedule.name,
+                enabled: schedule.enabled,
+                topic: schedule.topic,
+                scheduleType: schedule.scheduleType
+            }
+
+            if (schedule.scheduleType === 'time') {
+                newSchedule.period = schedule.period
+
+                if (['daily', 'weekly', 'monthly', 'yearly'].includes(schedule.period)) {
+                    newSchedule.time = schedule.time
+                    newSchedule.days = schedule.days
+                    if (schedule.timespan === 'time') {
+                        newSchedule.timespan = schedule.timespan
+                        newSchedule.endTime = schedule.endTime
+                    } else {
+                        newSchedule.timespan = false
+                    }
+                }
+
+                if (schedule.period === 'yearly') {
+                    newSchedule.month = schedule.yearlyMonth
+                } else if (schedule.period === 'minutes') {
+                    newSchedule.minutesInterval = schedule.minutesInterval
+                    if (schedule.timespan === 'duration') {
+                        newSchedule.timespan = schedule.timespan
+                        newSchedule.duration = schedule.duration
+                    } else {
+                        newSchedule.timespan = false
+                    }
+                } else if (schedule.period === 'hourly') {
+                    newSchedule.hourlyInterval = schedule.hourlyInterval
+                    if (schedule.timespan === 'duration') {
+                        newSchedule.timespan = schedule.timespan
+                        newSchedule.duration = schedule.duration
+                    } else {
+                        newSchedule.timespan = false
+                    }
+                }
+            } else if (schedule.scheduleType === 'solar') {
+                newSchedule.solarEvent = schedule.solarEvent
+                newSchedule.offset = schedule.offset
+
+                if (schedule.timespan === 'duration') {
+                    newSchedule.timespan = schedule.timespan
+                    newSchedule.duration = schedule.duration
+                } else if (schedule.timespan === 'time') {
+                    newSchedule.timespan = schedule.timespan
+                    newSchedule.solarEventStart = schedule.solarEventStart
+                    newSchedule.solarEventTimespanTime = schedule.solarEventTimespanTime
+                } else {
+                    newSchedule.timespan = false
+                }
+
+                if (
+                    schedule.solarDays &&
+                    Array.isArray(schedule.solarDays) &&
+                    schedule.solarDays.length > 0 &&
+                    schedule.solarDays.length < 7
+                ) {
+                    newSchedule.solarDays = schedule.solarDays
+                }
+            } else if (schedule.scheduleType === 'cron') {
+                newSchedule.startCronExpression = schedule.cronValue
+                if (schedule.timespan === 'duration') {
+                    newSchedule.timespan = schedule.timespan
+                    newSchedule.duration = schedule.duration
+                } else {
+                    newSchedule.timespan = false
+                }
+            }
+            if (schedule.timespan) {
+                newSchedule.payloadType = schedule.payloadType
+                if (schedule.payloadType !== 'custom') {
+                    newSchedule.payloadValue = true
+                    newSchedule.endPayloadValue = false
+                } else {
+                    newSchedule.payloadValue = parseCustomPayload(node, schedule.payloadValue)
+                    newSchedule.endPayloadValue = parseCustomPayload(node, schedule.endPayloadValue)
+                }
+            } else {
+                newSchedule.payloadType = schedule.payloadType
+                if (schedule.payloadType !== 'custom' && schedule.payloadType !== 'true_false') {
+                    newSchedule.payloadValue = schedule.payloadType
+                } else if (schedule.payloadType === 'custom') {
+                    newSchedule.payloadValue = parseCustomPayload(node, schedule.payloadValue)
+                }
+            }
+            return newSchedule
+        }
+
         // #region UI Actions
 
         /**
@@ -4556,18 +4919,18 @@ module.exports = function (RED) {
             * and emits UI updates. If there are schedule commands, they are handled asynchronously.
             * In case of an error, logs the error and reports it to the node.
             */
-        async function submitSchedule (msg) {
-            if (!msg?.payload?.schedules) return
-
+        async function submitSchedule (inputSchedule) {
+            if (!inputSchedule) return
+            if (!Array.isArray(inputSchedule)) inputSchedule = [inputSchedule]
             try {
                 const schedules = node.schedules || []
-                const scheduleCommands = processSchedules(msg.payload.schedules, schedules)
+                const scheduleCommands = processSchedules(inputSchedule, schedules)
 
                 updateSchedules(node, schedules)
                 emitUiUpdate(node, getUiSchedules(node), 'submit')
 
                 if (scheduleCommands.length > 0) {
-                    await handleScheduleCommands(scheduleCommands, msg)
+                    await handleScheduleCommands(scheduleCommands, inputSchedule)
                 }
 
                 emitUiUpdate(node, getUiSchedules(node), 'submit_status')
@@ -4591,13 +4954,13 @@ module.exports = function (RED) {
              * @param {Object} msg - The message containing the payload with schedule IDs.
              * @throws Will throw an error if processing the schedule commands fails.
              */
-        async function handleScheduleCommands (scheduleCommands, msg) {
+        async function handleScheduleCommands (scheduleCommands, inputSchedule) {
             try {
-                await updateTask(node, scheduleCommands, msg)
+                await updateTask(node, scheduleCommands, inputSchedule)
                 updateNextStatus(node, true)
                 requestSerialisation()
 
-                msg.payload.schedules.forEach(({ id }) => {
+                inputSchedule.forEach(({ id }) => {
                     const schedule = getSchedule(node, id)
                     if (schedule) {
                         updateScheduleNextStatus(node, schedule, false)
@@ -4827,7 +5190,8 @@ module.exports = function (RED) {
             beforeSend: function (msg) {
                 if (msg.action) {
                     if (msg.action === 'submit') {
-                        submitSchedule(msg)
+                        if (!msg?.payload?.schedules) return
+                        submitSchedule(msg.payload?.schedules)
                     } else if (msg.action === 'remove') {
                         removeSchedule(msg)
                     } else if (msg.action === 'setEnabled') {
@@ -4893,6 +5257,58 @@ module.exports = function (RED) {
             }
         }
     }
+
+    /**
+ * Parses a custom payload from the node's custom payloads.
+ *
+ * If a custom payload with the specified payload ID exists, returns the payload;
+ * otherwise, attempts to find a custom payload ID matching the payload value.
+ * Returns the matched custom payload ID if found, or null.
+ *
+ * @param {Object} node - The node to check for a custom payload.
+ * @param {*} payload - The payload identifier or value.
+ * @returns {*} The original payload or the custom payload ID if found, otherwise null.
+ */
+    const parseCustomPayload = (node, payload) =>
+        customPayloadExists(node, payload)
+            ? payload
+            : getCustomPayloadId(node, payload) || null
+
+    /**
+   * Retrieves the value of a custom payload from the node's custom payloads by its ID.
+   *
+   * @param {Object} node - The node object containing custom payloads.
+   * @param {string} payloadId - The ID of the payload to retrieve.
+   * @returns {*} The value of the custom payload if found, otherwise null.
+   */
+    const getCustomPayload = (node, payloadId) => {
+        if (!Array.isArray(node.customPayloads)) return null
+        const found = node.customPayloads.find(({ id }) => id === payloadId)
+        return found ? found.value : null
+    }
+
+    /**
+   * Retrieves the ID of a custom payload from the node's custom payloads based on a given payload value.
+   *
+   * @param {Object} node - The node object containing custom payloads.
+   * @param {*} payloadValue - The value of the payload to search for.
+   * @returns {string|null} The ID of the matching payload if found, otherwise null.
+   */
+    const getCustomPayloadId = (node, payloadValue) => {
+        if (!Array.isArray(node.customPayloads)) return null
+        const found = node.customPayloads.find(({ value }) => value === payloadValue)
+        return found ? found.id : null
+    }
+
+    /**
+   * Checks if a custom payload with the specified ID exists within the node's custom payloads.
+   *
+   * @param {Object} node - The node object containing custom payloads.
+   * @param {string} payloadId - The ID of the payload to search for.
+   * @returns {boolean} True if the payload exists, otherwise false.
+   */
+    const customPayloadExists = (node, payloadId) =>
+        Array.isArray(node.customPayloads) && node.customPayloads.some(({ id }) => id === payloadId)
 
     function evaluateNodeProperty (value, type, node, msg) {
         return new Promise(function (resolve, reject) {
