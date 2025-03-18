@@ -3968,10 +3968,17 @@ module.exports = function (RED) {
 
                             // Convert schedule.days and schedule.solarDays to lowercase
                             if (schedule.days) {
-                                schedule.days = schedule.days.map(day => day.toLowerCase())
+                                schedule.days = schedule.days.map(day => {
+                                    return typeof day === 'string' ? day.toLowerCase() : day
+                                })
                             }
+
                             if (schedule.solarDays) {
-                                schedule.solarDays = schedule.solarDays.map(day => day.toLowerCase())
+                                schedule.solarDays = schedule.solarDays.map(day => {
+                                    return typeof day === 'string' ? day.toLowerCase() : day
+                                })
+                            }
+
                             const result = validateCustomPayload(schedule)
                             if (result.valid === false) {
                                 schedule.invalid = true
