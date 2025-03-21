@@ -1,0 +1,407 @@
+[
+  {
+      "id": "fbbaa338350e1589",
+      "type": "tab",
+      "label": "Flow 1",
+      "disabled": false,
+      "info": "",
+      "env": []
+  },
+  {
+      "id": "node-red-tab-helper-api",
+      "type": "tab",
+      "label": "Helper API",
+      "disabled": false,
+      "info": "",
+      "env": []
+  },
+  {
+      "id": "dashboard-ui-base",
+      "type": "ui-base",
+      "name": "UI Name",
+      "path": "/dashboard",
+      "includeClientData": true,
+      "acceptsClientConfig": [
+          "ui-notification",
+          "ui-control"
+      ]
+  },
+  {
+      "id": "dashboard-ui-theme",
+      "type": "ui-theme",
+      "name": "Default Theme",
+      "colors": {
+          "surface": "#ffffff",
+          "primary": "#0094ce",
+          "bgPage": "#eeeeee",
+          "groupBg": "#ffffff",
+          "groupOutline": "#cccccc"
+      }
+  },
+  {
+      "id": "dashboard-ui-page-1",
+      "type": "ui-page",
+      "name": "Page 1",
+      "ui": "dashboard-ui-base",
+      "path": "/page1",
+      "icon": "",
+      "layout": "grid",
+      "theme": "dashboard-ui-theme",
+      "order": 1,
+      "className": "",
+      "visible": "true",
+      "disabled": false
+  },
+  {
+      "id": "4f87d7d9fab04a9d",
+      "type": "ui-group",
+      "name": "Scheduler Dynamic Properties",
+      "page": "dashboard-ui-page-1",
+      "width": "6",
+      "height": "1",
+      "order": 2,
+      "showTitle": true,
+      "className": "",
+      "visible": "true",
+      "disabled": "false"
+  },
+  {
+      "id": "a1ba982f1e2167e3",
+      "type": "ui-group",
+      "name": "Scheduler Main",
+      "page": "dashboard-ui-page-1",
+      "width": 6,
+      "height": 1,
+      "order": 1,
+      "showTitle": true,
+      "className": "",
+      "visible": "true",
+      "disabled": "false",
+      "groupType": "default"
+  },
+  {
+      "id": "7df21a2733c54bb1",
+      "type": "ui-group",
+      "name": "Scheduler Functions",
+      "page": "dashboard-ui-page-1",
+      "width": 6,
+      "height": 1,
+      "order": 3,
+      "showTitle": true,
+      "className": "",
+      "visible": "true",
+      "disabled": "false",
+      "groupType": "default"
+  },
+  {
+      "id": "80edc9655b77ee71",
+      "type": "change",
+      "z": "fbbaa338350e1589",
+      "name": "",
+      "rules": [
+          {
+              "t": "set",
+              "p": "ui_update.label",
+              "pt": "msg",
+              "to": "Dynamic Label",
+              "tot": "str"
+          }
+      ],
+      "action": "",
+      "property": "",
+      "from": "",
+      "to": "",
+      "reg": false,
+      "x": 590,
+      "y": 680,
+      "wires": [
+          [
+              "33ac17d273a52d97"
+          ]
+      ]
+  },
+  {
+      "id": "037c9d623a84bc6c",
+      "type": "ui-button",
+      "z": "fbbaa338350e1589",
+      "group": "4f87d7d9fab04a9d",
+      "name": "Dynamic Property: Label",
+      "label": "Dynamic Property: Label",
+      "order": 1,
+      "width": 0,
+      "height": 0,
+      "emulateClick": false,
+      "tooltip": "",
+      "color": "",
+      "bgcolor": "",
+      "className": "",
+      "icon": "",
+      "iconPosition": "left",
+      "payload": "",
+      "payloadType": "str",
+      "topic": "topic",
+      "topicType": "msg",
+      "buttonColor": "",
+      "textColor": "",
+      "iconColor": "",
+      "x": 350,
+      "y": 680,
+      "wires": [
+          [
+              "80edc9655b77ee71"
+          ]
+      ]
+  },
+  {
+      "id": "33ac17d273a52d97",
+      "type": "ui-scheduler",
+      "z": "fbbaa338350e1589",
+      "name": "scheduler",
+      "group": "a1ba982f1e2167e3",
+      "order": 1,
+      "label": "Scheduler",
+      "width": 6,
+      "height": 1,
+      "outputField": "payload",
+      "locale": "en",
+      "timeZone": "America/Chicago",
+      "use24HourFormat": true,
+      "useNewTimePicker": false,
+      "storeName": "NONE",
+      "commandResponseMsgOutput": "fanOut",
+      "defaultLocation": "",
+      "defaultLocationType": "env",
+      "sendStateInterval": "5",
+      "sendActiveState": true,
+      "sendInactiveState": true,
+      "topics": [
+          "Topic 1"
+      ],
+      "customPayloads": [
+          {
+              "label": "test",
+              "value": "test",
+              "type": "str",
+              "id": "f56a6c2cc2ff72c7"
+          }
+      ],
+      "outputs": 2,
+      "options": [],
+      "x": 780,
+      "y": 680,
+      "wires": [
+          [],
+          []
+      ]
+  },
+  {
+      "id": "3463d87e74ad75a3",
+      "type": "change",
+      "z": "fbbaa338350e1589",
+      "name": "",
+      "rules": [
+          {
+              "t": "set",
+              "p": "payload",
+              "pt": "msg",
+              "to": "{\"command\": \"add\", \"schedule\":[{   \"name\": \"Schedule\",   \"topic\": \"Topic 1\",   \"enabled\": true,   \"scheduleType\": \"time\",   \"period\": \"daily\",   \"time\": \"00:00\",   \"timespan\": false,   \"days\": [     \"sunday\",     \"monday\",     \"tuesday\",     \"wednesday\",     \"thursday\",     \"friday\",     \"saturday\"   ],   \"payloadType\": true,   \"payloadValue\": true,   \"isDynamic\": true }]}",
+              "tot": "json"
+          }
+      ],
+      "action": "",
+      "property": "",
+      "from": "",
+      "to": "",
+      "reg": false,
+      "x": 620,
+      "y": 640,
+      "wires": [
+          [
+              "33ac17d273a52d97"
+          ]
+      ]
+  },
+  {
+      "id": "c4ea3dc9798d8605",
+      "type": "ui-button",
+      "z": "fbbaa338350e1589",
+      "group": "7df21a2733c54bb1",
+      "name": "Add Schedule",
+      "label": "Add Schedule",
+      "order": 1,
+      "width": 0,
+      "height": 0,
+      "emulateClick": false,
+      "tooltip": "",
+      "color": "",
+      "bgcolor": "",
+      "className": "",
+      "icon": "",
+      "iconPosition": "left",
+      "payload": "",
+      "payloadType": "str",
+      "topic": "topic",
+      "topicType": "msg",
+      "buttonColor": "",
+      "textColor": "",
+      "iconColor": "",
+      "enableClick": true,
+      "enablePointerdown": false,
+      "pointerdownPayload": "",
+      "pointerdownPayloadType": "str",
+      "enablePointerup": false,
+      "pointerupPayload": "",
+      "pointerupPayloadType": "str",
+      "x": 380,
+      "y": 640,
+      "wires": [
+          [
+              "3463d87e74ad75a3"
+          ]
+      ]
+  },
+  {
+      "id": "node-red-http-in-store-context",
+      "type": "http in",
+      "z": "node-red-tab-helper-api",
+      "name": "",
+      "url": "/context/flow",
+      "method": "get",
+      "upload": false,
+      "swaggerDoc": "",
+      "x": 130,
+      "y": 50,
+      "wires": [
+          [
+              "fcn-store-context"
+          ]
+      ]
+  },
+  {
+      "id": "fcn-store-context",
+      "type": "function",
+      "z": "node-red-tab-helper-api",
+      "name": "function 1",
+      "func": "msg.payload = {} \n\nconst key = msg.req.query?.key || 'msg'\n\nconst body = {}\nbody[key] = global.get(key)\n\nmsg.payload = body\nreturn msg;",
+      "outputs": 1,
+      "timeout": 0,
+      "noerr": 0,
+      "initialize": "",
+      "finalize": "",
+      "libs": [],
+      "x": 300,
+      "y": 50,
+      "wires": [
+          [
+              "node-red-http-out-store-context"
+          ]
+      ]
+  },
+  {
+      "id": "node-red-http-out-store-context",
+      "type": "http response",
+      "z": "node-red-tab-helper-api",
+      "name": "",
+      "statusCode": "",
+      "headers": {},
+      "x": 430,
+      "y": 50,
+      "wires": []
+  },
+  {
+      "id": "node-red-http-in-reset-context",
+      "type": "http in",
+      "z": "node-red-tab-helper-api",
+      "name": "",
+      "url": "/context/reset",
+      "method": "post",
+      "upload": false,
+      "swaggerDoc": "",
+      "x": 130,
+      "y": 100,
+      "wires": [
+          [
+              "fcn-reset-context"
+          ]
+      ]
+  },
+  {
+      "id": "fcn-reset-context",
+      "type": "function",
+      "z": "node-red-tab-helper-api",
+      "name": "function 2",
+      "func": "global.set('msg', undefined)\nreturn msg;",
+      "outputs": 1,
+      "timeout": 0,
+      "noerr": 0,
+      "initialize": "",
+      "finalize": "",
+      "libs": [],
+      "x": 300,
+      "y": 100,
+      "wires": [
+          [
+              "node-red-http-out-reset-context"
+          ]
+      ]
+  },
+  {
+      "id": "node-red-http-out-reset-context",
+      "type": "http response",
+      "z": "node-red-tab-helper-api",
+      "name": "",
+      "statusCode": "",
+      "headers": {},
+      "x": 430,
+      "y": 100,
+      "wires": []
+  },
+  {
+      "id": "http-in-store-global",
+      "type": "http in",
+      "z": "node-red-tab-helper-api",
+      "name": "",
+      "url": "/context/global",
+      "method": "post",
+      "upload": false,
+      "swaggerDoc": "",
+      "x": 140,
+      "y": 160,
+      "wires": [
+          [
+              "fcn-store-global"
+          ]
+      ]
+  },
+  {
+      "id": "fcn-store-global",
+      "type": "function",
+      "z": "node-red-tab-helper-api",
+      "name": "Set Global Var",
+      "func": "function createNestedObject(keys, value) {\n    const keyParts = keys.split('.');\n    const result = {};\n    let current = result;\n\n    for (let i = 0; i < keyParts.length; i++) {\n        const key = keyParts[i];\n        if (i === keyParts.length - 1) {\n            current[key] = value;\n        } else {\n            current[key] = {};\n            current = current[key];\n        }\n    }\n\n    return result;\n}\n\nconst keys = msg.payload.key.split('.')\n\nif (keys.length > 1) {\n    const nested = createNestedObject(msg.payload.key, msg.payload.value)\n    global.set(keys[0], nested[keys[0]])\n} else {\n    global.set(msg.payload.key, msg.payload.value)\n}\nreturn msg;",
+      "outputs": 1,
+      "timeout": 0,
+      "noerr": 0,
+      "initialize": "",
+      "finalize": "",
+      "libs": [],
+      "x": 340,
+      "y": 160,
+      "wires": [
+          [
+              "http-out-store-global"
+          ]
+      ]
+  },
+  {
+      "id": "http-out-store-global",
+      "type": "http response",
+      "z": "node-red-tab-helper-api",
+      "name": "",
+      "statusCode": "",
+      "headers": {},
+      "x": 490,
+      "y": 160,
+      "wires": []
+  }
+]

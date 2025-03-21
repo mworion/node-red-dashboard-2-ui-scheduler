@@ -19,7 +19,7 @@
                 class="pl-3" @click.stop="toggleAllSchedules"
             />
 
-            <v-btn @click="openDialog()">
+            <v-btn id="nrdb2-ui-scheduler-new-schedule-button" @click="openDialog()">
                 <v-icon>mdi-plus</v-icon>
             </v-btn>
             <v-menu>
@@ -112,6 +112,7 @@
                     </template>
                     <template v-else>
                         <v-switch
+                            id="nrdb2-ui-scheduler-schedule-enable-switch"
                             v-model="item.enabled" :disabled="item.invalid" color="green" hide-details
                             @click.stop="toggleSchedule(item)"
                         />
@@ -136,7 +137,8 @@
                                         <em>No item selected</em>
                                     </div>
                                     <v-btn
-                                        v-if="item" icon color="primary" :disabled="item.isStatic || item.readonly"
+                                        v-if="item"
+                                        id="nrdb2-ui-scheduler-edit-schedule-button" icon color="primary" :disabled="item.isStatic || item.readonly"
                                         @click="editSchedule(item)"
                                     >
                                         <v-icon>mdi-pencil</v-icon>
@@ -460,13 +462,13 @@
                             v-model="enabled" :disabled="invalid" :label="enabled ? t('enabled') : t('disabled')"
                             :color="enabled ? 'green' : 'default'" required class="mr-2"
                         />
-                        <v-btn v-if="isEditing" icon variant="plain" color="blue" @click="openExportDialog()">
+                        <v-btn v-if="isEditing" id="nrdb2-ui-scheduler-export-schedule-button" icon variant="plain" color="blue" @click="openExportDialog()">
                             <v-icon>mdi-export</v-icon>
                         </v-btn>
-                        <v-btn v-if="!isEditing" icon variant="plain" color="green" @click="openImportDialog()">
+                        <v-btn v-if="!isEditing" id="nrdb2-ui-scheduler-import-schedule-button" icon variant="plain" color="green" @click="openImportDialog()">
                             <v-icon>mdi-import</v-icon>
                         </v-btn>
-                        <v-btn v-if="isEditing" icon color="red-lighten-1" @click="openDeleteDialog()">
+                        <v-btn v-if="isEditing" id="nrdb2-ui-scheduler-delete-schedule-button" icon color="red-lighten-1" @click="openDeleteDialog()">
                             <v-icon>mdi-delete</v-icon>
                         </v-btn>
                     </div>
@@ -475,7 +477,8 @@
                     <v-row justify="center">
                         <v-col cols="12" class="pt-0">
                             <v-text-field
-                                v-if="!isEditing" v-model="name" :label="t('scheduleName')"
+                                v-if="!isEditing" id="nrdb2-ui-scheduler-schedule-name-input" v-model="name"
+                                :label="t('scheduleName')"
                                 :rules="[rules.required]" required :disabled="isEditing"
                             >
                                 <template #append-inner>
@@ -1107,7 +1110,7 @@
             <v-card>
                 <v-card-title class="text-h5"> {{ t('importSchedule') }}</v-card-title>
                 <v-card-text>
-                    <v-textarea v-model="importText" :label="t('pasteJSONSchedule')" rows="10" auto-grow />
+                    <v-textarea id="nrdb2-ui-scheduler-import-schedule-textarea"v-model="importText" :label="t('pasteJSONSchedule')" rows="10" auto-grow />
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
