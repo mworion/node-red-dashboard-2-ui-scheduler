@@ -7,7 +7,7 @@
                 :class="['truncate-text', { 'text-body-1': selectedTopic !== 'All' && $vuetify.display.xs }]"
                 :style="{ margin: (selectedTopic !== 'All' && $vuetify.display.xs) ? '2px !important' : '20px' }"
             >
-                {{ props.label }}
+                {{ label }}
             </v-toolbar-title>
             <v-select
                 v-model="selectedTopic" :items="['All', ...uniqueTopics]" :label="t('topic')"
@@ -1349,7 +1349,10 @@ export default {
 
     computed: {
         ...mapState('data', ['messages']),
-
+        label: function () {
+            // Sanitize the html to avoid XSS attacks
+            return this.getProperty('label')
+        },
         // Validation rules
         rules () {
             return {
@@ -1687,9 +1690,9 @@ export default {
         onLoad (msg) {
             if (msg) {
                 this.$store.commit('data/bind', { widgetId: this.id, msg })
-                if (msg.payload !== undefined) {
-                    this.updateDynamicProperty('schedules', msg.payload?.schedules || [])
-                }
+                // if (msg.payload !== undefined) {
+                //     this.updateDynamicProperty('schedules', msg.payload?.schedules || [])
+                // }
             }
         },
         onInput (msg) {
@@ -1736,11 +1739,18 @@ export default {
             }
         },
         onDynamicProperties (msg) {
+            this.$store.commit('data/bind', { widgetId: this.id, msg })
             const updates = msg.ui_update
             if (!updates) {
                 return
             }
-            this.updateDynamicProperty('schedules', updates.schedules)
+            if (updates.schedules) {
+                this.updateDynamicProperty('schedules', updates.schedules)
+                console.log(msg)
+            }
+            if (updates.label) {
+                this.updateDynamicProperty('label', updates.label)
+            }
         },
         isRowExpanded (item) { return this.expanded.includes(item.name) },
         highlightExpandedRow () { const rows = this.$el.querySelectorAll('tr'); rows.forEach(row => { const itemName = row.querySelector('td:first-child')?.textContent.trim(); if (this.expanded.includes(itemName)) { row.classList.add('highlighted-row') } else { row.classList.remove('highlighted-row') } }) },

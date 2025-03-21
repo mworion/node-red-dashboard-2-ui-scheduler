@@ -5265,8 +5265,8 @@ module.exports = function (RED) {
                             base.stores.state.set(base, node, msg, 'schedules', update.schedules)
                         }
                     }
-                    return msg
                 }
+                return msg
             }
         }
 
