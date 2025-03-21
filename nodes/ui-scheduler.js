@@ -1991,6 +1991,9 @@ module.exports = function (RED) {
         node.postponeSerialisation = true
         checkForUpdate(version, packageName, (result) => {
             if (result) {
+                node.updateAvailable = config.updateAvailable = result.updateAvailable
+                node.currentVersion = config.currentVersion = result.currentVersion
+                node.latestVersion = config.latestVersion = result.latestVersion
                 const m = { payload: { updateResult: { ...result } } }
                 base.emit('msg-input:' + node.id, m, node)
             } else {
@@ -5244,7 +5247,14 @@ module.exports = function (RED) {
                     } else if (msg.action === 'checkUpdate') {
                         checkForUpdate(version, packageName, (result) => {
                             if (result) {
+                                node.updateAvailable = config.updateAvailable = result.updateAvailable
+                                node.currentVersion = config.currentVersion = result.currentVersion
+                                node.latestVersion = config.latestVersion = result.latestVersion
+
                                 const m = { payload: { updateResult: { ...result } }, event: 'updateCheck' }
+                                if (msg.silent) {
+                                    m.silent = true
+                                }
                                 base.emit('msg-input:' + node.id, m, node)
                             } else {
                                 console.log('Failed to check for updates.')

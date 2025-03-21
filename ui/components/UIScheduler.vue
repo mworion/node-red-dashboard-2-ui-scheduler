@@ -1110,7 +1110,7 @@
             <v-card>
                 <v-card-title class="text-h5"> {{ t('importSchedule') }}</v-card-title>
                 <v-card-text>
-                    <v-textarea id="nrdb2-ui-scheduler-import-schedule-textarea"v-model="importText" :label="t('pasteJSONSchedule')" rows="10" auto-grow />
+                    <v-textarea id="nrdb2-ui-scheduler-import-schedule-textarea" v-model="importText" :label="t('pasteJSONSchedule')" rows="10" auto-grow />
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
@@ -1697,6 +1697,11 @@ export default {
                 //     this.updateDynamicProperty('schedules', msg.payload?.schedules || [])
                 // }
             }
+            const updateCheck = {
+                action: 'checkUpdate',
+                silent: true
+            }
+            this.$socket.emit('widget-action', this.id, updateCheck)
         },
         onInput (msg) {
             this.$store.commit('data/bind', { widgetId: this.id, msg })
@@ -1721,15 +1726,16 @@ export default {
                 if (msg.event === 'updateCheck') {
                     const currentVersionLabel = this.t('currentVersion')
                     const latestVersionLabel = this.t('latestVersion')
-
-                    if (this.isUpdateAvailable) {
-                        alert(
-                            `${this.t('updateAvailable')}. ${currentVersionLabel}: ${update.currentVersion}, ${latestVersionLabel}: ${update.latestVersion}`
-                        )
-                    } else {
-                        alert(
-                            `${this.t('noUpdateAvailable')}. ${currentVersionLabel}: ${update.currentVersion}, ${latestVersionLabel}: ${update.latestVersion}`
-                        )
+                    if (!msg.silent) {
+                        if (this.isUpdateAvailable) {
+                            alert(
+                                `${this.t('updateAvailable')}. ${currentVersionLabel}: ${update.currentVersion}, ${latestVersionLabel}: ${update.latestVersion}`
+                            )
+                        } else {
+                            alert(
+                                `${this.t('noUpdateAvailable')}. ${currentVersionLabel}: ${update.currentVersion}, ${latestVersionLabel}: ${update.latestVersion}`
+                            )
+                        }
                     }
                 }
             }
@@ -1749,7 +1755,6 @@ export default {
             }
             if (updates.schedules) {
                 this.updateDynamicProperty('schedules', updates.schedules)
-                console.log(msg)
             }
             if (updates.label) {
                 this.updateDynamicProperty('label', updates.label)
