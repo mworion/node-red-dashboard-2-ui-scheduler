@@ -27,11 +27,11 @@ This node is still in beta and is not yet ready for production use. Any contribu
 - 📦 **Custom Payloads:** Attach custom payloads to your schedules for tailored automation.
 - 🌐 **Multi-Language Translations:** Available in multiple languages:
   - 🇬🇧 English
-  - 🇩🇪 German
-  - 🇫🇷 French
-  - 🇮🇹 Italian
-  - 🇳🇱 Dutch
-  - 🇪🇸 Spanish
+  - 🇩🇪 Deutsch
+  - 🇫🇷 Français
+  - 🇮🇹 Italiano
+  - 🇳🇱 Nederlands
+  - 🇪🇸 Español
 
 ![Overview](https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/blob/40658aef518f54a6068e5eb9bfc79029e86b4c16/assets/overview.png?raw=true)
 
