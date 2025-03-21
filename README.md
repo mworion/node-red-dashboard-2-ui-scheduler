@@ -41,7 +41,6 @@ This node is still in beta and is not yet ready for production use. Any contribu
 </div>
 
 
-
 ## 📦Installation
 
 You can install this node directly from the "Manage Palette" menu in the Node-RED interface.
