@@ -23,6 +23,7 @@
 
   "cron": "Cron",
   "cronExpression": "Cron-expressie",
+  "cronInfo": "Cron-info",
 
   "error": "Fout",
   "editSchedule": "Bewerk schema",

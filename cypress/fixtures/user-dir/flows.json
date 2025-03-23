@@ -45,6 +45,19 @@
         "disabled": false
     },
     {
+        "id": "4f87d7d9fab04a9d",
+        "type": "ui-group",
+        "name": "Scheduler Dynamic Properties",
+        "page": "dashboard-ui-page-1",
+        "width": "6",
+        "height": "1",
+        "order": 2,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    },
+    {
         "id": "a1ba982f1e2167e3",
         "type": "ui-group",
         "name": "Scheduler Main",
@@ -65,7 +78,7 @@
         "page": "dashboard-ui-page-1",
         "width": 6,
         "height": 1,
-        "order": 2,
+        "order": 3,
         "showTitle": true,
         "className": "",
         "visible": "true",
@@ -86,7 +99,6 @@
         "locale": "en",
         "timeZone": "America/Chicago",
         "use24HourFormat": true,
-        "useNewTimePicker": false,
         "storeName": "NONE",
         "commandResponseMsgOutput": "fanOut",
         "defaultLocation": "",
@@ -107,11 +119,51 @@
         ],
         "outputs": 2,
         "options": [],
-        "x": 540,
-        "y": 200,
+        "uiOptionTime": true,
+        "uiOptionSolar": true,
+        "uiOptionCron": true,
+        "uiOptionMinute": true,
+        "uiOptionHour": true,
+        "uiOptionDay": true,
+        "uiOptionWeek": true,
+        "uiOptionMonth": true,
+        "uiOptionYear": true,
+        "uiOptionTopic": true,
+        "uiOptionTimespan": true,
+        "uiOptionCustomOutput": true,
+        "uiOptionNewTimePicker": false,
+        "x": 600,
+        "y": 120,
         "wires": [
             [],
             []
+        ]
+    },
+    {
+        "id": "3463d87e74ad75a3",
+        "type": "change",
+        "z": "fbbaa338350e1589",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "{\"command\": \"add\", \"schedule\":[{   \"name\": \"Schedule\",   \"topic\": \"Topic 1\",   \"enabled\": true,   \"scheduleType\": \"time\",   \"period\": \"daily\",   \"time\": \"00:00\",   \"timespan\": false,   \"days\": [     \"sunday\",     \"monday\",     \"tuesday\",     \"wednesday\",     \"thursday\",     \"friday\",     \"saturday\"   ],   \"payloadType\": true,   \"payloadValue\": true,   \"isDynamic\": true }]}",
+                "tot": "json"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 420,
+        "y": 120,
+        "wires": [
+            [
+                "33ac17d273a52d97"
+            ]
         ]
     },
     {
@@ -146,37 +198,10 @@
         "pointerupPayload": "",
         "pointerupPayloadType": "str",
         "x": 200,
-        "y": 200,
+        "y": 120,
         "wires": [
             [
                 "3463d87e74ad75a3"
-            ]
-        ]
-    },
-    {
-        "id": "3463d87e74ad75a3",
-        "type": "change",
-        "z": "fbbaa338350e1589",
-        "name": "",
-        "rules": [
-            {
-                "t": "set",
-                "p": "payload",
-                "pt": "msg",
-                "to": "{\"command\": \"add\", \"schedule\":[{   \"name\": \"Schedule\",   \"topic\": \"Topic 1\",   \"enabled\": true,   \"scheduleType\": \"time\",   \"period\": \"daily\",   \"time\": \"00:00\",   \"timespan\": false,   \"days\": [     \"sunday\",     \"monday\",     \"tuesday\",     \"wednesday\",     \"thursday\",     \"friday\",     \"saturday\"   ],   \"payloadType\": true,   \"payloadValue\": true,   \"isDynamic\": true }]}",
-                "tot": "json"
-            }
-        ],
-        "action": "",
-        "property": "",
-        "from": "",
-        "to": "",
-        "reg": false,
-        "x": 380,
-        "y": 200,
-        "wires": [
-            [
-                "33ac17d273a52d97"
             ]
         ]
     }

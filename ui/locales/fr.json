@@ -23,6 +23,7 @@
 
   "cron": "Cron",
   "cronExpression": "Expression cron",
+  "cronInfo": "Infos cron",
 
   "error": "Erreur",
   "editSchedule": "Modifier l'horaire",

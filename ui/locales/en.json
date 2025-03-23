@@ -23,6 +23,7 @@
 
 "cron": "Cron",
 "cronExpression": "Cron Expression",
+"cronInfo": "Cron Info",
 
 "error": "Error",
 "editSchedule": "Edit Schedule",
