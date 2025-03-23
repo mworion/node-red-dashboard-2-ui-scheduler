@@ -4717,7 +4717,7 @@ module.exports = function (RED) {
                     const result = validateTimeTimespan(schedule, 'time or false for daily/weekly')
                     if (!result.valid) return result
                 } else if (schedule.period === 'monthly') {
-                // Monthly validation
+                    // Monthly validation
                     if (!Array.isArray(schedule.days) || schedule.days.length === 0) {
                         return { valid: false, message: RED._('ui-scheduler.error.daysRequiredForPeriod', { period: schedule.period }) }
                     }
@@ -4757,14 +4757,14 @@ module.exports = function (RED) {
                     const result = validateTimeTimespan(schedule, 'time or false for yearly')
                     if (!result.valid) return result
                 } else if (schedule.period === 'minutes') {
-                // Minutes validation
+                    // Minutes validation
                     if (typeof schedule.minutesInterval !== 'number') {
                         return { valid: false, message: RED._('ui-scheduler.error.minutesIntervalRequired') }
                     }
                     const result = validateDurationTimespan(schedule, 'ui-scheduler.error.minutesDurationRequired')
                     if (!result.valid) return result
                 } else if (schedule.period === 'hourly') {
-                // Hourly validation
+                    // Hourly validation
                     if (typeof schedule.hourlyInterval !== 'number') {
                         return { valid: false, message: RED._('ui-scheduler.error.hourlyIntervalRequired') }
                     }

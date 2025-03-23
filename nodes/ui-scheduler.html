@@ -78,7 +78,7 @@ copies or substantial portions of the Software.
         const dayOfWeekOpts = arrayToOptions(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'])
 
         // Convert an array of values to options to append to select input
-        function arrayToOptions (opts, values) {
+        function arrayToOptions(opts, values) {
             let inputOpts = ''
             for (let i = 0; i < opts.length; i++) {
                 let value = opts[i]
@@ -89,7 +89,7 @@ copies or substantial portions of the Software.
         }
 
         // Convert an integer range to options to append to select input
-        function rangeToOptions (start, end, isClock) {
+        function rangeToOptions(start, end, isClock) {
             let inputOpts = ''; let label
             for (let i = start; i <= end; i++) {
                 if (isClock && i < 10) label = '0' + i
@@ -100,7 +100,7 @@ copies or substantial portions of the Software.
         }
 
         // Add input elements to UI as defined in cronInputs
-        function addInputElements ($baseEl, inputObj, onFinish) {
+        function addInputElements($baseEl, inputObj, onFinish) {
             $(cronInputs.container).addClass(inputObj.tag).appendTo($baseEl)
             $baseEl.children('.' + inputObj.tag).append(inputObj.inputs)
             if (typeof onFinish === 'function') onFinish()
@@ -116,43 +116,43 @@ copies or substantial portions of the Software.
                 $selector.siblings('div.cron-start-time').show()
                 $selector.siblings('div.cron-start-time').children('select.cron-clock-hour').val('12')
                 switch (period) {
-                case 'Minutes':
-                    $selector.siblings('div.cron-minutes')
-                        .show()
-                        .find('select.cron-minutes-select').val('1')
-                    $selector.siblings('div.cron-start-time').hide()
-                    break
-                case 'Hourly': {
-                    const $hourlyEl = $selector.siblings('div.cron-hourly')
-                    $hourlyEl.show()
-                        .find('input[name=hourlyType][value=every]').prop('checked', true)
-                    $hourlyEl.find('select.cron-hourly-hour').val('12')
-                    $selector.siblings('div.cron-start-time').hide()
-                }
-                    break
-                case 'Daily': {
-                    const $dailyEl = $selector.siblings('div.cron-daily')
-                    $dailyEl.show()
-                        .find('input[name=dailyType][value=every]').prop('checked', true)
-                }
-                    break
-                case 'Weekly':
-                    $selector.siblings('div.cron-weekly')
-                        .show()
-                        .find('input[type=checkbox]').prop('checked', false)
-                    break
-                case 'Monthly': {
-                    const $monthlyEl = $selector.siblings('div.cron-monthly')
-                    $monthlyEl.show()
-                        .find('input[name=monthlyType][value=byDay]').prop('checked', true)
-                }
-                    break
-                case 'Yearly': {
-                    const $yearlyEl = $selector.siblings('div.cron-yearly')
-                    $yearlyEl.show()
-                        .find('input[name=yearlyType][value=byDay]').prop('checked', true)
-                }
-                    break
+                    case 'Minutes':
+                        $selector.siblings('div.cron-minutes')
+                            .show()
+                            .find('select.cron-minutes-select').val('1')
+                        $selector.siblings('div.cron-start-time').hide()
+                        break
+                    case 'Hourly': {
+                        const $hourlyEl = $selector.siblings('div.cron-hourly')
+                        $hourlyEl.show()
+                            .find('input[name=hourlyType][value=every]').prop('checked', true)
+                        $hourlyEl.find('select.cron-hourly-hour').val('12')
+                        $selector.siblings('div.cron-start-time').hide()
+                    }
+                        break
+                    case 'Daily': {
+                        const $dailyEl = $selector.siblings('div.cron-daily')
+                        $dailyEl.show()
+                            .find('input[name=dailyType][value=every]').prop('checked', true)
+                    }
+                        break
+                    case 'Weekly':
+                        $selector.siblings('div.cron-weekly')
+                            .show()
+                            .find('input[type=checkbox]').prop('checked', false)
+                        break
+                    case 'Monthly': {
+                        const $monthlyEl = $selector.siblings('div.cron-monthly')
+                        $monthlyEl.show()
+                            .find('input[name=monthlyType][value=byDay]').prop('checked', true)
+                    }
+                        break
+                    case 'Yearly': {
+                        const $yearlyEl = $selector.siblings('div.cron-yearly')
+                        $yearlyEl.show()
+                            .find('input[name=yearlyType][value=byDay]').prop('checked', true)
+                    }
+                        break
                 }
             }
         }
@@ -233,102 +233,102 @@ copies or substantial portions of the Software.
                 let hour = base.$el.find('select.cron-clock-hour').val()
                 const period = base.$el.find('select.cron-period-select').val()
                 switch (period) {
-                case 'Minutes':
-                    {
-                        const $selector = base.$el.find('div.cron-minutes')
-                        const nmin = $selector.find('select.cron-minutes-select').val()
-                        if (nmin > 1) min = '0/' + nmin
-                        else min = '*'
-                        hour = '*'
-                    }
-                    break
-
-                case 'Hourly':
-                    {
-                        const $selector = base.$el.find('div.cron-hourly')
-                        if ($selector.find('input[name=hourlyType][value=every]').is(':checked')) {
-                            min = 0
+                    case 'Minutes':
+                        {
+                            const $selector = base.$el.find('div.cron-minutes')
+                            const nmin = $selector.find('select.cron-minutes-select').val()
+                            if (nmin > 1) min = '0/' + nmin
+                            else min = '*'
                             hour = '*'
-                            const nhour = $selector.find('select.cron-hourly-select').val()
-                            if (nhour > 1) hour = '0/' + nhour
-                        } else {
-                            min = $selector.find('select.cron-hourly-minute').val()
-                            hour = $selector.find('select.cron-hourly-hour').val()
                         }
-                    }
-                    break
+                        break
 
-                case 'Daily':
-                    {
-                        const $selector = base.$el.find('div.cron-daily')
-                        if ($selector.find('input[name=dailyType][value=every]').is(':checked')) {
-                            const ndom = $selector.find('select.cron-daily-select').val()
-                            if (ndom > 1) dom = '1/' + ndom
-                        } else {
+                    case 'Hourly':
+                        {
+                            const $selector = base.$el.find('div.cron-hourly')
+                            if ($selector.find('input[name=hourlyType][value=every]').is(':checked')) {
+                                min = 0
+                                hour = '*'
+                                const nhour = $selector.find('select.cron-hourly-select').val()
+                                if (nhour > 1) hour = '0/' + nhour
+                            } else {
+                                min = $selector.find('select.cron-hourly-minute').val()
+                                hour = $selector.find('select.cron-hourly-hour').val()
+                            }
+                        }
+                        break
+
+                    case 'Daily':
+                        {
+                            const $selector = base.$el.find('div.cron-daily')
+                            if ($selector.find('input[name=dailyType][value=every]').is(':checked')) {
+                                const ndom = $selector.find('select.cron-daily-select').val()
+                                if (ndom > 1) dom = '1/' + ndom
+                            } else {
+                                dom = '?'
+                                dow = 'MON-FRI'
+                            }
+                        }
+                        break
+
+                    case 'Weekly':
+                        {
+                            const $selector = base.$el.find('div.cron-weekly')
+                            const ndow = []
+                            if ($selector.find('input[name=dayOfWeekMon]').is(':checked')) { ndow.push('MON') }
+                            if ($selector.find('input[name=dayOfWeekTue]').is(':checked')) { ndow.push('TUE') }
+                            if ($selector.find('input[name=dayOfWeekWed]').is(':checked')) { ndow.push('WED') }
+                            if ($selector.find('input[name=dayOfWeekThu]').is(':checked')) { ndow.push('THU') }
+                            if ($selector.find('input[name=dayOfWeekFri]').is(':checked')) { ndow.push('FRI') }
+                            if ($selector.find('input[name=dayOfWeekSat]').is(':checked')) { ndow.push('SAT') }
+                            if ($selector.find('input[name=dayOfWeekSun]').is(':checked')) { ndow.push('SUN') }
+                            dow = '*'
                             dom = '?'
-                            dow = 'MON-FRI'
+                            if (ndow.length < 7 && ndow.length > 0) dow = ndow.join(',')
                         }
-                    }
-                    break
+                        break
 
-                case 'Weekly':
-                    {
-                        const $selector = base.$el.find('div.cron-weekly')
-                        const ndow = []
-                        if ($selector.find('input[name=dayOfWeekMon]').is(':checked')) { ndow.push('MON') }
-                        if ($selector.find('input[name=dayOfWeekTue]').is(':checked')) { ndow.push('TUE') }
-                        if ($selector.find('input[name=dayOfWeekWed]').is(':checked')) { ndow.push('WED') }
-                        if ($selector.find('input[name=dayOfWeekThu]').is(':checked')) { ndow.push('THU') }
-                        if ($selector.find('input[name=dayOfWeekFri]').is(':checked')) { ndow.push('FRI') }
-                        if ($selector.find('input[name=dayOfWeekSat]').is(':checked')) { ndow.push('SAT') }
-                        if ($selector.find('input[name=dayOfWeekSun]').is(':checked')) { ndow.push('SUN') }
-                        dow = '*'
-                        dom = '?'
-                        if (ndow.length < 7 && ndow.length > 0) dow = ndow.join(',')
-                    }
-                    break
-
-                case 'Monthly':
-                    {
-                        const $selector = base.$el.find('div.cron-monthly')
-                        let nmonth
-                        let mnd
-                        if ($selector.find('input[name=monthlyType][value=byDay]').is(':checked')) {
-                            month = '*'
-                            nmonth = $selector.find('select.cron-monthly-month').val()
-                            dom = $selector.find('select.cron-monthly-day').val()
-                            dow = '?'
-                        } else {
-                            mnd = $selector.find('select.cron-monthly-nth-day').val()
-                            dow = $selector.find('select.cron-monthly-day-of-week').val() +
+                    case 'Monthly':
+                        {
+                            const $selector = base.$el.find('div.cron-monthly')
+                            let nmonth
+                            let mnd
+                            if ($selector.find('input[name=monthlyType][value=byDay]').is(':checked')) {
+                                month = '*'
+                                nmonth = $selector.find('select.cron-monthly-month').val()
+                                dom = $selector.find('select.cron-monthly-day').val()
+                                dow = '?'
+                            } else {
+                                mnd = $selector.find('select.cron-monthly-nth-day').val()
+                                dow = $selector.find('select.cron-monthly-day-of-week').val() +
                                     (mnd === 'L' ? 'L' : '#' + mnd)
-                            nmonth = $selector.find('select.cron-monthly-month-by-week').val()
-                            dom = '?'
+                                nmonth = $selector.find('select.cron-monthly-month-by-week').val()
+                                dom = '?'
+                            }
+                            if (nmonth > 1) month = '1/' + nmonth
                         }
-                        if (nmonth > 1) month = '1/' + nmonth
-                    }
-                    break
+                        break
 
-                case 'Yearly':
-                    {
-                        const $selector = base.$el.find('div.cron-yearly')
-                        let ynd
-                        if ($selector.find('input[name=yearlyType][value=byDay]').is(':checked')) {
-                            dom = $selector.find('select.cron-yearly-day').val()
-                            month = $selector.find('select.cron-yearly-month').val()
-                            dow = '?'
-                        } else {
-                            ynd = $selector.find('select.cron-yearly-nth-day').val()
-                            dow = $selector.find('select.cron-yearly-day-of-week').val() +
+                    case 'Yearly':
+                        {
+                            const $selector = base.$el.find('div.cron-yearly')
+                            let ynd
+                            if ($selector.find('input[name=yearlyType][value=byDay]').is(':checked')) {
+                                dom = $selector.find('select.cron-yearly-day').val()
+                                month = $selector.find('select.cron-yearly-month').val()
+                                dow = '?'
+                            } else {
+                                ynd = $selector.find('select.cron-yearly-nth-day').val()
+                                dow = $selector.find('select.cron-yearly-day-of-week').val() +
                                     (ynd === 'L' ? 'L' : '#' + ynd)
-                            month = $selector.find('select.cron-yearly-month-by-week').val()
-                            dom = '?'
+                                month = $selector.find('select.cron-yearly-month-by-week').val()
+                                dom = '?'
+                            }
                         }
-                    }
-                    break
+                        break
 
-                default:
-                    break
+                    default:
+                        break
                 }
                 return [sec, min, hour, dom, month, dow, year].join(' ')
             }
@@ -351,7 +351,7 @@ copies or substantial portions of the Software.
     }(jQuery));
 
     (function () {
-        function hasProperty (obj, prop) {
+        function hasProperty(obj, prop) {
             return Object.prototype.hasOwnProperty.call(obj, prop)
         }
 
@@ -359,7 +359,7 @@ copies or substantial portions of the Software.
         let map, mapPopup, selectedLocation, selectedLocationInput
         const filesAdded = [] // list of files already added
 
-        function toggleFullscreen (selector, callback) {
+        function toggleFullscreen(selector, callback) {
             callback = callback || function () { }
             const el = document.querySelector(selector || '#node-ui-scheduler-tab-static-schedules')
             const $el = $(el)
@@ -386,7 +386,7 @@ copies or substantial portions of the Software.
             }
         }
 
-        function checkLoadJsCssFile (filename, filetype, callback) {
+        function checkLoadJsCssFile(filename, filetype, callback) {
             if (filesAdded.indexOf(filename) === -1) {
                 loadJsCssFile(filename, filetype, function () {
                     filesAdded.push(filename)
@@ -397,7 +397,7 @@ copies or substantial portions of the Software.
             }
         }
 
-        function loadJsCssFile (filename, filetype, callback) {
+        function loadJsCssFile(filename, filetype, callback) {
             let fileRef
             if (filetype === 'js') { // if filename is a external JavaScript file
                 fileRef = document.createElement('script')
@@ -416,7 +416,7 @@ copies or substantial portions of the Software.
             }
         }
 
-        function generateUniqueId (length = 16) {
+        function generateUniqueId(length = 16) {
             const characters = 'abcdef0123456789'
             let result = ''
             for (let i = 0; i < length; i++) {
@@ -426,7 +426,8 @@ copies or substantial portions of the Software.
             return result
         }
 
-        function safeFloat (value, def) {
+
+        function safeFloat(value, def) {
             if ((undefined === value) || (value === null)) {
                 return def || 0.0
             }
@@ -441,7 +442,7 @@ copies or substantial portions of the Software.
             return value
         }
 
-        function isCronLike (expression) {
+        function isCronLike(expression) {
             if (typeof expression !== 'string') return false
             if (expression.indexOf('*') >= 0) return true
             const cleaned = expression.replace(/\s\s+/g, ' ')
@@ -449,7 +450,7 @@ copies or substantial portions of the Software.
             return spaces.length >= 4 && spaces.length <= 6
         }
 
-        function isDateSequenceLike (expression) {
+        function isDateSequenceLike(expression) {
             try {
                 if (typeof expression !== 'string') return false
                 if (expression.indexOf('*') >= 0) return false
@@ -470,7 +471,7 @@ copies or substantial portions of the Software.
             }
         }
 
-        function showSidebarHelpPanel () {
+        function showSidebarHelpPanel() {
             if (RED.sidebar.help) {
                 RED.sidebar.help.show()//  >= V1.1.0
             } else {
@@ -478,12 +479,12 @@ copies or substantial portions of the Software.
             }
         }
 
-        function showCronHelp () {
+        function showCronHelp() {
             showSidebarHelpPanel()
             $('#ui-scheduler-expression-info').get(0).scrollIntoView()
         }
 
-        function showSolarHelp () {
+        function showSolarHelp() {
             showSidebarHelpPanel()
             $('#ui-scheduler-solar-events-info').get(0).scrollIntoView()
         }
@@ -492,7 +493,7 @@ copies or substantial portions of the Software.
             return Math.min(800, ($(document).height() < 600) ? $(document).height() - 30 : $(document).height() - 100)
         }
 
-        function initMap () {
+        function initMap() {
             // create map popup dialog
             $('#ui-scheduler-map-dialog').dialog({
                 classes: {
@@ -548,7 +549,7 @@ copies or substantial portions of the Software.
             })
         }
 
-        function createMap (srcInput) {
+        function createMap(srcInput) {
             if (RED._cron_plus_debug) {
                 console.log('createMap', srcInput)
             }
@@ -562,7 +563,7 @@ copies or substantial portions of the Software.
             $('.ui-scheduler-map-not-loaded').hide()
             let lat, lon
             selectedLocationInput = srcInput
-            function getInputValue () {
+            function getInputValue() {
                 if (selectedLocationInput.typedInput('instance')) {
                     return selectedLocationInput.typedInput('value')
                 }
@@ -624,7 +625,7 @@ copies or substantial portions of the Software.
                 showMapPopup(content, e.latlng.lat, e.latlng.lng, map)
             })
 
-            function showMapPopup (content, lat, lon, map) {
+            function showMapPopup(content, lat, lon, map) {
                 mapPopup
                     .setLatLng([lat, lon])
                     .setContent(content)
@@ -667,7 +668,7 @@ copies or substantial portions of the Software.
                 })
         }
 
-        function showMap (srcInput) {
+        function showMap(srcInput) {
             $('#ui-scheduler-map-dialog').dialog('open')
             if (navigator.onLine === true) {
                 $('.ui-scheduler-map-not-loaded').show()
@@ -686,7 +687,7 @@ copies or substantial portions of the Software.
             }
         }
 
-        function updateEditorLayout () {
+        function updateEditorLayout() {
             onSchedulesExpandCompress()
 
             if (RED._cron_plus_debug) console.log('ui-scheduler-updateEditorLayout')
@@ -937,6 +938,7 @@ copies or substantial portions of the Software.
             hide: function () {
                 this.uiSelect.hide()
             }
+
         })
 
         RED.nodes.registerType('ui-scheduler', {
@@ -964,7 +966,6 @@ copies or substantial portions of the Software.
                 locale: { value: 'en' },
                 timeZone: { value: '' },
                 use24HourFormat: { value: false },
-                useNewTimePicker: { value: false },
                 storeName: { value: 'local_file_system' },
                 commandResponseMsgOutput: { value: 'fanOut' },
                 defaultLocation: { value: '' },
@@ -977,19 +978,15 @@ copies or substantial portions of the Software.
                     value: [{ value: '1', label: 'Custom 1', id: generateUniqueId(), type: 'str' }],
                     validate: function (v) {
                         if (!v) {
-                            console.log('Validation failed: null or undefined values array')
                             return false
                         }
 
                         const allNumValid = v.filter(o => o.type === 'num').every(o => o.value !== null && !isNaN(o.value))
                         if (!allNumValid) {
-                            console.log('Validation failed: num type values cannot be null or NaN')
                             return false
                         }
 
                         const allValid = v.every(o => o && (hasProperty(RED.validators, 'typedInput') ? RED.validators.typedInput(o.type) : true))
-                        console.log('allValid', allValid)
-                        console.log(v)
 
                         if (!allValid) {
                             return false
@@ -1047,6 +1044,139 @@ copies or substantial portions of the Software.
                         return true
                     },
                     required: true
+                },
+                uiOptionTime: {
+                    value: true,
+                    validate: function (v) {
+                        const uiOptionSolar = $('#node-input-uiOptionSolar').prop('checked') || this.uiOptionSolar;
+                        const uiOptionCron = $('#node-input-uiOptionCron').prop('checked') || this.uiOptionCron;
+
+                        const valid = v || uiOptionSolar || uiOptionCron;
+                        return valid;
+                    }
+                },
+                uiOptionSolar: {
+                    value: true,
+                    validate: function (v) {
+                        const uiOptionTime = $('#node-input-uiOptionTime').prop('checked') || this.uiOptionTime;
+                        const uiOptionCron = $('#node-input-uiOptionCron').prop('checked') || this.uiOptionCron;
+
+                        const valid = v || uiOptionTime || uiOptionCron;
+                        return valid;
+                    }
+                },
+                uiOptionCron: {
+                    value: true,
+                    validate: function (v) {
+                        const uiOptionTime = $('#node-input-uiOptionTime').prop('checked') || this.uiOptionTime;
+                        const uiOptionSolar = $('#node-input-uiOptionSolar').prop('checked') || this.uiOptionSolar;
+
+                        const valid = v || uiOptionTime || uiOptionSolar;
+                        return valid;
+                    },
+                },
+                uiOptionMinute: {
+                    value: true,
+                    validate: function (v) {
+                        const uiOptionTime = $('#node-input-uiOptionTime').prop('checked') || this.uiOptionTime;
+                        if (!uiOptionTime) {
+                            return true;
+                        }
+                        const uiOptionHour = $("#node-input-uiOptionHour").prop("checked") || this.uiOptionHour;
+                        const uiOptionDay = $("#node-input-uiOptionDay").prop("checked") || this.uiOptionDay;
+                        const uiOptionWeek = $("#node-input-uiOptionWeek").prop("checked") || this.uiOptionWeek;
+                        const uiOptionMonth = $("#node-input-uiOptionMonth").prop("checked") || this.uiOptionMonth;
+                        const uiOptionYear = $("#node-input-uiOptionYear").prop("checked") || this.uiOptionYear;
+                        // Valid if at least one is true:
+                        return v || uiOptionHour || uiOptionDay || uiOptionWeek || uiOptionMonth || uiOptionYear;
+                    }
+                },
+                uiOptionHour: {
+                    value: true,
+                    validate: function (v) {
+                        const uiOptionTime = $('#node-input-uiOptionTime').prop('checked') || this.uiOptionTime;
+                        if (!uiOptionTime) {
+                            return true;
+                        }
+                        const uiOptionMinute = $("#node-input-uiOptionMinute").prop("checked") || this.uiOptionMinute;
+                        const uiOptionDay = $("#node-input-uiOptionDay").prop("checked") || this.uiOptionDay;
+                        const uiOptionWeek = $("#node-input-uiOptionWeek").prop("checked") || this.uiOptionWeek;
+                        const uiOptionMonth = $("#node-input-uiOptionMonth").prop("checked") || this.uiOptionMonth;
+                        const uiOptionYear = $("#node-input-uiOptionYear").prop("checked") || this.uiOptionYear;
+                        return v || uiOptionMinute || uiOptionDay || uiOptionWeek || uiOptionMonth || uiOptionYear;
+                    }
+                },
+                uiOptionDay: {
+                    value: true,
+                    validate: function (v) {
+                        const uiOptionTime = $('#node-input-uiOptionTime').prop('checked') || this.uiOptionTime;
+                        if (!uiOptionTime) {
+                            return true;
+                        }
+                        const uiOptionMinute = $("#node-input-uiOptionMinute").prop("checked") || this.uiOptionMinute;
+                        const uiOptionHour = $("#node-input-uiOptionHour").prop("checked") || this.uiOptionHour;
+                        const uiOptionWeek = $("#node-input-uiOptionWeek").prop("checked") || this.uiOptionWeek;
+                        const uiOptionMonth = $("#node-input-uiOptionMonth").prop("checked") || this.uiOptionMonth;
+                        const uiOptionYear = $("#node-input-uiOptionYear").prop("checked") || this.uiOptionYear;
+                        return v || uiOptionMinute || uiOptionHour || uiOptionWeek || uiOptionMonth || uiOptionYear;
+                    }
+                },
+                uiOptionWeek: {
+                    value: true,
+                    validate: function (v) {
+                        const uiOptionTime = $('#node-input-uiOptionTime').prop('checked') || this.uiOptionTime;
+                        if (!uiOptionTime) {
+                            return true;
+                        }
+                        const uiOptionMinute = $("#node-input-uiOptionMinute").prop("checked") || this.uiOptionMinute;
+                        const uiOptionHour = $("#node-input-uiOptionHour").prop("checked") || this.uiOptionHour;
+                        const uiOptionDay = $("#node-input-uiOptionDay").prop("checked") || this.uiOptionDay;
+                        const uiOptionMonth = $("#node-input-uiOptionMonth").prop("checked") || this.uiOptionMonth;
+                        const uiOptionYear = $("#node-input-uiOptionYear").prop("checked") || this.uiOptionYear;
+                        return v || uiOptionMinute || uiOptionHour || uiOptionDay || uiOptionMonth || uiOptionYear;
+                    }
+                },
+                uiOptionMonth: {
+                    value: true,
+                    validate: function (v) {
+                        const uiOptionTime = $('#node-input-uiOptionTime').prop('checked') || this.uiOptionTime;
+                        if (!uiOptionTime) {
+                            return true;
+                        }
+                        const uiOptionMinute = $("#node-input-uiOptionMinute").prop("checked") || this.uiOptionMinute;
+                        const uiOptionHour = $("#node-input-uiOptionHour").prop("checked") || this.uiOptionHour;
+                        const uiOptionDay = $("#node-input-uiOptionDay").prop("checked") || this.uiOptionDay;
+                        const uiOptionWeek = $("#node-input-uiOptionWeek").prop("checked") || this.uiOptionWeek;
+                        const uiOptionYear = $("#node-input-uiOptionYear").prop("checked") || this.uiOptionYear;
+                        return v || uiOptionMinute || uiOptionHour || uiOptionDay || uiOptionWeek || uiOptionYear;
+                    }
+                },
+                uiOptionYear: {
+                    value: true,
+                    validate: function (v) {
+                        const uiOptionTime = $('#node-input-uiOptionTime').prop('checked') || this.uiOptionTime;
+                        if (!uiOptionTime) {
+                            return true;
+                        }
+                        const uiOptionMinute = $("#node-input-uiOptionMinute").prop("checked") || this.uiOptionMinute;
+                        const uiOptionHour = $("#node-input-uiOptionHour").prop("checked") || this.uiOptionHour;
+                        const uiOptionDay = $("#node-input-uiOptionDay").prop("checked") || this.uiOptionDay;
+                        const uiOptionWeek = $("#node-input-uiOptionWeek").prop("checked") || this.uiOptionWeek;
+                        const uiOptionMonth = $("#node-input-uiOptionMonth").prop("checked") || this.uiOptionMonth;
+                        return v || uiOptionMinute || uiOptionHour || uiOptionDay || uiOptionWeek || uiOptionMonth;
+                    }
+                },
+                uiOptionTopic: {
+                    value: true
+                },
+                uiOptionTimespan: {
+                    value: true
+                },
+                uiOptionCustomOutput: {
+                    value: true
+                },
+                uiOptionNewTimePicker: {
+                    value: false
                 }
             },
             inputs: 1,
@@ -1067,7 +1197,6 @@ copies or substantial portions of the Software.
             },
 
             oneditprepare: function () {
-                console.log(RED)
 
                 if (RED._cron_plus_debug) { console.log('oneditprepare - ui-scheduler') }
                 const node = this
@@ -1091,6 +1220,23 @@ copies or substantial portions of the Software.
                     })
                 }
 
+                $('.ui-scheduler-expand-button').on('click', function () {
+                    const content = $(this).closest('.ui-scheduler-advanced-options')
+                        .find('.ui-scheduler-options-content');
+                    const icon = $(this).find('i');
+
+                    content.slideToggle(200);
+                    icon.toggleClass('fa-caret-right fa-caret-down');
+
+                    const isExpanded = content.is(':visible');
+                    $('#node-input-advancedOptionsExpanded').val(isExpanded);
+                });
+
+                // Initialize from node properties
+                if ($('#node-input-advancedOptionsExpanded').val() === 'true') {
+                    $('.ui-scheduler-options-content').show();
+                    $('.ui-scheduler-expand-button i').addClass('fa-caret-down');
+                }
                 // set locale:
                 $('#node-input-locale').val(node.locale || 'en')
 
@@ -1166,7 +1312,7 @@ copies or substantial portions of the Software.
                     this.customPayloads = []
                 }
 
-                function isEmpty (value) {
+                function isEmpty(value) {
                     if (value === null || value === undefined) return true
                     if (typeof value === 'string' && value.trim() === '') return true
                     if (typeof value === 'number' && isNaN(value)) return true
@@ -1182,7 +1328,7 @@ copies or substantial portions of the Software.
                     $('#valWarning').show()
                 }
 
-                function generateCustomPayload (i, customPayload) {
+                function generateCustomPayload(i, customPayload) {
                     const container = $('<li/>', {
                         style: 'background: var(--red-ui-secondary-background, #fff); margin:0; padding:8px 0px 0px; border-bottom: 1px solid var(--red-ui-form-input-border-color, #ccc);'
                     })
@@ -1313,7 +1459,7 @@ copies or substantial portions of the Software.
                     $('#ui-scheduler-expression-builder').cronBuilder()
                 }
 
-                function StringBuilder () {
+                function StringBuilder() {
                     const strings = []
                     return {
                         push: function (value) {
@@ -1338,7 +1484,7 @@ copies or substantial portions of the Software.
                     }
                 }
 
-                function drawDynamicSchedulesTable (nodeId, table, spinner, options, callback) {
+                function drawDynamicSchedulesTable(nodeId, table, spinner, options, callback) {
                     if (RED._cron_plus_debug) console.log('drawDynamicSchedulesTable...')
                     const $table = $(table)
                     const $spinner = $(spinner)
@@ -1690,7 +1836,7 @@ copies or substantial portions of the Software.
                     makeSolarChoice('nadir', 'solar midnight', 'when the sun is closest to nadir and the night is equidistant from dusk and dawn')
                 ]
 
-                function isObject (o) {
+                function isObject(o) {
                     return (typeof o === 'object' && o !== null)
                 }
 
@@ -1755,7 +1901,7 @@ copies or substantial portions of the Software.
                     }
                 }
 
-                function updateItems () {
+                function updateItems() {
                     const topics = $('#node-input-topic-container').editableList('items')
                     topics.each(function (index) {
                         const current = node._('ui-scheduler.label.topic') + ' ' + (index + 1)
@@ -1789,7 +1935,7 @@ copies or substantial portions of the Software.
              * @param {integer} optionIndex An index number to use for defaults
              * @param {object} option The option object to update
             */
-                function applyOptionDefaults (optionIndex, option) {
+                function applyOptionDefaults(optionIndex, option) {
                     if (isObject(option) === false) {
                         return// no point in continuing
                     }
@@ -1831,10 +1977,10 @@ copies or substantial portions of the Software.
                  * @param {integer} optionIndex the index number of this schedule
                  * @param {object} option The option object to present
                 */
-                function generateOption (optionIndex, option) {
+                function generateOption(optionIndex, option) {
                     if (RED._cron_plus_debug) { console.log('generating option', optionIndex, option) }
                     applyOptionDefaults(optionIndex, option)
-                    function buildExpressionTip (title, desc, text, type) {
+                    function buildExpressionTip(title, desc, text, type) {
                         const helpFunc = type === 'solar' ? 'showSolarHelp();' : 'showCronHelp();'
                         const helpFuncPopOut = type === 'solar' ? "_popoutui-schedulerHelp('ui-scheduler-solar-events-info');" : "_popoutui-schedulerHelp('ui-scheduler-expression-info');"
                         const helpFuncHtml = '<span style="float: right">' +
@@ -1845,7 +1991,7 @@ copies or substantial portions of the Software.
                             '<hr><div>' + desc + '</div>' +
                             '<pre class="ui-scheduler-form-tip form-tips">' + text + '</pre></div>'
                     }
-                    function initTooltip (selector, type, pos) {
+                    function initTooltip(selector, type, pos) {
                         if (selector.typedInput('instance') && selector.typedInput('instance').input) {
                             selector = selector.typedInput('instance').input
                         }
@@ -2306,20 +2452,20 @@ copies or substantial portions of the Software.
                         const showLocationGroup = $('#node-input-defaultLocation').typedInput('type') === 'default' || !$('#node-input-defaultLocation').typedInput('type')
                         locationFieldDiv.toggleClass('ui-scheduler-hide-per-location', !showLocationGroup)
                         switch (value) {
-                        case 'solar':
-                            cell2Cron.hide()
-                            cell2Solar.show()
-                            break
-                        case 'dates':
-                            cell2Cron.show()
-                            cell2Solar.hide()
-                            expressionField.combobox('hideMenu')
-                            break
-                        default: // cron
-                            cell2Cron.show()
-                            cell2Solar.hide()
-                            expressionField.combobox('showMenu')
-                            break
+                            case 'solar':
+                                cell2Cron.hide()
+                                cell2Solar.show()
+                                break
+                            case 'dates':
+                                cell2Cron.show()
+                                cell2Solar.hide()
+                                expressionField.combobox('hideMenu')
+                                break
+                            default: // cron
+                                cell2Cron.show()
+                                cell2Solar.hide()
+                                expressionField.combobox('showMenu')
+                                break
                         }
                     })
                     scheduleTypeField.triggerHandler('change')
@@ -2394,6 +2540,149 @@ copies or substantial portions of the Software.
                     appendTo: $('#node-input-option-container')
                 })
 
+                // Set default values for UI Scheduler checkboxes
+                // Schedule Types
+                if (this.uiOptionTime === undefined) {
+                    $('#node-input-uiOptionTime').prop('checked', true);
+                }
+                if (this.uiOptionSolar === undefined) {
+                    $('#node-input-uiOptionSolar').prop('checked', true);
+                }
+                if (this.uiOptionCron === undefined) {
+                    $('#node-input-uiOptionCron').prop('checked', true);
+                }
+
+                // Periods
+                if (this.uiOptionMinute === undefined) {
+                    $('#node-input-uiOptionMinute').prop('checked', true);
+                }
+                if (this.uiOptionHour === undefined) {
+                    $('#node-input-uiOptionHour').prop('checked', true);
+                }
+                if (this.uiOptionDay === undefined) {
+                    $('#node-input-uiOptionDay').prop('checked', true);
+                }
+                if (this.uiOptionWeek === undefined) {
+                    $('#node-input-uiOptionWeek').prop('checked', true);
+                }
+                if (this.uiOptionMonth === undefined) {
+                    $('#node-input-uiOptionMonth').prop('checked', true);
+                }
+                if (this.uiOptionYear === undefined) {
+                    $('#node-input-uiOptionYear').prop('checked', true);
+                }
+
+                // Additional Options
+                if (this.uiOptionTopic === undefined) {
+                    $('#node-input-uiOptionTopic').prop('checked', true);
+                }
+                if (this.uiOptionTimespan === undefined) {
+                    $('#node-input-uiOptionTimespan').prop('checked', true);
+                }
+                if (this.uiOptionCustomOutput === undefined) {
+                    $('#node-input-uiOptionCustomOutput').prop('checked', true);
+                }
+                if (this.uiOptionNewTimePicker === undefined) {
+                    let value = false;
+                    if (this.useNewTimePicker !== undefined) {
+                        value = this.useNewTimePicker;
+                    }
+                    $('#node-input-uiOptionNewTimePicker').prop('checked', value);
+                }
+
+                function validateUIScheduleTypeOptions() {
+                    // Use .prop('checked') for checkboxes
+                    var uiOptionTime = $("#node-input-uiOptionTime").prop("checked");
+                    var uiOptionSolar = $("#node-input-uiOptionSolar").prop("checked");
+                    var uiOptionCron = $("#node-input-uiOptionCron").prop("checked");
+
+                    // Validation: At least one must be true
+                    return uiOptionTime || uiOptionSolar || uiOptionCron;
+                }
+
+                function validateUIPeriodOptions() {
+
+                    const uiOptionTime = $('#node-input-uiOptionTime').prop('checked');
+                    if (!uiOptionTime) {
+                        return true;
+                    }
+
+                    // Retrieve the checked state for each period input.
+                    var uiOptionMinute = $("#node-input-uiOptionMinute").prop("checked");
+                    var uiOptionHour = $("#node-input-uiOptionHour").prop("checked");
+                    var uiOptionDay = $("#node-input-uiOptionDay").prop("checked");
+                    var uiOptionWeek = $("#node-input-uiOptionWeek").prop("checked");
+                    var uiOptionMonth = $("#node-input-uiOptionMonth").prop("checked");
+                    var uiOptionYear = $("#node-input-uiOptionYear").prop("checked");
+
+                    // Validation passes if at least one option is true.
+                    return uiOptionMinute || uiOptionHour || uiOptionDay || uiOptionWeek || uiOptionMonth || uiOptionYear;
+                }
+
+                // Updated function to validate errors in the Schedule Type and Period groups
+                // and update the Advanced Options header and its content accordingly.
+                function validateAndSetAdvancedOptionsError() {
+                    var scheduleTypeValid = validateUIScheduleTypeOptions(); // existing function for schedule type validation
+                    var periodValid = validateUIPeriodOptions();             // existing function for period validation
+                    var hasError = (!scheduleTypeValid || !periodValid);
+
+                    var advancedOptionsHeader = $(".ui-scheduler-advanced-options-label");
+                    var advancedOptionsContent = $(".ui-scheduler-advanced-options .ui-scheduler-options-content");
+                    var icon = $(".ui-scheduler-expand-button i");
+
+                    if (hasError) {
+                        // Mark advanced options header with error style (red label)
+                        advancedOptionsHeader.addClass("advanced-error");
+                        // Auto-expand advanced options content if not already visible
+                        if (!advancedOptionsContent.is(":visible")) {
+                            advancedOptionsContent.slideDown(200);
+                            icon.removeClass("fa-caret-right").addClass("fa-caret-down");
+                            $("#node-input-advancedOptionsExpanded").val(true);
+                        }
+                    } else {
+                        advancedOptionsHeader.removeClass("advanced-error");
+                    }
+                }
+
+                $("#node-input-uiOptionTime, #node-input-uiOptionSolar, #node-input-uiOptionCron").on("change", function () {
+                    var valid = validateUIScheduleTypeOptions();
+                    if (!valid) {
+                        // Here we choose a single element (or each element) to mark with error,
+                        // Or you can mark all three if desired
+                        $("#node-input-uiOptionTime, #node-input-uiOptionSolar, #node-input-uiOptionCron")
+                            .addClass("input-error-type");
+                        $(".input-error-message-type").show();
+                    } else {
+                        $("#node-input-uiOptionTime, #node-input-uiOptionSolar, #node-input-uiOptionCron")
+                            .removeClass("input-error-type");
+                        $(".input-error-message-type").hide();
+                    }
+                });
+
+                // Attach change event listeners to all period checkboxes:
+                $("#node-input-uiOptionMinute, #node-input-uiOptionHour, #node-input-uiOptionDay, " +
+                    "#node-input-uiOptionWeek, #node-input-uiOptionMonth, #node-input-uiOptionYear, #node-input-uiOptionTime")
+                    .on("change", function () {
+                        var valid = validateUIPeriodOptions();
+                        // If validation fails, add red-border error class and show the error messages.
+                        if (!valid) {
+                            $("#node-input-uiOptionMinute, #node-input-uiOptionHour, #node-input-uiOptionDay, " +
+                                "#node-input-uiOptionWeek, #node-input-uiOptionMonth, #node-input-uiOptionYear")
+                                .addClass("input-error-period");
+                            // Show each of the sibling error messages.
+                            $(".input-error-message-period").show();
+                        } else {
+                            // Otherwise, remove the error class and hide the error messages.
+                            $("#node-input-uiOptionMinute, #node-input-uiOptionHour, #node-input-uiOptionDay, " +
+                                "#node-input-uiOptionWeek, #node-input-uiOptionMonth, #node-input-uiOptionYear")
+                                .removeClass("input-error-period");
+                            $(".input-error-message-period").hide();
+                        }
+                    });
+
+                validateAndSetAdvancedOptionsError();
+
+
                 updateEditorLayout()
 
                 // give the form a chance to render then remove the max width restriction
@@ -2408,7 +2697,7 @@ copies or substantial portions of the Software.
 
                 // set locale: default to en-US if not set
                 node.locale = $('#node-input-locale').val()
-    
+
                 const options = $('#node-input-option-container').children()
 
                 node.options = []
@@ -2541,7 +2830,6 @@ copies or substantial portions of the Software.
                 }
             },
             oneditresize: function () {
-                // console.log("RESIZING")
                 updateEditorLayout()
                 // HACK for old versions of node-red - prior to typedInput resizing changed from code to CSS
                 if (RED.settings.version && RED.settings.version.split('.')[0] < 1) {
@@ -2559,7 +2847,7 @@ copies or substantial portions of the Software.
         })
     })(jQuery)
 
-    function onSchedulesExpandCompress () {
+    function onSchedulesExpandCompress() {
         const selector = '#node-ui-scheduler-tab-static-schedules'
         const el = $(selector)
         const $buttonExpandIcon = $('#ui-scheduler-expand-schedules-button').find('i.fa')
@@ -2818,13 +3106,157 @@ copies or substantial portions of the Software.
         </a>
         </div>
 
-        <div class="form-row ui-scheduler-form-row">
-        <label for="node-input-useNewTimePicker">
-            <i class="fa fa-clock-o"></i>
-            <span data-i18n="ui-scheduler.label.useNewTimePicker"></span>
-        </label>
-        <input type="checkbox" id="node-input-useNewTimePicker" style="display: inline-block; width: auto; margin: 0px 0px 0px 4px;">
+       
+        <div style="margin-top: 20px;">
+            <div class="ui-scheduler-advanced-options">
+                <div class="ui-scheduler-options-header">
+                    <button class="ui-scheduler-expand-button" type="button">
+                        <i class="fa fa-caret-right"></i>
+                        <span class="ui-scheduler-advanced-options-label" data-i18n="ui-scheduler.label.uiOptionAdvancedOptions"></span>
+                    </button>
+                </div>
+                <div class="ui-scheduler-options-content" style="display: none;">
+                    <!-- Schedule Types Group -->
+                    <div class="form-row ui-scheduler-advanced-options-form-row">
+                        <label>
+                            <i class="fa fa-clock-o"></i>
+                            <span data-i18n="ui-scheduler.label.uiOptionScheduleTypes"></span>
+                        </label>
+                        <div class="checkbox-group">
+                            <div class="form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionTime">
+                                    <span data-i18n="ui-scheduler.label.uiOptionTime"></span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionTime" name="scheduleType"
+                                    style="display: inline-block; width: 20px; margin: 0px 0px 0px 4px;">
+                                <span class="input-error-message-type" style="color:red;display:none;" data-i18n="ui-scheduler.label.selectAtLeastOneOption"></span>
+                            </div>
+        
+                            <div class="form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionSolar">
+                                    <span data-i18n="ui-scheduler.label.uiOptionSolar"></span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionSolar" name="scheduleType"
+                                    style="display: inline-block; width: 20px; margin: 0px 0px 0px 4px;">
+                                    <span class="input-error-message-type" style="color:red;display:none;" data-i18n="ui-scheduler.label.selectAtLeastOneOption"></span>
+                                </div>
+        
+                            <div class="form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionCron">
+                                    <span data-i18n="ui-scheduler.label.uiOptionCron"></span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionCron" name="scheduleType"
+                                    style="display: inline-block; width: 20px; margin: 0px 0px 0px 4px;">
+                                    <span class="input-error-message-type" style="color:red;display:none;" data-i18n="ui-scheduler.label.selectAtLeastOneOption"></span>
+                                </div>
+                        </div>
+                    </div>
+        
+                    <!-- Periods Group -->
+                    <div class="form-row ui-scheduler-advanced-options-form-row">
+                        <label>
+                            <i class="fa fa-calendar"></i>
+                            <span data-i18n="ui-scheduler.label.uiOptionPeriods"></span>
+                        </label>
+                        <div class="checkbox-group">
+                            <div class="form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionMinute">
+                                    <span data-i18n="ui-scheduler.label.uiOptionMinute"></span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionMinute" name="period"
+                                    style="display: inline-block; width: 20px; margin: 0 0 0 4px;">
+                                <span class="input-error-message-period" style="color:red;display:none;" data-i18n="ui-scheduler.label.selectAtLeastOneOption"></span>
+                            </div>
+                    
+                            <div class="form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionHour">
+                                    <span data-i18n="ui-scheduler.label.uiOptionHour"></span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionHour" name="period"
+                                    style="display: inline-block; width: 20px; margin: 0 0 0 4px;">
+                                <span class="input-error-message-period" style="color:red;display:none;" data-i18n="ui-scheduler.label.selectAtLeastOneOption"></span>
+                            </div>
+                    
+                            <div class="form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionDay">
+                                    <span data-i18n="ui-scheduler.label.uiOptionDay"></span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionDay" name="period"
+                                    style="display: inline-block; width: 20px; margin: 0 0 0 4px;">
+                                <span class="input-error-message-period" style="color:red;display:none;" data-i18n="ui-scheduler.label.selectAtLeastOneOption"></span>
+                            </div>
+                    
+                            <div class="form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionWeek">
+                                    <span data-i18n="ui-scheduler.label.uiOptionWeek"></span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionWeek" name="period"
+                                    style="display: inline-block; width: 20px; margin: 0 0 0 4px;">
+                                <span class="input-error-message-period" style="color:red;display:none;" data-i18n="ui-scheduler.label.selectAtLeastOneOption"></span>
+                            </div>
+                    
+                            <div class="form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionMonth">
+                                    <span data-i18n="ui-scheduler.label.uiOptionMonth"></span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionMonth" name="period"
+                                    style="display: inline-block; width: 20px; margin: 0 0 0 4px;">
+                                <span class="input-error-message-period" style="color:red;display:none;" data-i18n="ui-scheduler.label.selectAtLeastOneOption"></span>
+                            </div>
+                    
+                            <div class="form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionYear">
+                                    <span data-i18n="ui-scheduler.label.uiOptionYear"></span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionYear" name="period"
+                                    style="display: inline-block; width: 20px; margin: 0 0 0 4px;">
+                                <span class="input-error-message-period" style="color:red;display:none;" data-i18n="ui-scheduler.label.selectAtLeastOneOption"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Individual Options -->
+                    <div class="form-row ui-scheduler-advanced-options-form-row">
+                        <label>
+                            <i class="fa fa-cog"></i>
+                            <span data-i18n="ui-scheduler.label.uiOptionAdditionalOptions"></span>
+                        </label>
+                        <div class="checkbox-group">
+                            <div class="form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionTopic">
+                                    <span data-i18n="topic">Topic</span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionTopic" name="topicOption"
+                                    style="display: inline-block; width: 20px; margin: 0px 0px 0px 4px;">
+                            </div>
+                    
+                            <div class="form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionTimespan">
+                                    <span data-i18n="ui-scheduler.label.uiOptionTimespan"></span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionTimespan" name="timespanOption"
+                                    style="display: inline-block; width: 20px; margin: 0px 0px 0px 4px;">
+                            </div>
+                    
+                            <div class="form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionCustomOutput">
+                                    <span data-i18n="ui-scheduler.label.uiOptionCustomOutput"></span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionCustomOutput" name="customOutput"
+                                    style="display: inline-block; width: 20px; margin: 0px 0px 0px 4px;">
+                            </div>
+                            <div class="form-row form-row ui-scheduler-advanced-options-form-row">
+                                <label for="node-input-uiOptionNewTimePicker">
+                                    <span data-i18n="ui-scheduler.label.uiOptionNewTimePicker"></span>
+                                </label>
+                                <input type="checkbox" id="node-input-uiOptionNewTimePicker"
+                                    style="display: inline-block; width: 20px; margin: 0px 0px 0px 4px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+
         <style>
             #ui-scheduler-map > div.leaflet-map-pane > div.leaflet-objects-pane > div.leaflet-popup-pane > div > div.leaflet-popup-content-wrapper,
             #ui-scheduler-map > div.leaflet-map-pane > div.leaflet-objects-pane > div.leaflet-popup-pane > div > div.leaflet-popup-tip-container > div {
@@ -2873,6 +3305,9 @@ copies or substantial portions of the Software.
             }
             .ui-scheduler-form-row > label {
                 width: 120px !important;
+            }
+            .ui-scheduler-advanced-options-form-row {
+                width: 500px !important;
             }
             .ui-scheduler-expression-tip {
                 background: var(--red-ui-primary-background);
@@ -3002,6 +3437,49 @@ copies or substantial portions of the Software.
             }
             .nr-db-ui-manual-size-row {
                 display: none;
+            }
+            .ui-scheduler-advanced-options {
+            border: 1px solid var(--red-ui-form-input-border-color);
+            border-radius: 4px;
+            margin: 10px 0;
+            }
+            .ui-scheduler-options-header {
+                background-color: var(--red-ui-secondary-background);
+                padding: 8px 15px;
+                cursor: pointer;
+            }
+            .ui-scheduler-expand-button {
+                background: none;
+                border: none;
+                color: var(--red-ui-primary-text-color);
+                font-size: 14px;
+            }
+            .ui-scheduler-expand-button i {
+                transition: transform 0.2s;
+                margin-right: 8px;
+            }
+            .ui-scheduler-options-content {
+                padding: 15px;
+                background-color: var(--red-ui-primary-background);
+            }
+            .checkbox-group {
+                display: grid;
+                grid-template-columns: 1fr; /* Ensures a single column layout */
+                gap: 10px;
+                margin-top: 8px;
+            }
+            .checkbox-group label {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            /* Apply a red border to elements with error classes */
+            .input-error-type,
+            .input-error-period {
+                border: 1px solid red;
+            }
+            .advanced-error {
+                color: red;
             }
         </style>  
     </script>

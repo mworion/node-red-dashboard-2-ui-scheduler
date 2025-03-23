@@ -23,6 +23,7 @@
 
   "cron": "Cron",
   "cronExpression": "Cron-Ausdruck",
+  "cronInfo": "Cron-Info",
 
   "error": "Fehler",
   "editSchedule": "Zeitplan bearbeiten",

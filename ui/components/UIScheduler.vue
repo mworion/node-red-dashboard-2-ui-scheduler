@@ -5,19 +5,14 @@
         <v-toolbar border color="navigation-background" rounded="lg">
             <v-toolbar-title
                 :class="['truncate-text', { 'text-body-1': selectedTopic !== 'All' && $vuetify.display.xs }]"
-                :style="{ margin: (selectedTopic !== 'All' && $vuetify.display.xs) ? '2px !important' : '20px' }"
-            >
+                :style="{ margin: (selectedTopic !== 'All' && $vuetify.display.xs) ? '2px !important' : '20px' }">
                 {{ label }}
             </v-toolbar-title>
-            <v-select
-                v-model="selectedTopic" :items="['All', ...uniqueTopics]" :label="t('topic')"
-                style="max-width: fit-content" rounded="lg" variant="solo-inverted"
-                @update:model-value="filterSchedules"
-            />
-            <v-switch
-                v-if="selectedTopic !== 'All'" v-model="anyScheduleEnabled" color="primary" hide-details
-                class="pl-3" @click.stop="toggleAllSchedules"
-            />
+            <v-select v-if="props.uiOptionTopic" v-model="selectedTopic" :items="['All', ...uniqueTopics]"
+                :label="t('topic')" style="max-width: fit-content" rounded="lg" variant="solo-inverted"
+                @update:model-value="filterSchedules" />
+            <v-switch v-if="selectedTopic !== 'All'" v-model="anyScheduleEnabled" color="primary" hide-details
+                class="pl-3" @click.stop="toggleAllSchedules" />
 
             <v-btn id="nrdb2-ui-scheduler-new-schedule-button" @click="openDialog()">
                 <v-icon>mdi-plus</v-icon>
@@ -33,26 +28,19 @@
                 </template>
 
                 <v-list>
-                    <v-list-item
-                        v-for="(item, i) in menuItems" :key="i" :value="item.value"
-                        @click="handleMenuItemClick(item)"
-                    >
+                    <v-list-item v-for="(item, i) in menuItems" :key="i" :value="item.value"
+                        @click="handleMenuItemClick(item)">
                         <template #prepend>
                             <v-badge v-if="item.value === 'updates' && isUpdateAvailable" color="red" dot floating>
-                                <v-icon
-                                    :color="(item.value === 'updates' && isUpdateAvailable) ? 'orange' : item.color"
-                                    :icon="item.icon"
-                                />
+                                <v-icon :color="(item.value === 'updates' && isUpdateAvailable) ? 'orange' : item.color"
+                                    :icon="item.icon" />
                             </v-badge>
-                            <v-icon
-                                v-else
+                            <v-icon v-else
                                 :color="(item.value === 'updates' && isUpdateAvailable) ? 'orange' : item.color"
-                                :icon="item.icon"
-                            />
+                                :icon="item.icon" />
                         </template>
                         <v-list-item-title
-                            :color="(item.value === 'updates' && isUpdateAvailable) ? 'orange' : 'primary'"
-                        >
+                            :color="(item.value === 'updates' && isUpdateAvailable) ? 'orange' : 'primary'">
                             {{
                                 item.label
                             }}
@@ -61,34 +49,28 @@
                 </v-list>
             </v-menu>
         </v-toolbar>
-        <v-data-table
-            v-model:expanded="expanded" :headers="filteredHeaders" :items="filteredSchedules"
+        <v-data-table v-model:expanded="expanded" :headers="filteredHeaders" :items="filteredSchedules"
             hide-default-footer density="compact" :show-expand="!$vuetify.display.xs" item-value="name"
-            :expand="expandedItem" items-per-page @click:row="handleRowClick"
-        >
+            :expand="expandedItem" items-per-page @click:row="handleRowClick">
             <template #item.rowNumber="{ item }">
-                <v-badge
-                    v-if="item.invalid"
-                    color="error"
-                >
+                <v-badge v-if="item.invalid" color="error">
                     <!-- Badge slot for the error icon -->
                     <template #badge>
                         <v-icon size="small">mdi-alert</v-icon>
                     </template>
-                    <v-chip :color="item.active === undefined ? 'gray' : (item.active ? 'green' : 'red')" density="compact">
+                    <v-chip :color="item.active === undefined ? 'gray' : (item.active ? 'green' : 'red')"
+                        density="compact">
                         {{ item.rowNumber }}
                     </v-chip>
                 </v-badge>
-                <v-chip v-else :color="item.active === undefined ? 'gray' : (item.active ? 'green' : 'red')" density="compact">
+                <v-chip v-else :color="item.active === undefined ? 'gray' : (item.active ? 'green' : 'red')"
+                    density="compact">
                     {{ item.rowNumber }}
                 </v-chip>
             </template>
 
             <template #item.name="{ item }">
-                <v-badge
-                    v-if="item.invalid"
-                    color="error"
-                >
+                <v-badge v-if="item.invalid" color="error">
                     <!-- Badge slot for the error icon -->
                     <template #badge>
                         <v-icon size="small">mdi-alert</v-icon>
@@ -111,11 +93,8 @@
                         </v-icon>
                     </template>
                     <template v-else>
-                        <v-switch
-                            id="nrdb2-ui-scheduler-schedule-enable-switch"
-                            v-model="item.enabled" :disabled="item.invalid" color="green" hide-details
-                            @click.stop="toggleSchedule(item)"
-                        />
+                        <v-switch id="nrdb2-ui-scheduler-schedule-enable-switch" v-model="item.enabled"
+                            :disabled="item.invalid" color="green" hide-details @click.stop="toggleSchedule(item)" />
                     </template>
                 </div>
             </template>
@@ -125,10 +104,8 @@
                     <tr v-if="item">
                         <td :colspan="columns.length" class="px-0">
                             <v-card>
-                                <v-progress-linear
-                                    v-if="item.active" :color="progressColor(item)"
-                                    :model-value="progressValue(item)" stream rounded :height="6"
-                                />
+                                <v-progress-linear v-if="item.active" :color="progressColor(item)"
+                                    :model-value="progressValue(item)" stream rounded :height="6" />
                                 <v-card-title class="d-flex align-items-center justify-space-between pb-4">
                                     <div v-if="item && item.name">
                                         {{ item.name }}
@@ -136,11 +113,8 @@
                                     <div v-else>
                                         <em>No item selected</em>
                                     </div>
-                                    <v-btn
-                                        v-if="item"
-                                        id="nrdb2-ui-scheduler-edit-schedule-button" icon color="primary" :disabled="item.isStatic || item.readonly"
-                                        @click="editSchedule(item)"
-                                    >
+                                    <v-btn v-if="item" id="nrdb2-ui-scheduler-edit-schedule-button" icon color="primary"
+                                        :disabled="item.isStatic || item.readonly" @click="editSchedule(item)">
                                         <v-icon>mdi-pencil</v-icon>
                                     </v-btn>
                                 </v-card-title>
@@ -175,8 +149,7 @@
                                                 <v-list-item-title>{{ t('output') }}</v-list-item-title>
                                                 <v-list-item-subtitle class="pb-2">
                                                     <template
-                                                        v-if="(item.timespan !== false) && item.payloadType === 'true_false'"
-                                                    >
+                                                        v-if="(item.timespan !== false) && item.payloadType === 'true_false'">
                                                         <v-chip density="compact" color="green">{{ t('true') }}</v-chip>
                                                         <span> {{ t('onStart') }} </span>
                                                         <v-chip density="compact" color="red">{{ t('false') }}</v-chip>
@@ -200,8 +173,7 @@
                                             <v-divider />
 
                                             <v-list-subheader
-                                                v-if="item.period || item.timespan !== false || item.solarDays"
-                                            >
+                                                v-if="item.period || item.timespan !== false || item.solarDays">
                                                 {{ t('timeDetails') }}
                                             </v-list-subheader>
 
@@ -219,11 +191,9 @@
                                                 </template>
                                                 <v-list-item-title>{{ t('days') }}</v-list-item-title>
                                                 <v-list-item-subtitle class="pb-2">
-                                                    <v-chip
-                                                        v-for="(day, index) in item.days" :key="index"
+                                                    <v-chip v-for="(day, index) in item.days" :key="index"
                                                         :color="['monthly', 'yearly'].includes(item.period) ? 'blue' : getChipColor(day)"
-                                                        density="compact"
-                                                    >
+                                                        density="compact">
                                                         <span v-if="['monthly', 'yearly'].includes(item.period)">
                                                             {{ day === 'Last' ? t('lastDay') : day }}
                                                         </span>
@@ -240,10 +210,8 @@
                                                 </template>
                                                 <v-list-item-title>{{ t('days') }}</v-list-item-title>
                                                 <v-list-item-subtitle>
-                                                    <v-chip
-                                                        v-for="(day, index) in item.solarDays" :key="index"
-                                                        :color="getChipColor(day)" density="compact"
-                                                    >
+                                                    <v-chip v-for="(day, index) in item.solarDays" :key="index"
+                                                        :color="getChipColor(day)" density="compact">
                                                         <span>{{ mapDayOfWeek(day).slice(0, 3) }}</span>
                                                     </v-chip>
                                                 </v-list-item-subtitle>
@@ -253,8 +221,7 @@
                                                 <template #prepend>
                                                     <v-icon
                                                         :icon="item.timespan === 'time' ? 'mdi-clock-start' : 'mdi-clock'"
-                                                        :color="item.timespan === 'time' ? 'green' : undefined"
-                                                    />
+                                                        :color="item.timespan === 'time' ? 'green' : undefined" />
                                                 </template>
                                                 <v-list-item-title>
                                                     {{ item.timespan === 'time' ? t('startTime') : t('time') }}
@@ -262,10 +229,8 @@
                                                 <v-list-item-subtitle>{{ formatTime(item.time) }}</v-list-item-subtitle>
                                             </v-list-item>
 
-                                            <v-list-item
-                                                v-if="item.timespan === 'time' && item.endTime"
-                                                class="prepend-icon-spacing"
-                                            >
+                                            <v-list-item v-if="item.timespan === 'time' && item.endTime"
+                                                class="prepend-icon-spacing">
                                                 <template #prepend>
                                                     <v-icon color="red">mdi-clock-end</v-icon>
                                                 </template>
@@ -279,15 +244,12 @@
                                                 </v-list-item-subtitle>
                                             </v-list-item>
 
-                                            <v-list-item
-                                                v-if="item.solarEventTimespanTime"
-                                                class="prepend-icon-spacing"
-                                            >
+                                            <v-list-item v-if="item.solarEventTimespanTime"
+                                                class="prepend-icon-spacing">
                                                 <template #prepend>
                                                     <v-icon
                                                         :icon="!item.solarEventStart ? 'mdi-clock-start' : 'mdi-clock-end'"
-                                                        :color="!item.solarEventStart ? 'green' : 'red'"
-                                                    />
+                                                        :color="!item.solarEventStart ? 'green' : 'red'" />
                                                 </template>
                                                 <v-list-item-title>
                                                     {{ !item.solarEventStart ? t('startTime') : t('endTime') }}
@@ -314,10 +276,8 @@
                                                 <v-list-item-subtitle>{{ item.hourlyInterval }}</v-list-item-subtitle>
                                             </v-list-item>
 
-                                            <v-list-item
-                                                v-if="item.calculatedDurationPretty"
-                                                class="prepend-icon-spacing"
-                                            >
+                                            <v-list-item v-if="item.calculatedDurationPretty"
+                                                class="prepend-icon-spacing">
                                                 <template #prepend>
                                                     <v-icon>mdi-timer-sand</v-icon>
                                                 </template>
@@ -329,8 +289,7 @@
                                             </v-list-item>
 
                                             <v-divider
-                                                v-if="(item.scheduleType === 'solar' && item.timespan !== false) || item.solarDays"
-                                            />
+                                                v-if="(item.scheduleType === 'solar' && item.timespan !== false) || item.solarDays" />
                                             <v-list-subheader v-if="item.solarEvent">{{ t('solar') }}</v-list-subheader>
 
                                             <v-list-item v-if="item.solarEvent" class="prepend-icon-spacing">
@@ -356,10 +315,8 @@
                                                 {{ t('cron')
                                                 }}
                                             </v-list-subheader>
-                                            <v-list-item
-                                                v-if="item.scheduleType === 'cron'" lines="two"
-                                                class="prepend-icon-spacing"
-                                            >
+                                            <v-list-item v-if="item.scheduleType === 'cron'" lines="two"
+                                                class="prepend-icon-spacing">
                                                 <template #prepend>
                                                     <v-icon>mdi-code-brackets</v-icon>
                                                 </template>
@@ -373,10 +330,8 @@
                                             <v-divider />
                                             <v-list-subheader>{{ t('next') }}</v-list-subheader>
 
-                                            <v-list-item
-                                                v-if="item.primaryTask?.nextDescription" lines="two"
-                                                class="prepend-icon-spacing" @click="requestStatus(item)"
-                                            >
+                                            <v-list-item v-if="item.primaryTask?.nextDescription" lines="two"
+                                                class="prepend-icon-spacing" @click="requestStatus(item)">
                                                 <template #prepend>
                                                     <v-icon :color="item.timespan ? 'green' : ''">
                                                         mdi-calendar-text
@@ -391,11 +346,9 @@
 
                                             <v-list-group>
                                                 <template #activator="{ isOpen, props }">
-                                                    <v-list-item
-                                                        v-bind="props"
+                                                    <v-list-item v-bind="props"
                                                         class="prepend-icon-spacing no-padding-start" lines="two"
-                                                        @click="handleNextDatesExpand(isOpen)"
-                                                    >
+                                                        @click="handleNextDatesExpand(isOpen)">
                                                         <template #prepend>
                                                             <v-icon :color="item.timespan ? 'green' : undefined">
                                                                 mdi-calendar-arrow-right
@@ -408,20 +361,16 @@
                                                         </v-list-item-subtitle>
                                                     </v-list-item>
                                                 </template>
-                                                <v-list-item
-                                                    v-for="(date, index) in item.primaryTask?.nextDates"
-                                                    :key="index" class="no-padding-start" lines="two"
-                                                >
+                                                <v-list-item v-for="(date, index) in item.primaryTask?.nextDates"
+                                                    :key="index" class="no-padding-start" lines="two">
                                                     <v-list-item-subtitle>
                                                         <strong>{{ index + 1 }}.&nbsp;&nbsp;</strong>{{ date }}
                                                     </v-list-item-subtitle>
                                                 </v-list-item>
                                             </v-list-group>
 
-                                            <v-list-item
-                                                v-if="item.endTask?.nextLocal" lines="two"
-                                                class="prepend-icon-spacing"
-                                            >
+                                            <v-list-item v-if="item.endTask?.nextLocal" lines="two"
+                                                class="prepend-icon-spacing">
                                                 <template #prepend>
                                                     <v-icon color="red">mdi-calendar-arrow-right</v-icon>
                                                 </template>
@@ -447,10 +396,8 @@
 
         <v-dialog v-model="dialog" :fullscreen="$vuetify.display.xs" rounded="lg" color="background" max-width="500px">
             <v-row v-if="validationResult.alert">
-                <v-alert
-                    v-model="validationResult.alert" :title="t('error')" min-height="fit-content" type="error"
-                    closable
-                >
+                <v-alert v-model="validationResult.alert" :title="t('error')" min-height="fit-content" type="error"
+                    closable>
                     {{ validationResult.message }}
                 </v-alert>
             </v-row>
@@ -458,17 +405,18 @@
                 <v-card-title class="d-flex align-items-center justify-space-between pb-0">
                     <span class="text-h5">{{ isEditing ? t('editSchedule') : t('newSchedule') }}</span>
                     <div class="d-flex align-items-center">
-                        <v-switch
-                            v-model="enabled" :disabled="invalid" :label="enabled ? t('enabled') : t('disabled')"
-                            :color="enabled ? 'green' : 'default'" required class="mr-2"
-                        />
-                        <v-btn v-if="isEditing" id="nrdb2-ui-scheduler-export-schedule-button" icon variant="plain" color="blue" @click="openExportDialog()">
+                        <v-switch v-model="enabled" :disabled="invalid" :label="enabled ? t('enabled') : t('disabled')"
+                            :color="enabled ? 'green' : 'default'" required class="mr-2" />
+                        <v-btn v-if="isEditing" id="nrdb2-ui-scheduler-export-schedule-button" icon variant="plain"
+                            color="blue" @click="openExportDialog()">
                             <v-icon>mdi-export</v-icon>
                         </v-btn>
-                        <v-btn v-if="!isEditing" id="nrdb2-ui-scheduler-import-schedule-button" icon variant="plain" color="green" @click="openImportDialog()">
+                        <v-btn v-if="!isEditing" id="nrdb2-ui-scheduler-import-schedule-button" icon variant="plain"
+                            color="green" @click="openImportDialog()">
                             <v-icon>mdi-import</v-icon>
                         </v-btn>
-                        <v-btn v-if="isEditing" id="nrdb2-ui-scheduler-delete-schedule-button" icon color="red-lighten-1" @click="openDeleteDialog()">
+                        <v-btn v-if="isEditing" id="nrdb2-ui-scheduler-delete-schedule-button" icon
+                            color="red-lighten-1" @click="openDeleteDialog()">
                             <v-icon>mdi-delete</v-icon>
                         </v-btn>
                     </div>
@@ -476,11 +424,8 @@
                 <v-card-text class="pt-0">
                     <v-row justify="center">
                         <v-col cols="12" class="pt-0">
-                            <v-text-field
-                                v-if="!isEditing" id="nrdb2-ui-scheduler-schedule-name-input" v-model="name"
-                                :label="t('scheduleName')"
-                                :rules="[rules.required]" required :disabled="isEditing"
-                            >
+                            <v-text-field v-if="!isEditing" id="nrdb2-ui-scheduler-schedule-name-input" v-model="name"
+                                :label="t('scheduleName')" :rules="[rules.required]" required :disabled="isEditing">
                                 <template #append-inner>
                                     <v-icon v-if="!isNameDuplicate()" color="green" icon="mdi-check-circle" />
                                     <v-icon v-else color="red" icon="mdi-close-circle" />
@@ -492,15 +437,13 @@
                         </v-col>
                     </v-row>
 
-                    <v-row no-gutters justify="center">
+                    <v-row v-if="props.uiOptionTopic" no-gutters justify="center">
                         <v-col cols="12" class="d-flex justify-center">
                             <v-label>{{ t('topic') }}</v-label>
                         </v-col>
                         <v-col cols="12">
-                            <v-select
-                                v-model="topic" :items="props.topics" :label="t('selectTopic')" required
-                                :rules="[rules.required]"
-                            >
+                            <v-select v-model="topic" :items="props.topics" :label="t('selectTopic')" required
+                                :rules="[rules.required]">
                                 <template #prepend-inner>
                                     <v-icon>mdi-sitemap-outline</v-icon>
                                 </template>
@@ -508,18 +451,27 @@
                         </v-col>
                     </v-row>
 
-                    <v-row no-gutters class="d-flex justify-center">
+                    <v-row
+                        v-if="[props.uiOptionTime, props.uiOptionSolar, props.uiOptionCron].filter(Boolean).length > 1"
+                        no-gutters class="d-flex justify-center">
                         <v-col cols="12" class="d-flex justify-center">
                             <v-label>{{ t('type') }}</v-label>
                         </v-col>
                         <v-col cols="12" class="d-flex justify-center">
-                            <v-btn-toggle
-                                v-model="scheduleType" :label="t('scheduleType')" mandatory divided
-                                variant="elevated" border="sm" rounded="xl"
-                            >
-                                <v-btn prepend-icon="mdi-clock-outline" value="time">{{ t('time') }}</v-btn>
-                                <v-btn prepend-icon="mdi-sun-clock" value="solar">{{ t('solar') }}</v-btn>
-                                <v-btn prepend-icon="mdi-code-brackets" group:selected="cronType()" value="cron">
+                            <v-btn-toggle v-model="scheduleType" :label="t('scheduleType')" mandatory divided
+                                variant="elevated" border="sm" rounded="xl">
+                                <v-btn v-if="props.uiOptionTime" prepend-icon="mdi-clock-outline" value="time">
+                                    {{
+                                        t('time')
+                                    }}
+                                </v-btn>
+                                <v-btn v-if="props.uiOptionSolar" prepend-icon="mdi-sun-clock" value="solar">
+                                    {{
+                                        t('solar')
+                                    }}
+                                </v-btn>
+                                <v-btn v-if="props.uiOptionCron" prepend-icon="mdi-code-brackets"
+                                    group:selected="cronType()" value="cron">
                                     {{ t('cron') }}
                                 </v-btn>
                             </v-btn-toggle>
@@ -527,54 +479,50 @@
                     </v-row>
 
                     <v-row v-if="scheduleType === 'time'" justify="center" class="mb-5">
-                        <v-row no-gutters>
+                        <v-row
+                            v-if="[props.uiOptionMinute, props.uiOptionHour, props.uiOptionDay, props.uiOptionWeek, props.uiOptionMonth, props.uiOptionYear].filter(Boolean).length > 1"
+                            no-gutters>
                             <v-col cols="12" class="d-flex justify-center">
                                 <v-label>{{ t('period') }}</v-label>
                             </v-col>
                             <v-col cols="12" class="mx-auto">
-                                <v-btn-toggle
-                                    v-model="period" class="d-flex flex-wrap" style="min-height: fit-content"
-                                    :label="t('period')" mandatory border="sm" rounded="xl"
-                                >
-                                    <v-row no-gutters>
-                                        <v-col>
-                                            <v-btn
-                                                prepend-icon="mdi-timer-refresh-outline" value="minutes"
-                                                min-width="100%"
-                                            >
+                                <v-btn-toggle v-model="period" class="d-flex flex-wrap" style="min-height: fit-content"
+                                    :label="t('period')" mandatory border="sm" rounded="xl">
+                                    <v-row v-if="props.uiOptionMinute || props.uiOptionHour || props.uiOptionDay"
+                                        no-gutters>
+                                        <v-col v-if="props.uiOptionMinute">
+                                            <v-btn prepend-icon="mdi-timer-refresh-outline" value="minutes"
+                                                min-width="100%">
                                                 {{ t('minute') }}
                                             </v-btn>
                                         </v-col>
-                                        <v-col>
+                                        <v-col v-if="props.uiOptionHour">
                                             <v-btn prepend-icon="mdi-timer-refresh" value="hourly" min-width="100%">
                                                 {{ t('hour') }}
                                             </v-btn>
                                         </v-col>
-                                        <v-col>
+                                        <v-col v-if="props.uiOptionDay">
                                             <v-btn prepend-icon="mdi-calendar-range" value="daily" min-width="100%">
                                                 {{ t('day') }}
                                             </v-btn>
                                         </v-col>
                                     </v-row>
-                                    <v-row no-gutters>
-                                        <v-col>
+                                    <v-row v-if="props.uiOptionWeek || props.uiOptionMonth || props.uiOptionYear"
+                                        no-gutters>
+                                        <v-col v-if="props.uiOptionWeek">
                                             <v-btn prepend-icon="mdi-calendar-weekend" value="weekly" min-width="100%">
                                                 {{ t('week') }}
                                             </v-btn>
                                         </v-col>
-                                        <v-col>
-                                            <v-btn
-                                                prepend-icon="mdi-calendar-month-outline" value="monthly"
-                                                min-width="100%"
-                                            >
+                                        <v-col v-if="props.uiOptionMonth">
+                                            <v-btn prepend-icon="mdi-calendar-month-outline" value="monthly"
+                                                min-width="100%">
                                                 {{ t('month') }}
                                             </v-btn>
                                         </v-col>
-                                        <v-col>
-                                            <v-btn
-                                                prepend-icon="mdi-calendar-today-outline" value="yearly"
-                                                min-width="100%"
-                                            >
+                                        <v-col v-if="props.uiOptionYear">
+                                            <v-btn prepend-icon="mdi-calendar-today-outline" value="yearly"
+                                                min-width="100%">
                                                 {{ t('year') }}
                                             </v-btn>
                                         </v-col>
@@ -585,10 +533,8 @@
 
                         <v-row justify="center">
                             <v-col v-if="period === 'daily'" cols="12" class="d-flex justify-center">
-                                <v-select
-                                    v-model="dailyDays" :items="daysOfWeek" :label="t('selectDays')" multiple
-                                    required chips :rules="[rules.required]"
-                                >
+                                <v-select v-model="dailyDays" :items="daysOfWeek" :label="t('selectDays')" multiple
+                                    required chips :rules="[rules.required]">
                                     <template #prepend-inner>
                                         <v-icon>mdi-calendar-range</v-icon>
                                     </template>
@@ -601,10 +547,8 @@
                             </v-col>
 
                             <v-col v-if="period === 'weekly'" cols="12" class="d-flex justify-center">
-                                <v-select
-                                    v-model="weeklyDays" :items="daysOfWeek" :label="t('selectDays')" multiple
-                                    required chips :rules="[rules.required]"
-                                >
+                                <v-select v-model="weeklyDays" :items="daysOfWeek" :label="t('selectDays')" multiple
+                                    required chips :rules="[rules.required]">
                                     <template #prepend-inner>
                                         <v-icon>mdi-calendar-weekend</v-icon>
                                     </template>
@@ -617,10 +561,8 @@
                             </v-col>
 
                             <v-col v-if="period === 'monthly'" cols="12" class="d-flex justify-center">
-                                <v-select
-                                    v-model="monthlyDays" :items="localizedDaysOfMonth" :label="t('selectDays')"
-                                    multiple chips required :rules="[rules.required]"
-                                >
+                                <v-select v-model="monthlyDays" :items="localizedDaysOfMonth" :label="t('selectDays')"
+                                    multiple chips required :rules="[rules.required]">
                                     <template #prepend-inner>
                                         <v-icon>mdi-calendar-month-outline</v-icon>
                                     </template>
@@ -633,10 +575,8 @@
                             </v-col>
 
                             <v-col v-if="period === 'yearly'" cols="12" class="d-flex justify-center">
-                                <v-select
-                                    v-model="yearlyMonth" :items="months" :label="t('selectMonth')" required
-                                    :rules="[rules.required]"
-                                >
+                                <v-select v-model="yearlyMonth" :items="months" :label="t('selectMonth')" required
+                                    :rules="[rules.required]">
                                     <template #prepend-inner>
                                         <v-icon>mdi-calendar-month-outline</v-icon>
                                     </template>
@@ -644,10 +584,8 @@
                             </v-col>
 
                             <v-col v-if="period === 'yearly'" cols="12" class="d-flex justify-center">
-                                <v-select
-                                    v-model="yearlyDay" :items="localizedDaysOfMonth" :label="t('selectDay')"
-                                    required :rules="[rules.required]"
-                                >
+                                <v-select v-model="yearlyDay" :items="localizedDaysOfMonth" :label="t('selectDay')"
+                                    required :rules="[rules.required]">
                                     <template #prepend-inner>
                                         <v-icon>mdi-calendar-today-outline</v-icon>
                                     </template>
@@ -660,10 +598,8 @@
                             </v-col>
 
                             <v-col v-if="period === 'minutes'" cols="12" class="d-flex justify-center">
-                                <v-select
-                                    v-model="minutesInterval" :items="generateNumberArray(1, 59)"
-                                    :label="t('intervalMinutes')" :rules="[rules.required]"
-                                >
+                                <v-select v-model="minutesInterval" :items="generateNumberArray(1, 59)"
+                                    :label="t('intervalMinutes')" :rules="[rules.required]">
                                     <template #prepend-inner>
                                         <v-icon>mdi-repeat</v-icon>
                                     </template>
@@ -671,77 +607,55 @@
                             </v-col>
 
                             <v-col v-if="period === 'hourly'" cols="12" class="d-flex justify-center">
-                                <v-select
-                                    v-model="hourlyInterval" :items="generateNumberArray(1, 23)"
-                                    :label="t('intervalHours')" :rules="[rules.required]"
-                                >
+                                <v-select v-model="hourlyInterval" :items="generateNumberArray(1, 23)"
+                                    :label="t('intervalHours')" :rules="[rules.required]">
                                     <template #prepend-inner>
                                         <v-icon>mdi-repeat</v-icon>
                                     </template>
                                 </v-select>
                             </v-col>
 
-                            <v-col
-                                v-if="period !== 'minutes' && period !== 'hourly'" cols="12"
-                                class="d-flex justify-center"
-                            >
-                                <v-text-field
-                                    v-if="props.useNewTimePicker" v-model="formattedTime" :active="modalTime"
-                                    :focused="modalTime" readonly :rules="[rules.required]"
-                                    :label="timespan === 'time' ? t('startTime') : t('time')"
-                                >
+                            <v-col v-if="period !== 'minutes' && period !== 'hourly'" cols="12"
+                                class="d-flex justify-center">
+                                <v-text-field v-if="props.uiOptionNewTimePicker" v-model="formattedTime"
+                                    :active="modalTime" :focused="modalTime" readonly :rules="[rules.required]"
+                                    :label="timespan === 'time' ? t('startTime') : t('time')">
                                     <template #prepend-inner>
-                                        <v-icon
-                                            :color="timespan === 'time' ? 'green' : undefined"
-                                            :icon="timespan === 'time' ? 'mdi-clock-start' : 'mdi-clock-time-four-outline'"
-                                        />
+                                        <v-icon :color="timespan === 'time' ? 'green' : undefined"
+                                            :icon="timespan === 'time' ? 'mdi-clock-start' : 'mdi-clock-time-four-outline'" />
                                     </template>
                                     <v-dialog v-model="modalTime" activator="parent" width="auto">
-                                        <v-time-picker
-                                            v-if="modalTime" v-model="time"
+                                        <v-time-picker v-if="modalTime" v-model="time"
                                             :format="props.use24HourFormat ? '24hr' : 'ampm'"
-                                            :ampm-in-title="!props.use24HourFormat"
-                                        />
+                                            :ampm-in-title="!props.use24HourFormat" />
                                     </v-dialog>
                                 </v-text-field>
-                                <v-text-field
-                                    v-else v-model="time"
+                                <v-text-field v-else v-model="time"
                                     :label="timespan === 'time' ? t('startTime') : t('time')" type="time"
-                                    :rules="[rules.required]"
-                                >
+                                    :rules="[rules.required]">
                                     <template #prepend-inner>
-                                        <v-icon
-                                            :color="timespan === 'time' ? 'green' : undefined"
-                                            :icon="timespan === 'time' ? 'mdi-clock-start' : 'mdi-clock-time-four-outline'"
-                                        />
+                                        <v-icon :color="timespan === 'time' ? 'green' : undefined"
+                                            :icon="timespan === 'time' ? 'mdi-clock-start' : 'mdi-clock-time-four-outline'" />
                                     </template>
                                 </v-text-field>
                             </v-col>
 
-                            <v-col
-                                v-if="timespan === 'time' && period !== 'minutes' && period !== 'hourly'" cols="12"
-                                class="d-flex justify-center"
-                            >
-                                <v-text-field
-                                    v-if="props.useNewTimePicker" v-model="formattedEndTime"
+                            <v-col v-if="timespan === 'time' && period !== 'minutes' && period !== 'hourly'" cols="12"
+                                class="d-flex justify-center">
+                                <v-text-field v-if="props.uiOptionNewTimePicker" v-model="formattedEndTime"
                                     :active="modalEndTime" :focused="modalEndTime" :label="t('endTime')" readonly
-                                    :rules="[rules.endTimeRule]"
-                                >
+                                    :rules="[rules.endTimeRule]">
                                     <template #prepend-inner>
                                         <v-icon color="red" icon="mdi-clock-end" />
                                     </template>
                                     <v-dialog v-model="modalEndTime" activator="parent" width="auto">
-                                        <v-time-picker
-                                            v-if="modalEndTime" v-model="endTime" :min="time"
+                                        <v-time-picker v-if="modalEndTime" v-model="endTime" :min="time"
                                             :format="props.use24HourFormat ? '24hr' : 'ampm'"
-                                            :ampm-in-title="!props.use24HourFormat"
-                                        />
+                                            :ampm-in-title="!props.use24HourFormat" />
                                     </v-dialog>
                                 </v-text-field>
-                                <v-text-field
-                                    v-else v-model="endTime" :label="t('endTime')" type="time"
-                                    :rules="[rules.required]"
-                                >
+                                <v-text-field v-else v-model="endTime" :label="t('endTime')" type="time"
+                                    :rules="[rules.required]">
                                     <template #prepend-inner>
                                         <v-icon color="red" icon="mdi-clock-end" />
                                     </template>
@@ -749,15 +663,14 @@
                             </v-col>
                         </v-row>
 
-                        <v-row v-if="period !== 'minutes' && period !== 'hourly'" justify="center" no-gutters>
+                        <v-row v-if="period !== 'minutes' && period !== 'hourly' && props.uiOptionTimespan"
+                            justify="center" no-gutters>
                             <v-col cols="12" class="d-flex justify-center">
                                 <v-label>{{ t('timespan') }}</v-label>
                             </v-col>
                             <v-col cols="12" class="d-flex justify-center">
-                                <v-btn-toggle
-                                    v-model="timespan" mandatory divided variant="elevated" border="sm"
-                                    rounded="xl" @update:model-value="setEndTime"
-                                >
+                                <v-btn-toggle v-model="timespan" mandatory divided variant="elevated" border="sm"
+                                    rounded="xl" @update:model-value="setEndTime">
                                     <v-btn prepend-icon="mdi-circle-off-outline" :value="false">
                                         {{ t('none') }}
                                     </v-btn>
@@ -774,20 +687,16 @@
                             <v-label>{{ t('event') }}</v-label>
                         </v-col>
                         <v-col cols="12" class="d-flex justify-center">
-                            <v-select
-                                v-model="solarEvent" :items="solarEvents" :label="t('selectEvent')" required
-                                :rules="[rules.required]"
-                            >
+                            <v-select v-model="solarEvent" :items="solarEvents" :label="t('selectEvent')" required
+                                :rules="[rules.required]">
                                 <template #prepend-inner>
                                     <v-icon>mdi-weather-sunset</v-icon>
                                 </template>
                             </v-select>
                         </v-col>
                         <v-col cols="12" class="d-flex justify-center">
-                            <v-select
-                                v-model="offset" :items="offsetItems" :label="t('offsetMinutes')"
-                                :rules="[rules.requiredNumber]"
-                            >
+                            <v-select v-model="offset" :items="offsetItems" :label="t('offsetMinutes')"
+                                :rules="[rules.requiredNumber]">
                                 <template #prepend-inner>
                                     <v-icon>mdi-plus-minus</v-icon>
                                 </template>
@@ -797,10 +706,8 @@
                             <v-expansion-panels v-model="solarShowMore" class="my-4" variant="popout">
                                 <v-expansion-panel :title="t('moreOptions')" value="moreOptions">
                                     <v-expansion-panel-text>
-                                        <v-select
-                                            v-model="solarDays" :items="daysOfWeek" :label="t('selectDays')"
-                                            multiple required chips :rules="[rules.required]"
-                                        >
+                                        <v-select v-model="solarDays" :items="daysOfWeek" :label="t('selectDays')"
+                                            multiple required chips :rules="[rules.required]">
                                             <template #prepend-inner>
                                                 <v-icon>mdi-calendar-range</v-icon>
                                             </template>
@@ -821,10 +728,8 @@
                             <v-label>{{ t('description') }}</v-label>
                         </v-col>
                         <v-col cols="12" class="d-flex justify-center">
-                            <v-textarea
-                                v-if="!cronLoading" v-model="cronDescription" readonly rows="2" auto-grow
-                                variant="solo" class="centered-input"
-                            />
+                            <v-textarea v-if="!cronLoading" v-model="cronDescription" readonly rows="2" auto-grow
+                                variant="solo" class="centered-input" />
                             <v-progress-linear v-else indeterminate />
                         </v-col>
                         <v-col v-if="cronNextDates" cols="12" class="d-flex justify-center">
@@ -836,10 +741,8 @@
                                                 {{ t('nextDates')
                                                 }}
                                             </v-list-subheader>
-                                            <v-list-item
-                                                v-for="(date, index) in cronNextDates" :key="index"
-                                                class="px-auto"
-                                            >
+                                            <v-list-item v-for="(date, index) in cronNextDates" :key="index"
+                                                class="px-auto">
                                                 {{ date }}
                                             </v-list-item>
                                             <v-list-subheader class="centered-subheader">
@@ -850,7 +753,7 @@
                                         </v-list>
                                     </v-expansion-panel-text>
                                 </v-expansion-panel>
-                                <v-expansion-panel :title="t('cron') + ' ' + t('custom')">
+                                <v-expansion-panel :title="t('cronInfo')">
                                     <v-expansion-panel-text>
                                         <CronFieldsTable class="mb-4" />
                                         <v-divider />
@@ -863,10 +766,8 @@
                             <v-label>{{ t('expression') }}</v-label>
                         </v-col>
                         <v-col cols="11" class="d-flex justify-center">
-                            <v-text-field
-                                :model-value="cronValue" style="letter-spacing: 2px;"
-                                @update:model-value="getCronDescription" @blur="cronValue = nextCronValue"
-                            >
+                            <v-text-field :model-value="cronValue" style="letter-spacing: 2px;"
+                                @update:model-value="getCronDescription" @blur="cronValue = nextCronValue">
                                 <template #prepend-inner>
                                     <v-icon>mdi-code-brackets</v-icon>
                                 </template>
@@ -878,34 +779,27 @@
                             </v-col>
                         </v-col>
                         <v-col cols="12" class="d-flex justify-center">
-                            <CronVuetify
-                                v-model="cronValue" :fields="fields" :chipProps="{ color: 'primary' }"
-                                format="quartz"
-                            />
+                            <CronVuetify v-model="cronValue" :fields="fields" :chipProps="{ color: 'primary' }"
+                                format="quartz" />
                         </v-col>
                     </v-row>
 
                     <v-row
-                        v-if="((period === 'minutes' || period === 'hourly') || scheduleType === 'solar' || scheduleType === 'cron')"
-                        justify="center" no-gutters
-                    >
+                        v-if="((period === 'minutes' || period === 'hourly') || scheduleType === 'solar' || scheduleType === 'cron') && props.uiOptionTimespan"
+                        justify="center" no-gutters>
                         <v-col cols="12" class="d-flex justify-center">
                             <v-label>{{ t('timespan') }}</v-label>
                         </v-col>
                         <v-col cols="12" class="d-flex justify-center mb-5">
-                            <v-btn-toggle
-                                v-model="timespan" mandatory divided variant="elevated" border="sm"
-                                rounded="xl"
-                            >
+                            <v-btn-toggle v-model="timespan" mandatory divided variant="elevated" border="sm"
+                                rounded="xl">
                                 <v-btn prepend-icon="mdi-circle-off-outline" :value="false">{{ t('none') }}</v-btn>
                                 <v-btn prepend-icon="mdi-timer-sand-complete" value="duration">
                                     {{ t('duration')
                                     }}
                                 </v-btn>
-                                <v-btn
-                                    v-if="(scheduleType === 'solar')" prepend-icon="mdi-clock-time-four-outline"
-                                    :value="'time'"
-                                >
+                                <v-btn v-if="(scheduleType === 'solar')" prepend-icon="mdi-clock-time-four-outline"
+                                    :value="'time'">
                                     {{ t('time') }}
                                 </v-btn>
                             </v-btn-toggle>
@@ -918,45 +812,32 @@
                         </v-col>
                         <v-col
                             v-if="((period === 'minutes' || period === 'hourly') || scheduleType === 'solar' || scheduleType === 'cron')"
-                            cols="12" class="d-flex justify-center"
-                        >
-                            <v-select
-                                v-if="timespan === 'duration'" v-model="duration" :items="durationItems"
-                                :label="t('duration') + ' (' + t('minutes') + ')'" :rules="[rules.required]"
-                            >
+                            cols="12" class="d-flex justify-center">
+                            <v-select v-if="timespan === 'duration'" v-model="duration" :items="durationItems"
+                                :label="t('duration') + ' (' + t('minutes') + ')'" :rules="[rules.required]">
                                 <template #prepend-inner>
                                     <v-icon>mdi-timer-sand-complete</v-icon>
                                 </template>
                             </v-select>
                             <v-col v-if="timespan === 'time'" class="d-flex justify-center">
-                                <v-text-field
-                                    v-if="props.useNewTimePicker" v-model="formattedSolarEventTimespanTime"
-                                    :active="modalTime" :focused="modalTime" readonly :rules="[rules.required]"
-                                    :label="t('time')"
-                                >
+                                <v-text-field v-if="props.uiOptionNewTimePicker"
+                                    v-model="formattedSolarEventTimespanTime" :active="modalTime" :focused="modalTime"
+                                    readonly :rules="[rules.required]" :label="t('time')">
                                     <template #prepend-inner>
-                                        <v-icon
-                                            :color="solarEventStart ? 'red' : 'green'"
-                                            :icon="solarEventStart ? 'mdi-clock-end' : 'mdi-clock-start'"
-                                        />
+                                        <v-icon :color="solarEventStart ? 'red' : 'green'"
+                                            :icon="solarEventStart ? 'mdi-clock-end' : 'mdi-clock-start'" />
                                     </template>
                                     <v-dialog v-model="modalTime" activator="parent" width="auto">
-                                        <v-time-picker
-                                            v-if="modalTime" v-model="solarEventTimespanTime"
+                                        <v-time-picker v-if="modalTime" v-model="solarEventTimespanTime"
                                             :format="props.use24HourFormat ? '24hr' : 'ampm'"
-                                            :ampm-in-title="!props.use24HourFormat"
-                                        />
+                                            :ampm-in-title="!props.use24HourFormat" />
                                     </v-dialog>
                                 </v-text-field>
-                                <v-text-field
-                                    v-else v-model="solarEventTimespanTime" :label="t('time')" type="time"
-                                    :rules="[rules.required]"
-                                >
+                                <v-text-field v-else v-model="solarEventTimespanTime" :label="t('time')" type="time"
+                                    :rules="[rules.required]">
                                     <template #prepend-inner>
-                                        <v-icon
-                                            :color="solarEventStart ? 'red' : 'green'"
-                                            :icon="solarEventStart ? 'mdi-clock-end' : 'mdi-clock-start'"
-                                        />
+                                        <v-icon :color="solarEventStart ? 'red' : 'green'"
+                                            :icon="solarEventStart ? 'mdi-clock-end' : 'mdi-clock-start'" />
                                     </template>
                                 </v-text-field>
                             </v-col>
@@ -968,69 +849,48 @@
                             <v-label>{{ t('output') }}</v-label>
                         </v-col>
                         <v-col cols="12" class="d-flex justify-center">
-                            <v-btn-toggle
-                                v-model="payloadType" mandatory divided variant="elevated" border="sm"
-                                rounded="xl"
-                            >
-                                <v-btn
-                                    v-if="!isTimespanSchedule" prepend-icon="mdi-close-circle-outline" :value="false"
-                                    color="red"
-                                >
+                            <v-btn-toggle v-model="payloadType" mandatory divided variant="elevated" border="sm"
+                                rounded="xl">
+                                <v-btn v-if="!isTimespanSchedule" prepend-icon="mdi-close-circle-outline" :value="false"
+                                    color="red">
                                     {{ t('false') }}
                                 </v-btn>
-                                <v-btn
-                                    v-if="!isTimespanSchedule" prepend-icon="mdi-check-circle-outline" :value="true"
-                                    color="green"
-                                >
+                                <v-btn v-if="!isTimespanSchedule" prepend-icon="mdi-check-circle-outline" :value="true"
+                                    color="green">
                                     {{ t('true') }}
                                 </v-btn>
-                                <v-btn
-                                    v-if="isTimespanSchedule" prepend-icon="mdi-check-circle-outline"
-                                    :value="'true_false'" color="green"
-                                >
+                                <v-btn v-if="isTimespanSchedule" prepend-icon="mdi-check-circle-outline"
+                                    :value="'true_false'" color="green">
                                     {{ t('trueFalse') }}
                                 </v-btn>
-                                <v-btn prepend-icon="mdi-code-braces" :value="'custom'" color="blue">
+                                <v-btn v-if="props.uiOptionCustomOutput" prepend-icon="mdi-code-braces"
+                                    :value="'custom'" color="blue">
                                     {{ t('custom') }}
                                 </v-btn>
                             </v-btn-toggle>
                         </v-col>
                         <v-col v-if="payloadType === 'custom'" cols="12" class="d-flex justify-center mt-3">
-                            <v-select
-                                v-model="customPayloadStart" :items="customPayloads"
+                            <v-select v-model="customPayloadStart" :items="customPayloads"
                                 :item-title="getCustomPayloadTitle" item-value="id"
                                 :label="isTimespanSchedule ? (timespan !== 'time' ? t('customOutputStart') : (solarEventStart && scheduleType === 'solar' ? t('customOutputSolarEvent') : t('customOutputStart'))) : t('customOutput')"
-                                no-data-text="No custom payloads defined"
-                                :rules="rules.required"
-                            >
+                                no-data-text="No custom payloads defined" :rules="rules.required">
                                 <template #prepend-inner>
-                                    <v-icon
-                                        v-if="isTimespanSchedule && scheduleType === 'solar' && timespan === 'time'"
-                                        color="green" :icon="solarEventStart ? 'mdi-weather-sunset' : 'mdi-clock'"
-                                    />
-                                    <v-icon
-                                        :color="isTimespanSchedule ? 'green' : undefined"
-                                        :icon="isTimespanSchedule ? 'mdi-arrow-expand-right' : 'mdi-arrow-right-thin'"
-                                    />
+                                    <v-icon v-if="isTimespanSchedule && scheduleType === 'solar' && timespan === 'time'"
+                                        color="green" :icon="solarEventStart ? 'mdi-weather-sunset' : 'mdi-clock'" />
+                                    <v-icon :color="isTimespanSchedule ? 'green' : undefined"
+                                        :icon="isTimespanSchedule ? 'mdi-arrow-expand-right' : 'mdi-arrow-right-thin'" />
                                 </template>
                             </v-select>
                         </v-col>
-                        <v-col
-                            v-if="payloadType === 'custom' && isTimespanSchedule" cols="12"
-                            class="d-flex justify-center"
-                        >
-                            <v-select
-                                v-model="customPayloadEnd" :items="customPayloads"
+                        <v-col v-if="payloadType === 'custom' && isTimespanSchedule" cols="12"
+                            class="d-flex justify-center">
+                            <v-select v-model="customPayloadEnd" :items="customPayloads"
                                 :item-title="getCustomPayloadTitle" item-value="id"
                                 :label="isTimespanSchedule && timespan !== 'time' ? t('customOutputEnd') : (!solarEventStart && scheduleType === 'solar' ? t('customOutputSolarEvent') : t('customOutputEnd'))"
-                                no-data-text="No custom payloads defined"
-                                :rules="rules.required"
-                            >
+                                no-data-text="No custom payloads defined" :rules="rules.required">
                                 <template #prepend-inner>
-                                    <v-icon
-                                        v-if="isTimespanSchedule && scheduleType === 'solar' && timespan === 'time'"
-                                        color="red" :icon="!solarEventStart ? 'mdi-weather-sunset' : 'mdi-clock'"
-                                    />
+                                    <v-icon v-if="isTimespanSchedule && scheduleType === 'solar' && timespan === 'time'"
+                                        color="red" :icon="!solarEventStart ? 'mdi-weather-sunset' : 'mdi-clock'" />
                                     <v-icon color="red" icon="mdi-arrow-collapse-right" />
                                 </template>
                             </v-select>
@@ -1048,10 +908,8 @@
             </v-card>
         </v-dialog>
 
-        <v-dialog
-            v-model="dialogDelete" min-width="fit-content" scrim="red-darken-4" color="background"
-            max-width="500px"
-        >
+        <v-dialog v-model="dialogDelete" min-width="fit-content" scrim="red-darken-4" color="background"
+            max-width="500px">
             <v-card>
                 <v-card-title class="text-body-2 text-center">
                     {{ t('deleteScheduleConfirmation') }}
@@ -1087,10 +945,8 @@
                         <v-alert type="error" density="compact" variant="outlined">{{ exportError }}</v-alert>
                     </div>
                     <div v-else>
-                        <v-textarea
-                            v-model="exportedScheduleJSON" :label="t('exportedSchedule')" rows="10" auto-grow
-                            readonly
-                        />
+                        <v-textarea v-model="exportedScheduleJSON" :label="t('exportedSchedule')" rows="10" auto-grow
+                            readonly />
                     </div>
                 </v-card-text>
                 <v-card-actions>
@@ -1110,7 +966,8 @@
             <v-card>
                 <v-card-title class="text-h5"> {{ t('importSchedule') }}</v-card-title>
                 <v-card-text>
-                    <v-textarea id="nrdb2-ui-scheduler-import-schedule-textarea" v-model="importText" :label="t('pasteJSONSchedule')" rows="10" auto-grow />
+                    <v-textarea id="nrdb2-ui-scheduler-import-schedule-textarea" v-model="importText"
+                        :label="t('pasteJSONSchedule')" rows="10" auto-grow />
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
@@ -1145,7 +1002,7 @@ import CronFieldsTable from './CronFieldsTable.vue'
 import CronSpecialCharacters from './CronSpecialCharacters.vue'
 import CronVuetify from './cron-vuetify.vue'
 
-function hsvToRgb (h, s, v) {
+function hsvToRgb(h, s, v) {
     let r, g, b
     const i = Math.floor(h * 6)
     const f = h * 6 - i
@@ -1153,36 +1010,36 @@ function hsvToRgb (h, s, v) {
     const q = v * (1 - f * s)
     const t = v * (1 - (1 - f) * s)
     switch (i % 6) {
-    case 0:
-        r = v
-        g = t
-        b = p
-        break
-    case 1:
-        r = q
-        g = v
-        b = p
-        break
-    case 2:
-        r = p
-        g = v
-        b = t
-        break
-    case 3:
-        r = p
-        g = q
-        b = v
-        break
-    case 4:
-        r = t
-        g = p
-        b = v
-        break
-    case 5:
-        r = v
-        g = p
-        b = q
-        break
+        case 0:
+            r = v
+            g = t
+            b = p
+            break
+        case 1:
+            r = q
+            g = v
+            b = p
+            break
+        case 2:
+            r = p
+            g = v
+            b = t
+            break
+        case 3:
+            r = p
+            g = q
+            b = v
+            break
+        case 4:
+            r = t
+            g = p
+            b = v
+            break
+        case 5:
+            r = v
+            g = p
+            b = q
+            break
     }
 
     return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`
@@ -1357,18 +1214,18 @@ export default {
             return this.getProperty('label')
         },
         // Validation rules
-        rules () {
+        rules() {
             return {
                 required: value => !!value || this.t('required'),
                 requiredNumber: value => (value !== undefined && value !== null && (value === 0 || !!value)) || this.t('required')
             }
         },
 
-        fieldItems () {
+        fieldItems() {
             return defaultItems(this.locale)
         },
 
-        fields () {
+        fields() {
             return [
                 { id: 'second', items: this.fieldItems.secondItems },
                 { id: 'minute', items: this.fieldItems.minuteItems },
@@ -1378,25 +1235,25 @@ export default {
                 { id: 'dayOfWeek', items: this.fieldItems.dayOfWeekItems }
             ]
         },
-        schedules () {
+        schedules() {
             return this.getProperty('schedules') || []
         },
-        anyScheduleEnabled () {
+        anyScheduleEnabled() {
             return this.filteredSchedules.some((schedule) => schedule.enabled)
         },
-        formattedTime () {
+        formattedTime() {
             if (!this.time) return ''
             return this.formatTime(this.time)
         },
-        formattedEndTime () {
+        formattedEndTime() {
             if (!this.endTime) return ''
             return this.formatTime(this.endTime)
         },
-        formattedSolarEventTimespanTime () {
+        formattedSolarEventTimespanTime() {
             if (!this.solarEventTimespanTime) return ''
             return this.formatTime(this.solarEventTimespanTime)
         },
-        durationItems () {
+        durationItems() {
             if (this.scheduleType === 'time') {
                 if (this.period === 'minutes') {
                     return this.generateNumberArray(1, this.minutesInterval - 1)
@@ -1408,11 +1265,11 @@ export default {
             }
             return []
         },
-        offsetItems () {
+        offsetItems() {
             return this.generateNumberArray(-120, 120)
         },
 
-        localizedDaysOfMonth () {
+        localizedDaysOfMonth() {
             return this.daysOfMonth().map(day => {
                 return {
                     value: day, // Underlying value (e.g., "1", "2", ..., "Last")
@@ -1421,7 +1278,7 @@ export default {
             })
         },
 
-        uniqueTopics () {
+        uniqueTopics() {
             if (this.schedules && Array.isArray(this.schedules)) {
                 const topics = this.schedules.map((schedule2) => schedule2.topic)
                 return [...new Set(topics)]
@@ -1430,7 +1287,7 @@ export default {
             }
         },
 
-        isValidJson () {
+        isValidJson() {
             try {
                 JSON.parse(this.importText)
                 return true
@@ -1438,7 +1295,7 @@ export default {
                 return false
             }
         },
-        filteredSchedules () {
+        filteredSchedules() {
             if (!this.schedules) {
                 return []
             }
@@ -1458,7 +1315,7 @@ export default {
             })
         },
 
-        filteredHeaders () {
+        filteredHeaders() {
             return this.$vuetify.display.xs
                 ? this.headers.map((header) => {
                     if (header.key === 'name') {
@@ -1468,47 +1325,47 @@ export default {
                 })
                 : this.headers
         },
-        isTimespanSchedule () {
+        isTimespanSchedule() {
             return (this.scheduleType === 'time' && (this.period === 'daily' || this.period === 'weekly' || this.period === 'monthly' || this.period === 'yearly') && this.timespan === 'time') ||
                 (this.scheduleType === 'time' && (this.period === 'minutes' || this.period === 'hourly') && this.timespan === 'duration') ||
                 (this.scheduleType === 'solar' && (this.timespan === 'duration' || this.timespan === 'time')) ||
                 (this.scheduleType === 'cron' && this.timespan === 'duration')
         },
-        customPayloads () {
+        customPayloads() {
             return this.props.customPayloads || []
         },
-        locale () {
+        locale() {
             return this.props.locale || 'en'
         },
-        localeMessages () {
+        localeMessages() {
             let baseMessages
 
             // Select the appropriate translations based on the `locale` prop.
             switch (this.locale) {
-            case 'de':
+                case 'de':
 
-                baseMessages = de
-                break
-            case 'es':
-                baseMessages = es
-                break
-            case 'fr':
-                baseMessages = fr
-                break
-            case 'it':
-                baseMessages = it
-                break
-            case 'nl':
-                baseMessages = nl
-                break
-            case 'en':
-            default:
-                baseMessages = en
-                break
+                    baseMessages = de
+                    break
+                case 'es':
+                    baseMessages = es
+                    break
+                case 'fr':
+                    baseMessages = fr
+                    break
+                case 'it':
+                    baseMessages = it
+                    break
+                case 'nl':
+                    baseMessages = nl
+                    break
+                case 'en':
+                default:
+                    baseMessages = en
+                    break
             }
             return baseMessages
         },
-        menuItems () {
+        menuItems() {
             return [
                 { value: 'reportIssue', label: this.t('reportIssue'), icon: 'mdi-bug', color: 'red-lighten-1' },
                 { value: 'featureRequest', label: this.t('featureRequest'), icon: 'mdi-lightbulb', color: 'yellow-darken-1' },
@@ -1523,7 +1380,7 @@ export default {
                 }
             ]
         },
-        headers () {
+        headers() {
             return [
                 { title: this.t('name'), align: 'start', key: 'name' },
                 { title: this.t('description'), align: 'start', key: 'description' },
@@ -1532,21 +1389,21 @@ export default {
         },
 
         // Localized months
-        months () {
+        months() {
             return this.monthNames.map(month => ({ title: this.t(month), value: month }))
         },
 
         // Localized days of the week
-        daysOfWeek () {
+        daysOfWeek() {
             return this.dayNames.map(day => ({ title: this.t(day), value: day }))
         },
 
         // Localized solar events
-        solarEvents () {
+        solarEvents() {
             return this.solarEventNames.map(event => ({ title: this.t(event), value: event }))
         },
         // JSON representation of the exported schedule
-        exportedScheduleJSON () {
+        exportedScheduleJSON() {
             if (!this.exportedSchedule) return ''
             try {
                 // Ensure we work with an object.
@@ -1564,7 +1421,7 @@ export default {
     },
 
     watch: {
-        expanded (val) {
+        expanded(val) {
             if (this.updatingExpanded) return
 
             if (val.length > 0) {
@@ -1588,13 +1445,13 @@ export default {
                 this.updatingExpanded = false
             }
         },
-        yearlyMonth (newMonth) {
+        yearlyMonth(newMonth) {
             const maxDays = this.getMaxDaysInMonth(newMonth)
             if (this.yearlyDay > maxDays) {
                 this.yearlyDay = maxDays // Reset if the selected day is no longer valid
             }
         },
-        timespan (value) {
+        timespan(value) {
             if (this.period === 'minutes') {
                 if (!this.durationItems.includes((this.minutesInterval ?? 0) - 1)) {
                     this.duration = null
@@ -1612,7 +1469,7 @@ export default {
                 }
             }
         },
-        minutesInterval (value) {
+        minutesInterval(value) {
             if (this.period === 'minutes') {
                 if (!this.durationItems.includes(value - 1)) {
                     this.duration = null
@@ -1620,12 +1477,12 @@ export default {
                 }
             }
         },
-        cronValue (value) {
+        cronValue(value) {
             if (this.scheduleType === 'cron') {
                 this.getCronDescription(value)
             }
         },
-        scheduleType (value) {
+        scheduleType(value) {
             if (value === 'cron') {
                 this.getCronDescription(this.cronValue)
                 if (this.timespan === 'time') {
@@ -1643,22 +1500,22 @@ export default {
                 }
             }
         },
-        dailyDays (value) {
+        dailyDays(value) {
             if (value?.length && Array.isArray(value) && this.period === 'daily' && this.scheduleType === 'time') {
                 this.dailyDays = this.sortDaysOfWeek(value)
             }
         },
-        weeklyDays (value) {
+        weeklyDays(value) {
             if (value?.length && Array.isArray(value) && this.period === 'weekly' && this.scheduleType === 'time') {
                 this.weeklyDays = this.sortDaysOfWeek(value)
             }
         },
-        solarDays (value) {
+        solarDays(value) {
             if (value?.length && Array.isArray(value) && this.scheduleType === 'solar') {
                 this.solarDays = this.sortDaysOfWeek(value)
             }
         },
-        period (value) {
+        period(value) {
             if (this.scheduleType === 'time' && ['daily', 'weekly', 'monthly', 'yearly'].includes(this.period)) {
                 if (this.timespan === 'duration') {
                     this.timespan = false
@@ -1673,7 +1530,7 @@ export default {
 
     },
 
-    created () {
+    created() {
         this.$dataTracker(
             this.id,
             this.onInput,
@@ -1682,15 +1539,15 @@ export default {
         )
         this.$socket.emit('widget-load', this.id)
     },
-    mounted () {
+    mounted() {
         this.updateNowUTC()
         setInterval(this.updateNowUTC, 1000)
     },
-    unmounted () {
+    unmounted() {
     },
 
     methods: {
-        onLoad (msg) {
+        onLoad(msg) {
             if (msg) {
                 this.$store.commit('data/bind', { widgetId: this.id, msg })
                 // if (msg.payload !== undefined) {
@@ -1703,7 +1560,7 @@ export default {
             }
             this.$socket.emit('widget-action', this.id, updateCheck)
         },
-        onInput (msg) {
+        onInput(msg) {
             this.$store.commit('data/bind', { widgetId: this.id, msg })
             if (msg.payload?.cronExpression) {
                 this.cronDescription = msg.payload?.cronExpression.description || ''
@@ -1747,7 +1604,7 @@ export default {
                 }
             }
         },
-        onDynamicProperties (msg) {
+        onDynamicProperties(msg) {
             this.$store.commit('data/bind', { widgetId: this.id, msg })
             const updates = msg.ui_update
             if (!updates) {
@@ -1760,52 +1617,52 @@ export default {
                 this.updateDynamicProperty('label', updates.label)
             }
         },
-        isRowExpanded (item) { return this.expanded.includes(item.name) },
-        highlightExpandedRow () { const rows = this.$el.querySelectorAll('tr'); rows.forEach(row => { const itemName = row.querySelector('td:first-child')?.textContent.trim(); if (this.expanded.includes(itemName)) { row.classList.add('highlighted-row') } else { row.classList.remove('highlighted-row') } }) },
-        handleRowClick (item, index) {
+        isRowExpanded(item) { return this.expanded.includes(item.name) },
+        highlightExpandedRow() { const rows = this.$el.querySelectorAll('tr'); rows.forEach(row => { const itemName = row.querySelector('td:first-child')?.textContent.trim(); if (this.expanded.includes(itemName)) { row.classList.add('highlighted-row') } else { row.classList.remove('highlighted-row') } }) },
+        handleRowClick(item, index) {
             if (this.expanded.length === 0 || this.expanded[0] !== index.item.name) {
                 this.expanded = [index.item.name]
             } else {
                 this.expanded = []
             }
         },
-        handleNextDatesExpand (isOpen) {
+        handleNextDatesExpand(isOpen) {
             if (!isOpen) {
                 // You can add any other actions you want to perform here
             }
         },
 
-        handleMenuItemClick (item) {
+        handleMenuItemClick(item) {
             if (item) {
                 switch (item.value) {
-                case 'reportIssue':
-                    window.open('https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/issues/new?template=bug-report.md', '_blank')
-                    break
-                case 'featureRequest':
-                    window.open('https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/issues/new?labels=enhancement', '_blank')
-                    break
-                case 'buyCoffee':
-                    window.open('https://www.buymeacoffee.com/cgjgh', '_blank')
-                    break
-                case 'updates':
-                    if (!this.isUpdateAvailable) {
-                        const msg = {
-                            action: 'checkUpdate'
+                    case 'reportIssue':
+                        window.open('https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/issues/new?template=bug-report.md', '_blank')
+                        break
+                    case 'featureRequest':
+                        window.open('https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/issues/new?labels=enhancement', '_blank')
+                        break
+                    case 'buyCoffee':
+                        window.open('https://www.buymeacoffee.com/cgjgh', '_blank')
+                        break
+                    case 'updates':
+                        if (!this.isUpdateAvailable) {
+                            const msg = {
+                                action: 'checkUpdate'
+                            }
+                            this.$socket.emit('widget-action', this.id, msg)
+                        } else {
+                            window.open('https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/releases', '_blank')
                         }
-                        this.$socket.emit('widget-action', this.id, msg)
-                    } else {
-                        window.open('https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler/releases', '_blank')
-                    }
-                    break
-                default:
+                        break
+                    default:
                 }
             }
         },
 
-        filterSchedules () {
+        filterSchedules() {
             // This will automatically trigger the computed property 'filteredSchedules'
         },
-        generateNumberArray (min, max) {
+        generateNumberArray(min, max) {
             const array = []
             if (min > max) {
                 return array
@@ -1815,7 +1672,7 @@ export default {
             }
             return array
         },
-        daysOfMonth () {
+        daysOfMonth() {
             if (this.period === 'yearly') {
                 const maxDays = this.getMaxDaysInMonth(this.yearlyMonth)
                 if (maxDays === 0) {
@@ -1828,14 +1685,14 @@ export default {
                 return days
             }
         },
-        getMaxDaysInMonth (monthName) {
+        getMaxDaysInMonth(monthName) {
             const month = this.monthNames.indexOf(monthName) + 1
             if (month === 0) {
                 return 0
             }
             return month === 2 ? 29 : new Date(2024, month, 0).getDate()
         },
-        isNameDuplicate () {
+        isNameDuplicate() {
             return this.schedules
                 ? this.schedules.some(
                     schedule =>
@@ -1846,7 +1703,7 @@ export default {
                 : false
         },
 
-        getCustomPayloadTitle (item) {
+        getCustomPayloadTitle(item) {
             if (!item) return '' // Return empty string if item is null or undefined
 
             let title = item.label || (item.type === 'json' ? JSON.stringify(item.value) : item.value)
@@ -1867,23 +1724,23 @@ export default {
             return title
         },
 
-        mapSolarEvent (event, toTitle = true) {
+        mapSolarEvent(event, toTitle = true) {
             const found = this.solarEvents.find(e => toTitle ? e.value === event : e.title === event)
             return found ? (toTitle ? found.title : found.value) : event
         },
-        mapDayOfWeek (value) {
+        mapDayOfWeek(value) {
             const day = this.daysOfWeek.find(day => day.value === value)
             return day ? day.title : ''
         },
-        mapMonth (value) {
+        mapMonth(value) {
             const month = this.months.find(month => month.value === value)
             return month ? month.title : ''
         },
-        sendSchedule (schedule) {
+        sendSchedule(schedule) {
             const msg = { action: 'submit', payload: { schedules: [schedule] } }
             this.$socket.emit('widget-action', this.id, msg)
         },
-        getCronDescription (expression) {
+        getCronDescription(expression) {
             this.nextCronValue = expression
             this.cronLoading = true
             const msg = { action: 'describe', payload: { cronExpression: expression } }
@@ -1896,7 +1753,7 @@ export default {
                 }
             }, 5000)
         },
-        formatTime (time) {
+        formatTime(time) {
             if (!time) return ''
             const [hours, minutes] = time.split(':')
             if (this.props.use24HourFormat) {
@@ -1907,23 +1764,23 @@ export default {
                 return `${formattedHours}:${minutes} ${period}`
             }
         },
-        updateNowUTC () { this.now = new Date().getTime() },
-        toTitleCase (str) {
+        updateNowUTC() { this.now = new Date().getTime() },
+        toTitleCase(str) {
             return str.charAt(0).toUpperCase() + str.slice(1)
         },
-        openDialog () {
+        openDialog() {
             this.dialog = true
             this.isEditing = false
             this.resetForm()
         },
-        closeDialog () {
+        closeDialog() {
             this.dialog = false
             this.validationResult = {
                 alert: false,
                 message: ''
             }
         },
-        progressValue (item) {
+        progressValue(item) {
             // Destructure currentStartTime from item and nextEndUTC from item.endTask
             const { currentStartTime, endTask: { nextDate: nextEndDate } = {} } = item
 
@@ -1940,7 +1797,7 @@ export default {
             return Math.min(Math.max(value, 0), 100) // Ensure the value stays between 0 and 100
         },
 
-        progressColor (item) {
+        progressColor(item) {
             const progress = this.progressValue(item) / 100 // Normalize to 0-1 range
             const hue = (progress * 120) / 360
             const saturation = 1
@@ -1948,7 +1805,7 @@ export default {
             return hsvToRgb(hue, saturation, value)
         },
 
-        saveSchedule () {
+        saveSchedule() {
             this.validationResult = this.validateSchedule()
             if (this.validationResult.alert) {
                 return
@@ -2057,7 +1914,7 @@ export default {
             this.expanded = []
         },
 
-        validateSchedule () {
+        validateSchedule() {
             if (!this.name) {
                 return { alert: true, message: this.t('scheduleNameRequired') }
             }
@@ -2164,7 +2021,7 @@ export default {
             return { alert: false, message: '' }
         },
 
-        getSelectedDays () {
+        getSelectedDays() {
             if (this.period === 'daily') {
                 return this.dailyDays
             } else if (this.period === 'weekly') {
@@ -2176,12 +2033,12 @@ export default {
             }
             return []
         },
-        sortDaysOfWeek (days) {
+        sortDaysOfWeek(days) {
             const dayOrder = this.daysOfWeek.map(day => day.value)
             return days.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b))
         },
 
-        getChipColor (day) {
+        getChipColor(day) {
             const colors = {
                 sunday: 'red',
                 monday: 'yellow-darken-2',
@@ -2194,7 +2051,7 @@ export default {
 
             return colors[day]
         },
-        toggleSchedule (item) {
+        toggleSchedule(item) {
             const enabled = !item.enabled
             if (item.id) {
                 this.$socket.emit('widget-action', this.id, {
@@ -2210,7 +2067,7 @@ export default {
                 })
             }
         },
-        toggleAllSchedules () {
+        toggleAllSchedules() {
             const enabled = !this.anyScheduleEnabled
 
             const ids = this.filteredSchedules.map(schedule => schedule.id).filter(id => id)
@@ -2234,7 +2091,7 @@ export default {
             }
         },
 
-        requestStatus (item) {
+        requestStatus(item) {
             if (item.id) {
                 this.$socket.emit('widget-action', this.id, {
                     action: 'requestStatus',
@@ -2251,11 +2108,11 @@ export default {
                 })
             }
         },
-        toggleExpandedItem (item) {
+        toggleExpandedItem(item) {
             this.expandedItem = this.expandedItem === item ? null : item
             this.requestStatus(item)
         },
-        editSchedule (item) {
+        editSchedule(item) {
             this.resetForm() // Initialize with defaults first
 
             this.currentSchedule = item
@@ -2316,11 +2173,12 @@ export default {
             this.dialog = true
         },
 
-        resetForm () {
+        resetForm() {
             this.scheduleId = null
             const baseName = this.t('schedule')
             let newName = baseName
             let index = 2
+            const uiOptions = this.getDefaultUIOptions(this.props)
 
             if (this.schedules) {
                 while (this.schedules.some(schedule => schedule.name === newName)) {
@@ -2341,8 +2199,8 @@ export default {
             }
             this.enabled = true
             this.invalid = false
-            this.scheduleType = 'time'
-            this.period = 'daily'
+            this.scheduleType = uiOptions.scheduleType || 'time'
+            this.period = uiOptions.period || 'daily'
             this.dailyDays = [...this.daysOfWeek.map(day => day.value)]
             this.weeklyDays = ['monday']
             this.monthlyDays = [1]
@@ -2365,7 +2223,46 @@ export default {
             this.customPayloadStart = null
             this.customPayloadEnd = null
         },
-        setEndTime () {
+
+        getDefaultUIOptions(props) {
+            if (!props) return {}
+            const options = {}
+
+            // Handle scheduleType
+            const scheduleTypes = ['uiOptionTime', 'uiOptionSolar', 'uiOptionCron']
+            for (const type of scheduleTypes) {
+                if (props[type]) {
+                    options.scheduleType = type.replace('uiOption', '').toLowerCase()
+                    break
+                }
+            }
+            if (!options.scheduleType) {
+                options.scheduleType = 'time' // Default value if none match
+            }
+
+            // Handle period
+            const periods = {
+                uiOptionDay: 'daily',
+                uiOptionHour: 'hourly',
+                uiOptionMinute: 'minutes',
+                uiOptionWeek: 'weekly',
+                uiOptionMonth: 'monthly',
+                uiOptionYear: 'yearly'
+            }
+
+            for (const [prop, value] of Object.entries(periods)) {
+                if (props[prop]) {
+                    options.period = value
+                    break
+                }
+            }
+            if (!options.period) {
+                options.period = 'daily' // Default value if none match
+            }
+            return options
+        },
+
+        setEndTime() {
             if (this.timespan !== 'time') {
                 this.endTime = null
             } else {
@@ -2392,13 +2289,13 @@ export default {
                 }
             }
         },
-        openDeleteDialog () {
+        openDeleteDialog() {
             this.dialogDelete = true
         },
-        closeDelete () {
+        closeDelete() {
             this.dialogDelete = false
         },
-        deleteConfirm () {
+        deleteConfirm() {
             if (this.currentSchedule) {
                 if (this.currentSchedule.id) {
                     const index = this.schedules.findIndex(schedule => schedule.id === this.currentSchedule.id)
@@ -2425,7 +2322,7 @@ export default {
         },
 
         // Opens the export dialog and initiates the export request.
-        openExportDialog () {
+        openExportDialog() {
             this.showExportDialog = true
             this.exportLoading = true
             this.exportError = ''
@@ -2447,7 +2344,7 @@ export default {
             })
         },
         // Copies the exported schedule text to the clipboard.
-        copyExport () {
+        copyExport() {
             navigator.clipboard
                 .writeText(this.exportedScheduleJSON)
                 .then(() => {
@@ -2461,22 +2358,22 @@ export default {
                     console.error('Failed to copy:', err)
                 })
         },
-        closeExportDialog () {
+        closeExportDialog() {
             this.showExportDialog = false
             // Remove the socket listener for cleanliness.
             // this.$socket.off('exported-schedule')
         },
         // Opens the import dialog.
-        openImportDialog () {
+        openImportDialog() {
             this.showImportDialog = true
             this.importText = ''
         },
-        closeImportDialog () {
+        closeImportDialog() {
             this.showImportDialog = false
         },
         // Handles the import action: parses the text, iterates through keys,
         // and calls editSchedule() for each schedule item.
-        handleImport () {
+        handleImport() {
             let parsedData
             try {
                 parsedData = JSON.parse(this.importText)
@@ -2545,7 +2442,7 @@ export default {
             }
         },
 
-        copyToClipboard (item) {
+        copyToClipboard(item) {
             const el = document.createElement('textarea')
             el.value = JSON.stringify(item)
             document.body.appendChild(el)
@@ -2557,7 +2454,7 @@ export default {
 
         // Simple translation function that returns the message for a given key.
         // If the key is not found, it falls back to displaying the key.
-        t (key) {
+        t(key) {
             return this.localeMessages[key] || key
         }
     }
