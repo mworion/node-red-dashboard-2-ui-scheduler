@@ -93,7 +93,7 @@
         "locale": "en",
         "timeZone": "America/Chicago",
         "use24HourFormat": true,
-        "storeName": "NONE",
+        "storeName": "local_file_system",
         "commandResponseMsgOutput": "fanOut",
         "defaultLocation": "",
         "defaultLocationType": "env",
@@ -130,7 +130,9 @@
         "y": 120,
         "wires": [
             [],
-            []
+            [
+                "4ba30b2dd2dc9963"
+            ]
         ]
     },
     {
@@ -198,5 +200,22 @@
                 "3463d87e74ad75a3"
             ]
         ]
+    },
+    {
+        "id": "4ba30b2dd2dc9963",
+        "type": "debug",
+        "z": "fbbaa338350e1589",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 740,
+        "y": 200,
+        "wires": []
     }
 ]
