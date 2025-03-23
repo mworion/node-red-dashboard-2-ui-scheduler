@@ -35,3 +35,4 @@ cypress/fixtures/user-dir/.config.users.json
 cypress/fixtures/user-dir/.flows.json.backup
 cypress/fixtures/user-dir/flows.json
 *.sqlite
+cypress/fixtures/user-dir/.config.users.json.backup
