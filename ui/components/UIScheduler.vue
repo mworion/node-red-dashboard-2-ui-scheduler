@@ -897,7 +897,7 @@
                         <v-col cols="11" class="d-flex justify-center">
                             <v-text-field
                                 :model-value="cronValue" style="letter-spacing: 2px;"
-                                @update:model-value="getCronDescription" @blur="cronValue = nextCronValue"
+                                @update:model-value="updateCronValue"
                             >
                                 <template #prepend-inner>
                                     <v-icon>mdi-code-brackets</v-icon>
@@ -911,7 +911,7 @@
                         </v-col>
                         <v-col cols="12" class="d-flex justify-center">
                             <CronVuetify
-                                v-model="cronValue" :fields="fields" :chipProps="{ color: 'primary' }"
+                                v-model="cronValue" :fields="fields" :locale="locale" :chipProps="{ color: 'primary' }"
                                 format="quartz"
                             />
                         </v-col>
@@ -1919,8 +1919,10 @@ export default {
             const msg = { action: 'submit', payload: { schedules: [schedule] } }
             this.$socket.emit('widget-action', this.id, msg)
         },
+        updateCronValue (expression) {
+            this.cronValue = expression
+        },
         getCronDescription (expression) {
-            this.nextCronValue = expression
             this.cronLoading = true
             const msg = { action: 'describe', payload: { cronExpression: expression } }
             this.$socket.emit('widget-action', this.id, msg)
