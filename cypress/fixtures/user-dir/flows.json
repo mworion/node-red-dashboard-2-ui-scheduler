@@ -23,11 +23,18 @@
         "type": "ui-theme",
         "name": "Default Theme",
         "colors": {
-            "surface": "#ffffff",
+            "surface": "#000000",
             "primary": "#0094ce",
-            "bgPage": "#eeeeee",
-            "groupBg": "#ffffff",
+            "bgPage": "#212121",
+            "groupBg": "#363636",
             "groupOutline": "#cccccc"
+        },
+        "sizes": {
+            "density": "default",
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "4px",
+            "widgetGap": "12px"
         }
     },
     {
@@ -43,19 +50,6 @@
         "className": "",
         "visible": "true",
         "disabled": false
-    },
-    {
-        "id": "4f87d7d9fab04a9d",
-        "type": "ui-group",
-        "name": "Scheduler Dynamic Properties",
-        "page": "dashboard-ui-page-1",
-        "width": "6",
-        "height": "1",
-        "order": 2,
-        "showTitle": true,
-        "className": "",
-        "visible": "true",
-        "disabled": "false"
     },
     {
         "id": "a1ba982f1e2167e3",
@@ -78,7 +72,7 @@
         "page": "dashboard-ui-page-1",
         "width": 6,
         "height": 1,
-        "order": 3,
+        "order": 2,
         "showTitle": true,
         "className": "",
         "visible": "true",
