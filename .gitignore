@@ -26,7 +26,9 @@ dist-ssr
 
 # No need to include lock file
 package-lock.json
+
 *.tgz
+# exclude cypress files
 cypress/fixtures/user-dir/.config.runtime.json
 cypress/fixtures/user-dir/.config.nodes.json
 cypress/fixtures/user-dir/.config.nodes.json.backup
@@ -35,4 +37,8 @@ cypress/fixtures/user-dir/.config.users.json
 cypress/fixtures/user-dir/.flows.json.backup
 cypress/fixtures/user-dir/flows.json
 *.sqlite
+.qodo
+cypress/fixtures/user-dir/.config.users.json.backup
+cypress/fixtures/user-dir/.flows.json.backup
+cypress/fixtures/user-dir/.flows.json.backup
 cypress/fixtures/user-dir/.config.users.json.backup
