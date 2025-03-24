@@ -25,7 +25,7 @@ dist-ssr
 *.sw?
 
 # No need to include lock file
-package-lock.json
+# package-lock.json
 
 *.tgz
 # exclude cypress files
