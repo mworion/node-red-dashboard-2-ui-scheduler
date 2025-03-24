@@ -1,4 +1,4 @@
-const version = '3.2.2'
+const version = '3.3.0'
 const packageName = '@cgjgh/node-red-dashboard-2-ui-scheduler'
 /* eslint-disable no-unused-vars */
 
@@ -1989,6 +1989,23 @@ module.exports = function (RED) {
         node.queuedSerialisationRequest = null
         node.serialisationRequestBusy = null
         node.postponeSerialisation = true
+
+        // set ui option defaults
+        config.uiOptionTime = config.uiOptionTime || true
+        config.uiOptionSolar = config.uiOptionSolar || true
+        config.uiOptionCron = config.uiOptionCron || true
+        config.uiOptionPeriod = config.uiOptionPeriod || 'daily'
+        config.uiOptionMinute = config.uiOptionMinute || true
+        config.uiOptionHour = config.uiOptionHour || true
+        config.uiOptionDay = config.uiOptionDay || true
+        config.uiOptionWeek = config.uiOptionWeek || true
+        config.uiOptionMonth = config.uiOptionMonth || true
+        config.uiOptionYear = config.uiOptionYear || true
+        config.uiOptionTopic = config.uiOptionTopic || true
+        config.uiOptionTimespan = config.uiOptionTimespan || true
+        config.uiOptionCustomOutput = config.uiOptionCustomOutput || true
+        config.uiOptionNewTimePicker = config.uiOptionNewTimePicker || false
+
         checkForUpdate(version, packageName, (result) => {
             if (result) {
                 node.updateAvailable = config.updateAvailable = result.updateAvailable
@@ -3381,8 +3398,10 @@ module.exports = function (RED) {
             } catch (error) { }
         }
 
-        function updateSchedules (node, schedules) {
-            node.schedules = schedules
+        function updateSchedules (node, schedules = null) {
+            if (schedules) {
+                node.schedules = schedules
+            }
             updateUISchedules(node)
         }
 
@@ -4028,7 +4047,7 @@ module.exports = function (RED) {
                                 cmds.push(cmd)
                             }
 
-                            // Get or add the schedule
+                            // Get or add the schedule, no need t delete task sunce not started yet
                             const nodeSchedule = getSchedule(node, schedule.id)
                             if (nodeSchedule) {
                                 // Directly overwrite nodeSchedule object
@@ -4125,7 +4144,8 @@ module.exports = function (RED) {
                                     // Get or add the schedule
                                     const nodeSchedule = getSchedule(node, schedule.id)
                                     if (nodeSchedule) {
-                                        Object.assign(nodeSchedule, schedule) // Update existing schedule
+                                        // Directly overwrite nodeSchedule object
+                                        node.schedules[node.schedules.indexOf(nodeSchedule)] = schedule
                                     } else {
                                         schedules.push(schedule) // Add new schedule
                                     }
@@ -4964,7 +4984,7 @@ module.exports = function (RED) {
                 const schedules = node.schedules || []
                 const scheduleCommands = processSchedules(inputSchedule, schedules)
 
-                updateSchedules(node, schedules)
+                updateSchedules(node)
                 emitUiUpdate(node, getUiSchedules(node), 'submit')
 
                 if (scheduleCommands.length > 0) {
@@ -4999,9 +5019,9 @@ module.exports = function (RED) {
                 requestSerialisation()
 
                 inputSchedule.forEach(({ id }) => {
-                    const schedule = getSchedule(node, id)
+                    let schedule = getSchedule(node, id)
                     if (schedule) {
-                        updateScheduleNextStatus(node, schedule, false)
+                        schedule = updateScheduleNextStatus(node, schedule, false)
                     } else {
                         console.warn(`Schedule not found for ID: ${id}`)
                     }
@@ -5025,17 +5045,20 @@ module.exports = function (RED) {
                 schedule.id = schedule.id ?? RED.util.generateId()
                 schedule.isDynamic = schedule.isStatic !== true
 
+                const existingSchedule = getSchedule(node, schedule.id)
+                if (existingSchedule) {
+                    // delete old schedule and tasks for cleanliness
+                    deleteSchedule(node, existingSchedule.id)
+                }
+
                 const cmd = generateTaskCmd(schedule)
                 if (cmd?.primary) schedule.primaryTaskId = cmd.id
                 if (cmd) commands.push(cmd)
 
-                const existingSchedule = getSchedule(node, schedule.id)
-                if (existingSchedule) {
-                    // Directly overwrite existingSchedule object
-                    schedules[schedules.indexOf(existingSchedule)] = schedule
-                } else {
-                    schedules.push(schedule)
-                }
+                // ensure were working with up to date schedule array
+                schedules = node.schedules
+
+                schedules.push(schedule)
             })
             return commands
         }

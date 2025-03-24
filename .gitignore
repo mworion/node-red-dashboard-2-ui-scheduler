@@ -40,4 +40,3 @@ cypress/fixtures/user-dir/flows.json
 .qodo
 cypress/fixtures/user-dir/.config.users.json.backup
 cypress/fixtures/user-dir/.flows.json.backup
-cypress/fixtures/user-dir/.flows.json.backup

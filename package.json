@@ -1,6 +1,6 @@
 {
     "name": "@cgjgh/node-red-dashboard-2-ui-scheduler",
-    "version": "3.2.2",
+    "version": "3.3.0",
     "description": "A UI scheduler node that integrates with Node-RED Dashboard 2.0",
     "keywords": [
         "node-red",
