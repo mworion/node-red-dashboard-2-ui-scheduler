@@ -3,7 +3,7 @@
 title: "Node-RED Dashboard 2 UI Scheduler"
 description: "Official documentation for Node-RED Dashboard 2 UI Scheduler"
 author: "cgjgh"
-baseurl: "/docs" # The subpath of your site, e.g. /blog
+baseurl: "/node-red-dashboard-2-ui-scheduler" # The subpath of your site, e.g. /blog
 url: "https://cgjgh.github.io/node-red-dashboard-2-ui-scheduler"
 github_repo_url: "https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler"
 
