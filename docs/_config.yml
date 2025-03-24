@@ -8,10 +8,11 @@ url: "https://cgjgh.github.io/node-red-dashboard-2-ui-scheduler"
 github_repo_url: "https://github.com/cgjgh/node-red-dashboard-2-ui-scheduler"
 
 # Themes and Plugins
-theme: jekyll-theme-minimal
+remote_theme: pages-themes/midnight@v0.2.0
 plugins:
   - jekyll-feed
   - jekyll-sitemap
+  - jekyll-remote-theme
 
 # Build settings
 markdown: kramdown
