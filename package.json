@@ -1,6 +1,6 @@
 {
   "name": "@cgjgh/node-red-dashboard-2-ui-scheduler",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "description": "A UI scheduler node that integrates with Node-RED Dashboard 2.0",
   "keywords": [
     "node-red",
@@ -21,7 +21,8 @@
   "files": [
     "nodes/*",
     "ui/*",
-    "resources/*"
+    "resources/*",
+    "examples/*"
   ],
   "scripts": {
     "build": "npm run replace-import-paths && vite build && npm run add-package-info",
