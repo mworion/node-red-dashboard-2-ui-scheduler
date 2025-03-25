@@ -237,7 +237,7 @@
                                                     <v-icon>mdi-calendar-range</v-icon>
                                                 </template>
                                                 <v-list-item-title>{{ t('days') }}</v-list-item-title>
-                                                <v-list-item-subtitle>
+                                                <v-list-item-subtitle class="pb-2">
                                                     <v-chip
                                                         v-for="(day, index) in item.solarDays" :key="index"
                                                         :color="getChipColor(day)" density="compact"
