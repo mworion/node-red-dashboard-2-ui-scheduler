@@ -1991,20 +1991,20 @@ module.exports = function (RED) {
         node.postponeSerialisation = true
 
         // set ui option defaults
-        config.uiOptionTime = config.uiOptionTime || true
-        config.uiOptionSolar = config.uiOptionSolar || true
-        config.uiOptionCron = config.uiOptionCron || true
-        config.uiOptionPeriod = config.uiOptionPeriod || 'daily'
-        config.uiOptionMinute = config.uiOptionMinute || true
-        config.uiOptionHour = config.uiOptionHour || true
-        config.uiOptionDay = config.uiOptionDay || true
-        config.uiOptionWeek = config.uiOptionWeek || true
-        config.uiOptionMonth = config.uiOptionMonth || true
-        config.uiOptionYear = config.uiOptionYear || true
-        config.uiOptionTopic = config.uiOptionTopic || true
-        config.uiOptionTimespan = config.uiOptionTimespan || true
-        config.uiOptionCustomOutput = config.uiOptionCustomOutput || true
-        config.uiOptionNewTimePicker = config.uiOptionNewTimePicker || false
+        config.uiOptionTime = config.uiOptionTime ?? true
+        config.uiOptionSolar = config.uiOptionSolar ?? true
+        config.uiOptionCron = config.uiOptionCron ?? true
+        config.uiOptionPeriod = config.uiOptionPeriod ?? 'daily'
+        config.uiOptionMinute = config.uiOptionMinute ?? true
+        config.uiOptionHour = config.uiOptionHour ?? true
+        config.uiOptionDay = config.uiOptionDay ?? true
+        config.uiOptionWeek = config.uiOptionWeek ?? true
+        config.uiOptionMonth = config.uiOptionMonth ?? true
+        config.uiOptionYear = config.uiOptionYear ?? true
+        config.uiOptionTopic = config.uiOptionTopic ?? true
+        config.uiOptionTimespan = config.uiOptionTimespan ?? true
+        config.uiOptionCustomOutput = config.uiOptionCustomOutput ?? true
+        config.uiOptionNewTimePicker = config.uiOptionNewTimePicker ?? false
 
         checkForUpdate(version, packageName, (result) => {
             if (result) {
