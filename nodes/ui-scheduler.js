@@ -1778,7 +1778,7 @@ function getTaskStatus (node, task, opts, getNextDates = false) {
      * @param {boolean} [getNextDates=true] - Flag to determine if next dates should be retrieved.
      * @returns {Object} The updated schedule with recalculated task statuses and durations.
      */
-function updateScheduleNextStatus (node, schedule, getNextDates = true) {
+function updateScheduleNextStatus (node, schedule, getNextDates = true, run = false) {
     const calculateDuration = (start, end) => {
         if (start && end) {
             return new Date(end) - new Date(start) // duration in milliseconds
@@ -2841,28 +2841,33 @@ module.exports = function (RED) {
                     case 'delete-': // multiple
                         deleteAllSchedules(node, cmdFilter)
                         updateNextStatus(node, true)
+                        updateSchedules(node)
                         requestSerialisation()// update persistence
                         break
                     case 'remove': // single
                     case 'delete': // single
                         deleteSchedule(node, cmd.name)
                         updateNextStatus(node, true)
+                        updateSchedules(node)
                         requestSerialisation()// update persistence
                         break
                     case 'start': // single
                         startSchedule(node, getScheduleId(node, cmd.name))
                         updateNextStatus(node, true)
+                        updateSchedules(node)
                         requestSerialisation()// update persistence
                         break
                     case 'start-': // multiple
                         startAllSchedules(node, cmdFilter)
                         updateNextStatus(node, true)
+                        updateSchedules(node)
                         requestSerialisation()// update persistence
                         break
                     case 'stop': // single
                     case 'pause': // single
                         stopSchedule(node, getScheduleId(node, cmd.name), cmd.command === 'stop')
                         updateNextStatus(node, true)
+                        updateSchedules(node)
                         requestSerialisation()// update persistence
                         break
                     case 'stop-': // multiple
@@ -2870,6 +2875,7 @@ module.exports = function (RED) {
                         const resetCounter = cmd.command.startsWith('stop-')
                         stopAllSchedules(node, resetCounter, cmdFilter)
                         updateNextStatus(node, true)
+                        updateSchedules(node)
                         requestSerialisation()// update persistence
                     }
                         break
@@ -3425,10 +3431,14 @@ module.exports = function (RED) {
             updateUISchedules(node)
         }
 
-        function updateUISchedules (node) {
+        function updateUISchedules (node, emitEvent = true) {
             const schedules = node.schedules || []
             const uiSchedules = schedules.map(schedule => generateUiSchedule(schedule))
             base.stores.state.set(base, node, null, 'schedules', uiSchedules)
+            if (emitEvent) {
+                const m = { ui_update: { schedules: uiSchedules } }
+                base.emit('msg-input:' + node.id, m, node)
+            }
             return uiSchedules
         }
 
@@ -3866,8 +3876,13 @@ module.exports = function (RED) {
                                     // check if end task is already completed
                                     if (now < nextEndTimeOccurrence) {
                                         nextEndDate = nextEndTimeOccurrence
-                                        schedule.active = true
-                                        schedule.currentStartTime = schedule?.primaryTask?.lastDate
+                                        if (schedule.primaryTask.nextDate > nextEndDate) {
+                                            schedule.active = true
+                                            schedule.currentStartTime = schedule?.primaryTask?.lastDate
+                                        } else {
+                                            schedule.active = false
+                                            schedule.currentStartTime = null
+                                        }
                                     }
                                 }
 
