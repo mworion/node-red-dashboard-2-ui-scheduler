@@ -511,9 +511,9 @@ function setTimeForTZ (inputDateTime, timezone, timeArray) {
 
     // Create a TZDate instance in the given timezone
     const tzDate = new TZDate(
-        inputDateTime.getUTCFullYear(),
-        inputDateTime.getUTCMonth(),
-        inputDateTime.getUTCDate(),
+        inputDateTime.getFullYear(),
+        inputDateTime.getMonth(),
+        inputDateTime.getDate(),
         inputHour,
         inputMinute,
         inputSecond,
