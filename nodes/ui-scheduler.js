@@ -139,6 +139,7 @@ const abbreviateDays = (description) => {
 let futureTemplate = 'in {time}'
 let pastTemplate = '{time} ago'
 let never = 'Never'
+let lessThanASecond = 'Less than a second'
 
 /**
  * Converts a given time in milliseconds to a human-readable format indicating
@@ -152,12 +153,19 @@ let never = 'Never'
  */
 function pastMs (ms) {
     if (!ms) ms = 0
-    let enhanced = enhancedMs(ms)
-    if (enhanced && enhanced.indexOf('-') >= 0) {
-        enhanced = enhanced.replace(/-/g, '')
+    let formatted
+    if (ms < 1000) {
+        formatted = lessThanASecond
+    } else {
+        // Otherwise, format normally
+        formatted = enhancedMs(ms)
     }
 
-    return pastTemplate.replace('{time}', enhanced)
+    if (formatted && formatted.indexOf('-') >= 0) {
+        formatted = formatted.replace(/-/g, '')
+    }
+
+    return pastTemplate.replace('{time}', formatted)
 }
 
 /**
@@ -169,7 +177,19 @@ function pastMs (ms) {
  */
 function futureMs (ms) {
     if (!ms) ms = 0
-    return futureTemplate.replace('{time}', enhancedMs(ms))
+    let formatted
+    if (ms < 1000) {
+        formatted = lessThanASecond
+    } else {
+        // Otherwise, format normally
+        formatted = enhancedMs(ms)
+    }
+
+    if (formatted && formatted.indexOf('-') >= 0) {
+        formatted = formatted.replace(/-/g, '')
+    }
+
+    return futureTemplate.replace('{time}', formatted)
 }
 
 // accepted commands using topic as the command & (in compatible cases, the payload is the schedule name)
@@ -310,6 +330,7 @@ function applyLocalizedWords (RED) {
     futureTemplate = RED._('ui-scheduler.label.future')
     pastTemplate = RED._('ui-scheduler.label.past')
     never = RED._('ui-scheduler.label.never')
+    lessThanASecond = RED._('ui-scheduler.label.lessThanASecond')
 }
 
 /**
@@ -629,24 +650,23 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
     if (exOk) {
         const ex = cronosjs.CronosExpression.parse(expression, cronOpts)
         const next = ex.nextDate()
-        const previous = ex.previousDate()
+        // Add 1 second to the current time to avoid edge cases where the previous date is the same as the current date
+        const nowPlus = new Date(now.getTime() + 1000)
+        const previous = ex.previousDate(nowPlus, false)
         if (next) {
             const ms = next.valueOf() - now.valueOf()
             result.prettyNext = (result.nextEvent ? getSolarEventName(result.nextEvent) + ' ' : '') + futureMs(ms)
         }
-        const msLast = result.previousDate ? now.valueOf() - result.previousDate.valueOf() : 0
-        result.prettyPrevious = msLast > 0 ? (result.lastEvent ? getSolarEventName(result.lastEvent) + ' ' : '') + pastMs(msLast) : never
-
         try {
             result.nextDates = ex.nextNDates(now, 5)
         } catch (error) {
             console.debug(error)
         }
         if (previous) {
-            const ms = now.valueOf() - previous.valueOf()
-            result.prettyPrevious = pastMs(ms)
+            const msLast = now.valueOf() - previous.valueOf()
+            result.prettyPrevious = pastMs(msLast)
             try {
-                result.prevDates = ex.previousNDates(now, 5)
+                result.prevDates = ex.previousNDates(nowPlus, 5)
             } catch (error) {
                 console.debug(error)
             }

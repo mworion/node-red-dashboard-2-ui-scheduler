@@ -61,7 +61,8 @@
       "done": "Fatto",
       "future": "tra {time}",
       "past": "fa {time}",
-      "never": "Mai"
+      "never": "Mai",
+      "lessThanASecond": "Meno di un secondo"
     },
     "days": {
       "sunday": "Domenica",

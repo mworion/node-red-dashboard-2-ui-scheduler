@@ -61,7 +61,8 @@
       "done": "Terminé",
       "future": "dans {time}",
       "past": "il y a {time}",
-      "never": "Jamais"
+      "never": "Jamais",
+      "lessThanASecond": "Moins d'une seconde"
     },
     "days": {
       "sunday": "Dimanche",
