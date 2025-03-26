@@ -457,7 +457,7 @@
                     <span class="text-h5">{{ isEditing ? t('editSchedule') : t('newSchedule') }}</span>
                     <div class="d-flex align-items-center">
                         <v-switch
-                            v-model="enabled" :disabled="invalid" :label="enabled ? t('enabled') : t('disabled')"
+                            v-model="enabled" :disabled="invalid" :label=" !$vuetify.display.xs ? (enabled ? t('enabled') : t('disabled')) : ''"
                             :color="enabled ? 'green' : 'default'" required class="mr-2"
                         />
                         <v-btn
