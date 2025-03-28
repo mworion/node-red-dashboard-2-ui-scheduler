@@ -1706,9 +1706,10 @@ function getTaskStatus (node, task, opts, getNextDates = false) {
     opts.defaultLocation = node.defaultLocation
     opts.defaultLocationType = node.defaultLocationType
     opts.solarDays = task.node_opt?.solarDays || null
+    opts.date = task.node_opt?.date || null
     const sol = task.node_expressionType === 'solar'
     const exp = sol ? task.node_location : task.node_expression
-    const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, null, opts, node.use24HourFormat, node.locale)
+    const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, opts.date, opts, node.use24HourFormat, node.locale)
     let nextDescription = null
     let nextDate = null
     let lastDescription = null
@@ -3803,7 +3804,7 @@ module.exports = function (RED) {
                             if (task.node_expressionType === 'cron' && schedule.scheduleType === 'solar') {
                                 const { payload: endPayload, payloadType: endPayloadType } = getPayloadAndType(schedule, 'endPayloadValue', false)
 
-                                const solarCmd = {
+                                let solarCmd = {
                                     command: 'add',
                                     id: schedule.endTaskId || RED.util.generateId(),
                                     scheduleId: schedule.id,
