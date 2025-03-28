@@ -232,7 +232,7 @@
                                                 </v-list-item-subtitle>
                                             </v-list-item>
 
-                                            <v-list-item v-if="item.solarDays" lines="two" class="prepend-icon-spacing">
+                                            <v-list-item v-if="item.solarDays" lines="3" class="prepend-icon-spacing">
                                                 <template #prepend>
                                                     <v-icon>mdi-calendar-range</v-icon>
                                                 </template>
