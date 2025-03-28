@@ -65,17 +65,17 @@
   padding-inline-start: 0px !important;
 }
 
-.v-btn--density-compact {
-  --widget-row-height: 32px;
-  max-height: 32px;
+.scheduler-button .v-btn--density-compact {
+  --widget-row-height: 32px !important;
+  max-height: 32px !important;
 }
 
-.v-btn--density-comfortable {
-  --widget-row-height: 38px;
-  max-height: 38px;
+.scheduler-button .v-btn--density-comfortable {
+  --widget-row-height: 38px !important;
+  max-height: 38px !important;
 }
 
-.v-btn--density-default {
-  --widget-row-height: 48px;
-  max-height: 48px;
+.scheduler-button .v-btn--density-default {
+  --widget-row-height: 48px !important;
+  max-height: 48px !important;
 }
