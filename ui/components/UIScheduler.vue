@@ -232,7 +232,7 @@
                                                 </v-list-item-subtitle>
                                             </v-list-item>
 
-                                            <v-list-item v-if="item.solarDays" lines="two" class="prepend-icon-spacing">
+                                            <v-list-item v-if="item.solarDays" lines="3" class="prepend-icon-spacing">
                                                 <template #prepend>
                                                     <v-icon>mdi-calendar-range</v-icon>
                                                 </template>
@@ -453,7 +453,7 @@
                 </v-alert>
             </v-row>
             <v-card :class="{ 'bordered-card': !$vuetify.display.xs, 'border-none': $vuetify.display.xs }" class="pa-2">
-                <v-card-title class="d-flex align-items-center justify-space-between pb-0">
+                <v-card-title class="d-flex align-items-center justify-space-between pb-0 scheduler-button">
                     <span class="text-h5">{{ isEditing ? t('editSchedule') : t('newSchedule') }}</span>
                     <div class="d-flex align-items-center">
                         <v-switch
@@ -523,7 +523,8 @@
                         </v-col>
                         <v-col cols="12" class="d-flex justify-center">
                             <v-btn-toggle
-                                v-model="scheduleType" :label="t('scheduleType')" mandatory divided
+                                v-model="scheduleType"
+                                class="scheduler-button" :label="t('scheduleType')" mandatory divided
                                 variant="elevated" border="sm" rounded="xl"
                             >
                                 <v-btn v-if="props.uiOptionTime" prepend-icon="mdi-clock-outline" value="time">
@@ -556,7 +557,8 @@
                             </v-col>
                             <v-col cols="12" class="mx-auto">
                                 <v-btn-toggle
-                                    v-model="period" class="d-flex flex-wrap" style="min-height: fit-content"
+                                    v-model="period"
+                                    class="scheduler-button d-flex flex-wrap" style="min-height: fit-content"
                                     :label="t('period')" mandatory border="sm" rounded="xl"
                                 >
                                     <v-row
@@ -787,7 +789,8 @@
                             </v-col>
                             <v-col cols="12" class="d-flex justify-center">
                                 <v-btn-toggle
-                                    v-model="timespan" mandatory divided variant="elevated" border="sm"
+                                    v-model="timespan"
+                                    class="scheduler-button" mandatory divided variant="elevated" border="sm"
                                     rounded="xl" @update:model-value="setEndTime"
                                 >
                                     <v-btn prepend-icon="mdi-circle-off-outline" :value="false">
@@ -859,9 +862,9 @@
                             />
                             <v-progress-linear v-else indeterminate />
                         </v-col>
-                        <v-col v-if="cronNextDates" cols="12" class="d-flex justify-center">
+                        <v-col cols="12" class="d-flex justify-center">
                             <v-expansion-panels class="my-4" variant="popout">
-                                <v-expansion-panel :title="t('nextInfo')">
+                                <v-expansion-panel v-if="cronNextDates" :title="t('nextInfo')">
                                     <v-expansion-panel-text>
                                         <v-list>
                                             <v-list-subheader class="centered-subheader">
@@ -926,7 +929,8 @@
                         </v-col>
                         <v-col cols="12" class="d-flex justify-center mb-5">
                             <v-btn-toggle
-                                v-model="timespan" mandatory divided variant="elevated" border="sm"
+                                v-model="timespan"
+                                class="scheduler-button" mandatory divided variant="elevated" border="sm"
                                 rounded="xl"
                             >
                                 <v-btn prepend-icon="mdi-circle-off-outline" :value="false">{{ t('none') }}</v-btn>
@@ -1001,7 +1005,8 @@
                         </v-col>
                         <v-col cols="12" class="d-flex justify-center">
                             <v-btn-toggle
-                                v-model="payloadType" mandatory divided variant="elevated" border="sm"
+                                v-model="payloadType"
+                                class="scheduler-button" mandatory divided variant="elevated" border="sm"
                                 rounded="xl"
                             >
                                 <v-btn

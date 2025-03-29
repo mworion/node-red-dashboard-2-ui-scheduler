@@ -1706,9 +1706,10 @@ function getTaskStatus (node, task, opts, getNextDates = false) {
     opts.defaultLocation = node.defaultLocation
     opts.defaultLocationType = node.defaultLocationType
     opts.solarDays = task.node_opt?.solarDays || null
+    opts.date = task.node_opt?.date || null
     const sol = task.node_expressionType === 'solar'
     const exp = sol ? task.node_location : task.node_expression
-    const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, null, opts, node.use24HourFormat, node.locale)
+    const h = _describeExpression(exp, task.node_expressionType, node.timeZone, task.node_offset, task.node_solarType, task.node_solarEvents, opts.date, opts, node.use24HourFormat, node.locale)
     let nextDescription = null
     let nextDate = null
     let lastDescription = null
@@ -2606,20 +2607,21 @@ module.exports = function (RED) {
             if (done && typeof done === 'function') done()
         })
 
-        this.on('input', async function (msg, send, done) {
-            send = send || function () { node.send.apply(node, arguments) }
-            done = done || function (err) {
-                if (err) {
-                    node.error(err, msg)
-                }
-            }
-            // is this an button press?...
-            if (!msg.payload && !msg.topic) { // TODO: better method of differentiating between bad input and button press
-                // await sendMsg(node, node.tasks[0], Date.now(), true)
-                // done()
-                // return
-            }
-
+        // this.on('input', async function (msg, send, done) {
+        //     send = send || function () {
+        //         node.send.apply(node, arguments) }
+        //     done = done || function (err) {
+        //         if (err) {
+        //             node.error(err, msg)
+        //         }
+        //     }
+        //     // is this an button press?...
+        //     if (!msg.payload && !msg.topic) { // TODO: better method of differentiating between bad input and button press
+        //         // await sendMsg(node, node.tasks[0], Date.now(), true)
+        //         // done()
+        //         // return
+        //     }
+        async function handleInput (msg) {
             const controlTopic = controlTopics.find(ct => ct.command === msg.topic)
             let payload = msg.payload
             if (controlTopic) {
@@ -2650,8 +2652,8 @@ module.exports = function (RED) {
                 if (Array.isArray(payload) === false) {
                     input = [input]
                 }
-                const sendCommandResponse = function (msg) {
-                    send(generateSendMsg(node, msg, 'command-response'))
+                const cmdResponse = function (msg) {
+                    return generateSendMsg(node, msg, 'command-response')
                 }
                 for (let i = 0; i < input.length; i++) {
                     const cmd = input[i]
@@ -2732,72 +2734,72 @@ module.exports = function (RED) {
                         }
                         break
                     case 'describe': // single
-                        {
-                            const exp = (cmd.expressionType === 'solar') ? cmd.location : cmd.expression
-                            applyOptionDefaults(node, cmd)
-                            newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, { includeSolarStateOffset: true, locationType: node.node_locationType }, node.use24HourFormat, node.locale)
-                            sendCommandResponse(newMsg)
-                        }
-                        break
+                    {
+                        const exp = (cmd.expressionType === 'solar') ? cmd.location : cmd.expression
+                        applyOptionDefaults(node, cmd)
+                        newMsg.payload.result = _describeExpression(exp, cmd.expressionType, cmd.timeZone || node.timeZone, cmd.offset, cmd.solarType, cmd.solarEvents, cmd.time, { includeSolarStateOffset: true, locationType: node.node_locationType }, node.use24HourFormat, node.locale)
+                        // sendCommandResponse(newMsg)
+                        return cmdResponse(newMsg)
+                    }
                     case 'status': // single
-                        {
-                            const schedule = getScheduleByName(node, cmd.name)
-                            if (schedule) {
-                                newMsg.payload.result.config = exportSchedule(schedule)
-                                newMsg.payload.result.status = getScheduleStatus(node, schedule, true)
-                            } else {
-                                newMsg.error = `${cmd.name} not found`
-                            }
-                            sendCommandResponse(newMsg)
+                    {
+                        const schedule = getScheduleByName(node, cmd.name)
+                        if (schedule) {
+                            newMsg.payload.result.config = exportSchedule(schedule)
+                            newMsg.payload.result.status = getScheduleStatus(node, schedule, true)
+                        } else {
+                            newMsg.error = `${cmd.name} not found`
                         }
+                        // sendCommandResponse(newMsg)
                         updateNextStatus(node, true)
-                        break
+                        return cmdResponse(newMsg)
+                    }
                     case 'export': // single
-                        {
-                            const schedule = getScheduleByName(node, cmd.name)
-                            if (schedule) {
-                                newMsg.payload.result.config = exportSchedule(schedule)
-                            } else {
-                                newMsg.error = `${cmd.name} not found`
-                            }
-                            sendCommandResponse(newMsg)
+                    {
+                        const schedule = getScheduleByName(node, cmd.name)
+                        if (schedule) {
+                            newMsg.payload.result.config = exportSchedule(schedule)
+                        } else {
+                            newMsg.error = `${cmd.name} not found`
                         }
-                        break
+                        // sendCommandResponse(newMsg)
+                        return cmdResponse(newMsg)
+                    }
                     case 'refresh':
                         await refreshTasks(node)
                         break
                     case 'list-': // multiple
                     case 'status-': // multiple
-                        {
-                            const results = []
-                            if (node.schedules) {
-                                node.schedules.forEach(schedule => {
-                                    if (schedule && (cmdAll || scheduleFilterMatch(schedule, cmdFilter))) {
-                                        const result = {}
-                                        result.config = exportSchedule(schedule)
-                                        result.status = getScheduleStatus(node, schedule, true)
-                                        results.push(result)
-                                    }
-                                })
-                            }
-                            newMsg.payload.result = results
-                            sendCommandResponse(newMsg)
+                    {
+                        const results = []
+                        if (node.schedules) {
+                            node.schedules.forEach(schedule => {
+                                if (schedule && (cmdAll || scheduleFilterMatch(schedule, cmdFilter))) {
+                                    const result = {}
+                                    result.config = exportSchedule(schedule)
+                                    result.status = getScheduleStatus(node, schedule, true)
+                                    results.push(result)
+                                }
+                            })
                         }
-                        break
+                        newMsg.payload.result = results
+                        // sendCommandResponse(newMsg)
+                        return cmdResponse(newMsg)
+                    }
                     case 'export-': // multiple
-                        {
-                            const results = []
-                            if (node.schedules) {
-                                node.schedules.forEach(schedule => {
-                                    if (schedule && (cmdAll || scheduleFilterMatch(schedule, cmdFilter))) {
-                                        results.push(exportSchedule(schedule))
-                                    }
-                                })
-                            }
-                            newMsg.payload.result = results
-                            sendCommandResponse(newMsg)
+                    {
+                        const results = []
+                        if (node.schedules) {
+                            node.schedules.forEach(schedule => {
+                                if (schedule && (cmdAll || scheduleFilterMatch(schedule, cmdFilter))) {
+                                    results.push(exportSchedule(schedule))
+                                }
+                            })
                         }
-                        break
+                        newMsg.payload.result = results
+                        // sendCommandResponse(newMsg)
+                        return cmdResponse(newMsg)
+                    }
                     case 'add':
                     case 'update':
                         console.log(cmd)
@@ -2904,8 +2906,8 @@ module.exports = function (RED) {
                         if (!newMsg.payload) {
                             newMsg.payload = {}
                         }
-                        sendCommandResponse(newMsg)
-                        break
+                        // sendCommandResponse(newMsg)
+                        return cmdResponse(newMsg)
                     case 'debug': {
                         const schedule = getScheduleByName(node, cmd.name)
                         const result = {}
@@ -2937,7 +2939,8 @@ module.exports = function (RED) {
                             processTask(endTask?.task, 'end')
 
                             newMsg.payload = result
-                            sendCommandResponse(newMsg)
+                            // sendCommandResponse(newMsg)
+                            return cmdResponse(newMsg)
                         }
                     }
                         break
@@ -2977,16 +2980,20 @@ module.exports = function (RED) {
 
                         // Example of how you might use 'results' array
                         newMsg.payload = results
-                        sendCommandResponse(newMsg)
+                        // sendCommandResponse(newMsg)
+                        return cmdResponse(newMsg)
                     }
-                        break
                     }
                 }
             } catch (error) {
-                done(error)
+                msg.error = error
+                return msg
+                // done(error)
                 // node.error(error,msg);
             }
-        })
+            return msg
+        }
+        // })
 
         function getTask (node, id) {
             const schedule = node.schedules.find(function (schedule) {
@@ -5287,54 +5294,64 @@ module.exports = function (RED) {
         // #endregion UI Actions
 
         // region D2
-        const evts = {
-            onAction: true,
-            beforeSend: function (msg) {
-                if (msg.action) {
-                    if (msg.action === 'submit') {
-                        if (!msg?.payload?.schedules) return
-                        submitSchedule(msg.payload?.schedules)
-                    } else if (msg.action === 'remove') {
-                        removeSchedule(msg)
-                    } else if (msg.action === 'setEnabled') {
-                        setScheduleEnabled(msg)
-                    } else if (msg.action === 'requestStatus') {
-                        requestScheduleStatus(msg)
-                    } else if (msg.action === 'describe') {
-                        describeExpression(msg)
-                    } else if (msg.action === 'checkUpdate') {
-                        checkForUpdate(version, packageName, (result) => {
-                            if (result) {
-                                node.updateAvailable = config.updateAvailable = result.updateAvailable
-                                node.currentVersion = config.currentVersion = result.currentVersion
-                                node.latestVersion = config.latestVersion = result.latestVersion
 
-                                const m = { payload: { updateResult: { ...result } }, event: 'updateCheck' }
-                                if (msg.silent) {
-                                    m.silent = true
-                                }
-                                base.emit('msg-input:' + node.id, m, node)
-                            } else {
-                                console.log('Failed to check for updates.')
+        const beforeSend = async function (msg) {
+            if (msg.action) {
+                if (msg.action === 'submit') {
+                    if (!msg?.payload?.schedules) return
+                    submitSchedule(msg.payload?.schedules)
+                } else if (msg.action === 'remove') {
+                    removeSchedule(msg)
+                } else if (msg.action === 'setEnabled') {
+                    setScheduleEnabled(msg)
+                } else if (msg.action === 'requestStatus') {
+                    requestScheduleStatus(msg)
+                } else if (msg.action === 'describe') {
+                    describeExpression(msg)
+                } else if (msg.action === 'checkUpdate') {
+                    checkForUpdate(version, packageName, (result) => {
+                        if (result) {
+                            node.updateAvailable = config.updateAvailable = result.updateAvailable
+                            node.currentVersion = config.currentVersion = result.currentVersion
+                            node.latestVersion = config.latestVersion = result.latestVersion
+
+                            const m = { payload: { updateResult: { ...result } }, event: 'updateCheck' }
+                            if (msg.silent) {
+                                m.silent = true
                             }
-                        })
-                    } else if (msg.action === 'exportSchedule') {
-                        exportUISchedule(msg)
-                    } else { console.log('Unknown action', msg.action) }
+                            base.emit('msg-input:' + node.id, m, node)
+                        } else {
+                            console.log('Failed to check for updates.')
+                        }
+                    })
+                } else if (msg.action === 'exportSchedule') {
+                    exportUISchedule(msg)
+                } else { console.log('Unknown action', msg.action) }
 
-                    if (msg.ui_update) {
-                        const update = msg.ui_update
-                        if (typeof update.label !== 'undefined') {
-                            // dynamically set "label" property
-                            base.stores.state.set(base, node, msg, 'label', update.label)
-                        }
-                        if (typeof update.schedules !== 'undefined') {
-                            // dynamically set "schedules" property
-                            base.stores.state.set(base, node, msg, 'schedules', update.schedules)
-                        }
+                if (msg.ui_update) {
+                    const update = msg.ui_update
+                    if (typeof update.label !== 'undefined') {
+                        // dynamically set "label" property
+                        base.stores.state.set(base, node, msg, 'label', update.label)
+                    }
+                    if (typeof update.schedules !== 'undefined') {
+                        // dynamically set "schedules" property
+                        base.stores.state.set(base, node, msg, 'schedules', update.schedules)
                     }
                 }
-                return msg
+            }
+            return msg
+        }
+
+        const evts = {
+            onAction: true,
+            beforeSend,
+            onInput: async function (msg) {
+                msg = await beforeSend(msg)
+                const handledMsg = await handleInput(msg)
+                if (handledMsg && Array.isArray(handledMsg)) {
+                    node.send(handledMsg)
+                }
             }
         }
 
