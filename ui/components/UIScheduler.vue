@@ -862,9 +862,9 @@
                             />
                             <v-progress-linear v-else indeterminate />
                         </v-col>
-                        <v-col v-if="cronNextDates" cols="12" class="d-flex justify-center">
+                        <v-col cols="12" class="d-flex justify-center">
                             <v-expansion-panels class="my-4" variant="popout">
-                                <v-expansion-panel :title="t('nextInfo')">
+                                <v-expansion-panel v-if="cronNextDates" :title="t('nextInfo')">
                                     <v-expansion-panel-text>
                                         <v-list>
                                             <v-list-subheader class="centered-subheader">
