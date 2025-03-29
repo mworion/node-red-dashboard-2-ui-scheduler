@@ -1,0 +1,335 @@
+[
+    {
+        "id": "33ac17d273a52d97",
+        "type": "ui-scheduler",
+        "z": "fbbaa338350e1589",
+        "name": "scheduler",
+        "group": "a1ba982f1e2167e3",
+        "order": 1,
+        "label": "Scheduler",
+        "width": 6,
+        "height": 1,
+        "outputField": "payload",
+        "locale": "en",
+        "timeZone": "America/Chicago",
+        "use24HourFormat": false,
+        "storeName": "local_file_system",
+        "commandResponseMsgOutput": "fanOut",
+        "defaultLocation": "",
+        "defaultLocationType": "env",
+        "sendStateInterval": "5",
+        "sendActiveState": false,
+        "sendInactiveState": false,
+        "topics": [
+            "Topic 1"
+        ],
+        "customPayloads": [
+            {
+                "label": "Custom 1",
+                "value": "1",
+                "type": "str",
+                "id": "f56a6c2cc2ff72c7"
+            }
+        ],
+        "outputs": 2,
+        "options": [],
+        "uiOptionTime": true,
+        "uiOptionSolar": true,
+        "uiOptionCron": true,
+        "uiOptionMinute": true,
+        "uiOptionHour": true,
+        "uiOptionDay": true,
+        "uiOptionWeek": true,
+        "uiOptionMonth": true,
+        "uiOptionYear": true,
+        "uiOptionTopic": true,
+        "uiOptionTimespan": true,
+        "uiOptionCustomOutput": true,
+        "uiOptionNewTimePicker": false,
+        "x": 660,
+        "y": 240,
+        "wires": [
+            [],
+            [
+                "4ba30b2dd2dc9963"
+            ]
+        ]
+    },
+    {
+        "id": "c4ea3dc9798d8605",
+        "type": "ui-button",
+        "z": "fbbaa338350e1589",
+        "group": "7df21a2733c54bb1",
+        "name": "Add Schedule",
+        "label": "Add Schedule",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "emulateClick": false,
+        "tooltip": "",
+        "color": "",
+        "bgcolor": "",
+        "className": "",
+        "icon": "",
+        "iconPosition": "left",
+        "payload": "",
+        "payloadType": "str",
+        "topic": "topic",
+        "topicType": "msg",
+        "buttonColor": "",
+        "textColor": "",
+        "iconColor": "",
+        "enableClick": true,
+        "enablePointerdown": false,
+        "pointerdownPayload": "",
+        "pointerdownPayloadType": "str",
+        "enablePointerup": false,
+        "pointerupPayload": "",
+        "pointerupPayloadType": "str",
+        "x": 180,
+        "y": 220,
+        "wires": [
+            [
+                "f56119b7f871e412"
+            ]
+        ]
+    },
+    {
+        "id": "4ba30b2dd2dc9963",
+        "type": "debug",
+        "z": "fbbaa338350e1589",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 840,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "57403505542c16ea",
+        "type": "inject",
+        "z": "fbbaa338350e1589",
+        "name": "",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 210,
+        "y": 260,
+        "wires": [
+            [
+                "f56119b7f871e412"
+            ]
+        ]
+    },
+    {
+        "id": "01813fcadf55fdef",
+        "type": "ui-button",
+        "z": "fbbaa338350e1589",
+        "group": "7df21a2733c54bb1",
+        "name": "Clear Schedules",
+        "label": "Clear Schedules",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "emulateClick": false,
+        "tooltip": "",
+        "color": "",
+        "bgcolor": "",
+        "className": "",
+        "icon": "",
+        "iconPosition": "left",
+        "payload": "",
+        "payloadType": "str",
+        "topic": "topic",
+        "topicType": "msg",
+        "buttonColor": "",
+        "textColor": "",
+        "iconColor": "",
+        "enableClick": true,
+        "enablePointerdown": false,
+        "pointerdownPayload": "",
+        "pointerdownPayloadType": "str",
+        "enablePointerup": false,
+        "pointerupPayload": "",
+        "pointerupPayloadType": "str",
+        "x": 180,
+        "y": 340,
+        "wires": [
+            [
+                "f148b14f717009c1"
+            ]
+        ]
+    },
+    {
+        "id": "11d0b0845c66dd81",
+        "type": "inject",
+        "z": "fbbaa338350e1589",
+        "name": "",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 210,
+        "y": 380,
+        "wires": [
+            [
+                "f148b14f717009c1"
+            ]
+        ]
+    },
+    {
+        "id": "f148b14f717009c1",
+        "type": "change",
+        "z": "fbbaa338350e1589",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "topic",
+                "pt": "msg",
+                "to": "clear",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 450,
+        "y": 340,
+        "wires": [
+            [
+                "33ac17d273a52d97"
+            ]
+        ]
+    },
+    {
+        "id": "f56119b7f871e412",
+        "type": "function",
+        "z": "fbbaa338350e1589",
+        "name": "Set Dynamic Schedule Time",
+        "func": "// Get the current time\nvar now = new Date();\n// Reset seconds and milliseconds\nnow.setSeconds(0, 0);\n\n// Calculate the next occurring minute (i.e. next minute boundary)\nvar nextMinute = new Date(now.getTime() + 60000);\n\n// Calculate the end time which is 5 minutes after the next minute\nvar endTime = new Date(nextMinute.getTime() + 5 * 60000);\n\n// Helper function to pad digits\nfunction pad(num) { return num < 10 ? '0' + num : num; }\n\n// Format the times in HH:MM\nvar formattedTime = pad(nextMinute.getHours()) + ':' + pad(nextMinute.getMinutes());\nvar formattedEndTime = pad(endTime.getHours()) + ':' + pad(endTime.getMinutes());\n\n// Construct the payload object\nmsg.payload = {\n    command: \"add\",\n    schedule: [\n        {\n            name: \"My Schedule\",\n            topic: \"Topic 1\",\n            enabled: true,\n            scheduleType: \"time\",\n            period: \"daily\",\n            time: formattedTime,\n            endTime: formattedEndTime,\n            timespan: \"time\",\n            days: [\"sunday\", \"monday\", \"tuesday\", \"wednesday\", \"thursday\", \"friday\", \"saturday\"],\n            payloadType: \"true_false\",\n            payloadValue: true,\n            endPayloadValue: false,\n            isDynamic: true\n        }\n    ]\n};\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 400,
+        "y": 240,
+        "wires": [
+            [
+                "33ac17d273a52d97"
+            ]
+        ]
+    },
+    {
+        "id": "5c7d81b280c161d9",
+        "type": "inject",
+        "z": "fbbaa338350e1589",
+        "name": "Add Simple Schedule",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"command\": \"add\", \"schedule\":[{   \"name\": \"Simple Schedule\",   \"topic\": \"Topic 1\",   \"enabled\": true,   \"scheduleType\": \"time\",   \"period\": \"daily\",   \"time\": \"00:00\",   \"timespan\": false,   \"days\": [     \"sunday\",     \"monday\",     \"tuesday\",     \"wednesday\",     \"thursday\",     \"friday\",     \"saturday\"   ],   \"payloadType\": true,   \"payloadValue\": true,   \"isDynamic\": true }]}",
+        "payloadType": "json",
+        "x": 440,
+        "y": 160,
+        "wires": [
+            [
+                "33ac17d273a52d97"
+            ]
+        ]
+    },
+    {
+        "id": "a1ba982f1e2167e3",
+        "type": "ui-group",
+        "name": "Scheduler Main",
+        "page": "dashboard-ui-page-1",
+        "width": 6,
+        "height": 1,
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "7df21a2733c54bb1",
+        "type": "ui-group",
+        "name": "Scheduler Functions",
+        "page": "dashboard-ui-page-1",
+        "width": 6,
+        "height": 1,
+        "order": 2,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "dashboard-ui-page-1",
+        "type": "ui-page",
+        "name": "Page 1",
+        "ui": "dashboard-ui-base",
+        "path": "/page1",
+        "icon": "",
+        "layout": "grid",
+        "theme": "dashboard-ui-theme",
+        "order": 1,
+        "className": "",
+        "visible": "true",
+        "disabled": false
+    },
+    {
+        "id": "dashboard-ui-base",
+        "type": "ui-base",
+        "name": "UI Name",
+        "path": "/dashboard",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification",
+            "ui-control"
+        ]
+    },
+    {
+        "id": "dashboard-ui-theme",
+        "type": "ui-theme",
+        "name": "Default Theme",
+        "colors": {
+            "surface": "#000000",
+            "primary": "#0094ce",
+            "bgPage": "#212121",
+            "groupBg": "#363636",
+            "groupOutline": "#cccccc"
+        },
+        "sizes": {
+            "density": "default",
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "4px",
+            "widgetGap": "12px"
+        }
+    }
+]

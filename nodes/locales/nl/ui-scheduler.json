@@ -61,7 +61,8 @@
       "done": "Klaar",
       "future": "over {time}",
       "past": "{time} geleden",
-      "never": "Nooit"
+      "never": "Nooit",
+      "lessThanASecond": "Minder dan een seconde"
     },
     "days": {
       "sunday": "Zondag",
