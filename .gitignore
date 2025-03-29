@@ -45,3 +45,4 @@ cypress/fixtures/user-dir/.flows.json.backup
 # exclude include vitepress dist
 docs/.vitepress/cache
 docs/.vitepress/dist
+/.vitepress/cache

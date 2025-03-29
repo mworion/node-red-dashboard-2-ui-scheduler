@@ -1,7 +1,7 @@
-const version = '3.3.2'
+const version = '3.3.3'
 const packageName = '@cgjgh/node-red-dashboard-2-ui-scheduler'
-/* eslint-disable no-unused-vars */
 
+/* eslint-disable no-unused-vars */
 /* eslint-disable no-case-declarations */
 /* eslint-disable no-console */
 
@@ -683,145 +683,6 @@ function _describeExpression (expression, expressionType, timeZone, offset, sola
     return result
 }
 
-async function _asyncDescribeExpression (expression, expressionType, timeZone, offset, solarType, solarEvents, time, opts, use24HourFormat = true, locale = null) {
-    const now = time ? new Date(time) : new Date()
-    opts = opts || {}
-    let result = { description: undefined, nextDate: undefined, nextDescription: undefined, prettyNext: 'Never' }
-    const cronOpts = timeZone ? { timezone: timeZone } : undefined
-    let ds = null
-    let dsOk = false
-    let exOk = false
-    // let now = new Date();
-
-    if (solarType === 'all') {
-        solarEvents = PERMITTED_SOLAR_EVENTS.join(',')
-    }
-
-    if (expressionType === 'solar') {
-        const opt = {
-            locationType: opts.locationType || opts.defaultLocationType,
-            defaultLocationType: opts.defaultLocationType,
-            defaultLocation: opts.defaultLocation,
-            expressionType,
-            location: expression,
-            offset: offset || 0,
-            name: 'dummy',
-            id: 'dummy',
-            solarType,
-            solarEvents,
-            solarDays: opts.solarDays,
-            payloadType: 'default',
-            payload: ''
-        }
-        if (validateOpt(opt)) {
-            const pos = coordParser(opt.location)
-            const offset = isNumber(opt.offset) ? parseInt(opt.offset) : 0
-            const nowOffset = new Date(now.getTime() - offset * 60000)
-            const daysOfWeek = opt?.solarDays || null
-
-            result = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, now, offset, daysOfWeek, timeZone, use24HourFormat, locale)
-            // eslint-disable-next-line eqeqeq
-            if (opts.includeSolarStateOffset && offset != 0) {
-                const ssOffset = getSolarTimes(pos.lat, pos.lon, 0, solarEvents, nowOffset, 0, daysOfWeek, timeZone, use24HourFormat, locale)
-                result.solarStateOffset = ssOffset.solarState
-            }
-            result.offset = offset
-            result.now = now
-            result.nowOffset = nowOffset
-            ds = parseDateSequence(result.eventTimes.map((event) => event.timeOffset))
-            dsOk = ds && ds.isDateSequence
-            result.valid = dsOk
-        }
-    } else {
-        if (expressionType === 'cron' || expressionType === '') {
-            exOk = cronosjs.validate(expression)
-
-            result.valid = exOk
-        } else {
-            ds = parseDateSequence(expression)
-            dsOk = ds.isDateSequence
-            result.valid = dsOk
-        }
-        if (!exOk && !dsOk) {
-            result.description = 'Invalid expression'
-            result.valid = false
-            return result
-        }
-    }
-
-    if (dsOk) {
-        const task = ds.task
-        const dates = ds.dates
-        const dsFutureDates = dates.filter(d => d >= now)
-        const dsLastDates = dates.filter(d => d <= now)
-        const count = dsFutureDates ? dsFutureDates.length : 0
-        result.description = 'Date sequence with fixed dates'
-
-        if (task && task._sequence && count) {
-            result.nextDate = dsFutureDates[0]
-            result.previousDate = dsLastDates[dsLastDates.length - 1]
-            const ms = result.nextDate.valueOf() - now.valueOf()
-            const msLast = result.previousDate ? now.valueOf() - result.previousDate.valueOf() : 0
-
-            result.prettyNext = (result.nextEvent ? getSolarEventName(result.nextEvent) + ' ' : '') + futureMs(ms)
-            result.prettyPrevious = msLast > 0 ? (result.lastEvent ? getSolarEventName(result.lastEvent) + ' ' : '') + pastMs(msLast) : never
-            if (expressionType === 'solar') {
-                if (solarType === 'all') {
-                    result.description = 'All Solar Events'
-                } else {
-                    const solarEventsArray = solarEvents.split(',')
-                    const events = solarEventsArray.map(event => getSolarEventName(event)).join(', ')
-                    result.description = events + ((opts.solarDays && opts.solarDays.length) ? ', ' + opts.solarDays.map(day => getDayAbbreviation(day)).join(',') : '')
-                }
-            } else {
-                if (count === 1) {
-                    result.description = 'One time at ' + formatShortDateTimeWithTZ(result.nextDate, timeZone, use24HourFormat, locale)
-                } else {
-                    result.description = count + ' Date Sequences starting at ' + formatShortDateTimeWithTZ(result.nextDate, timeZone, use24HourFormat, locale)
-                }
-                result.nextDates = dsFutureDates.slice(0, 5)
-                result.prevDates = dsLastDates.slice(-5)
-            }
-        }
-    }
-
-    if (exOk) {
-        const ex = cronosjs.CronosExpression.parse(expression, cronOpts)
-        const next = ex.nextDate()
-        const previous = ex.previousDate()
-        if (next) {
-            const ms = next.valueOf() - now.valueOf()
-            result.prettyNext = (result.nextEvent ? getSolarEventName(result.nextEvent) + ' ' : '') + futureMs(ms)
-        }
-        const msLast = result.previousDate ? now.valueOf() - result.previousDate.valueOf() : 0
-        result.prettyPrevious = msLast > 0 ? (result.lastEvent ? getSolarEventName(result.lastEvent) + ' ' : '') + pastMs(msLast) : never
-
-        try {
-            result.nextDates = ex.nextNDates(now, 5)
-        } catch (error) {
-            console.debug(error)
-        }
-        if (previous) {
-            const ms = now.valueOf() - previous.valueOf()
-            result.prettyPrevious = pastMs(ms)
-            try {
-                result.prevDates = ex.previousNDates(now, 5)
-            } catch (error) {
-                console.debug(error)
-            }
-        } else {
-            // result.description = 'Invalid expression'
-            // result.valid = false
-            // return result
-        }
-
-        result.description = humanizeCron(expression, locale, use24HourFormat)
-        result.nextDate = next
-        result.previousDate = previous
-    }
-    return result
-}
-
 /**
      * Formats a given date into a short date-time string with timezone information.
      *
@@ -946,6 +807,7 @@ function applyOptionDefaults (node, option, optionIndex) {
     option.timezone = node.timezone || 'UTC'
     option.timeFormat = node.use24HourFormat || '24'
 }
+
 /**
      * Calculates the next occurrence of a specified weekday from a given start date.
      *
@@ -2139,14 +2001,14 @@ module.exports = function (RED) {
         }
 
         /**
- * Generates a human-readable description of a cron interval based on the given interval and unit.
- *
- * @param {Object} node - The node object containing locale and time format preferences.
- * @param {number} interval - The interval value, must be a positive number.
- * @param {string} unit - The unit of time for the interval, either "minute" or "hour".
- * @returns {string} A human-readable description of the cron interval.
- * @throws {Error} Throws an error if the interval is not positive or if the unit is invalid.
- */
+         * Generates a human-readable description of a cron interval based on the given interval and unit.
+         *
+         * @param {Object} node - The node object containing locale and time format preferences.
+         * @param {number} interval - The interval value, must be a positive number.
+         * @param {string} unit - The unit of time for the interval, either "minute" or "hour".
+         * @returns {string} A human-readable description of the cron interval.
+         * @throws {Error} Throws an error if the interval is not positive or if the unit is invalid.
+         */
         function generateIntervalDescription (node, interval, unit) {
             if (interval <= 0) {
                 throw new Error('Interval must be a positive number.')
@@ -2168,153 +2030,6 @@ module.exports = function (RED) {
 
             // Return the human-readable description
             return description
-        }
-
-        // Need to improve this to handle more schedule types
-        function generateScheduleObject (task) {
-            function convertStringBoolean (value) {
-                if (typeof value === 'string') {
-                    if (value.toLowerCase() === 'true') return true
-                    if (value.toLowerCase() === 'false') return false
-                }
-                return value
-            }
-            if (task.node_expressionType === 'cron') {
-                const schedule = {
-                    name: task.name,
-                    enabled: task.node_opt.dontStartTheTask || true,
-                    topic: task.node_topic,
-                    scheduleType: 'cron',
-                    startCronExpression: task.node_expression,
-                    payloadValue: convertStringBoolean(task.node_payload),
-                    description: _describeExpression(
-                        task.node_opt.expression,
-                        task.node_opt.expressionType,
-                        task.node_opt.timeZone || node.timeZone,
-                        task.node_opt.offset,
-                        task.node_opt.solarType,
-                        task.node_opt.solarEvents,
-                        task.node_opt.time,
-                        task.node_opt,
-                        node.use24HourFormat, node.locale
-                    ).description,
-                    ...(task.isStatic && { isStatic: true }) // Conditionally add isStatic
-                }
-                // const cronParts = task.node_expression.split(' ')
-                // if (cronParts.length < 5 || cronParts.length > 7) {
-                //     console.log('Invalid cron expression.', task.node_expression, cronParts)
-                //     return null
-                // }
-
-                // // eslint-disable-next-line no-unused-vars
-                // const [second, minute, hour, dayOfMonth, month, dayOfWeek, year] = cronParts.length === 7
-                //     ? cronParts
-                //     : cronParts.length === 6
-                //         ? cronParts
-                //         : ['', ...cronParts]
-
-                // const daysMap = { SUN: 'Sunday', MON: 'Monday', TUE: 'Tuesday', WED: 'Wednesday', THU: 'Thursday', FRI: 'Friday', SAT: 'Saturday' }
-                // const daysOfWeekNumbersMap = { 0: 'Sunday', 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday' }
-
-                // if (second.includes('/') || minute.includes('/') || hour.includes('/') || dayOfMonth.includes('/') || month.includes('/') || dayOfWeek.includes('/')) {
-                //     // Handle interval-based schedules
-                //     const interval = second.includes('/')
-                //         ? second.split('/')[1]
-                //         : minute.includes('/')
-                //             ? minute.split('/')[1]
-                //             : hour.includes('/')
-                //                 ? hour.split('/')[1]
-                //                 : dayOfMonth.includes('/')
-                //                     ? dayOfMonth.split('/')[1]
-                //                     : month.includes('/')
-                //                         ? month.split('/')[1]
-                //                         : dayOfWeek.split('/')[1]
-
-                //     if (minute === '0' && hour.includes('/')) {
-                //         schedule.period = 'hourly'
-                //         schedule.hourlyInterval = parseInt(interval, 10)
-                //     } else if (minute.includes('/')) {
-                //         schedule.period = 'minutes'
-                //         schedule.minutesInterval = parseInt(interval, 10)
-                //     } else if (second.includes('/')) {
-                //         schedule.period = 'seconds'
-                //         schedule.secondsInterval = parseInt(interval, 10)
-                //         schedule.readonly = true
-                //     } else if (dayOfMonth.includes('/')) {
-                //         schedule.period = 'monthly'
-                //         schedule.days = Array.from({ length: 31 }, (_, i) => i + 1).filter(day => day % parseInt(interval, 10) === 0)
-                //     } else if (month.includes('/')) {
-                //         schedule.period = 'yearly'
-                //         schedule.months = Array.from({ length: 12 }, (_, i) => i + 1).filter(month => month % parseInt(interval, 10) === 0)
-                //     } else if (dayOfWeek.includes('/')) {
-                //         schedule.period = 'weekly'
-                //         schedule.days = dayOfWeek.split('/').map(day => {
-                //             return isNaN(day) ? daysMap[day] : daysOfWeekNumbersMap[day]
-                //         })
-                //     }
-                // } else if (dayOfWeek.includes('-')) {
-                //     // Handle day-of-week ranges
-                //     const [startDay, endDay] = dayOfWeek.split('-').map(day => {
-                //         return isNaN(day) ? daysMap[day] : daysOfWeekNumbersMap[day]
-                //     })
-                //     schedule.period = 'weekly'
-                //     schedule.time = `${hour}:${minute}`
-                //     schedule.days = Array.from(
-                //         { length: 7 },
-                //         (_, i) => daysOfWeekNumbersMap[(Object.keys(daysOfWeekNumbersMap).indexOf(startDay) + i) % 7]
-                //     ).slice(0, endDay - startDay + 1)
-                // } else if (dayOfWeek !== '*') {
-                //     // Handle specific day-of-week schedules
-                //     schedule.period = 'weekly'
-                //     schedule.time = `${hour}:${minute}`
-                //     schedule.days = dayOfWeek.split(',').map(day => {
-                //         return isNaN(day) ? daysMap[day] : daysOfWeekNumbersMap[day]
-                //     })
-                // } else if (dayOfMonth !== '*' && month !== '*') {
-                //     // Handle specific dates
-                //     schedule.period = 'yearly'
-                //     schedule.time = `${hour}:${minute}`
-                //     schedule.days = dayOfMonth.split(',').map(Number)
-                //     schedule.month = month
-                // } else if (dayOfMonth !== '*') {
-                //     // Handle monthly schedules
-                //     schedule.period = 'monthly'
-                //     schedule.time = `${hour}:${minute}`
-                //     schedule.days = dayOfMonth.split(',').map(Number)
-                // } else if (hour !== '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
-                //     // Handle daily schedules
-                //     schedule.period = 'daily'
-                //     schedule.time = `${hour}:${minute}`
-                // } else if (second === '*' && minute === '*' && hour === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
-                //     // Handle secondly schedules
-                //     schedule.period = 'secondly'
-                //     schedule.readonly = true
-                // } else if (minute === '*' && hour === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
-                //     // Handle minutes schedules
-                //     schedule.period = 'minutes'
-                // } else if (hour === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
-                //     // Handle hourly schedules
-                //     schedule.period = 'hourly'
-                // } else {
-                //     // Custom schedules
-                //     schedule.period = 'custom'
-                // }
-
-                return schedule
-            } else if (task.node_expressionType === 'solar') {
-                const schedule = {
-                    name: task.name,
-                    enabled: task.node_opt.isRunning || true,
-                    topic: task.node_topic,
-                    scheduleType: 'solar',
-                    solarEvent: task.node_solarEvents,
-                    offset: task.node_offset,
-                    description: generateSolarDescription(node, task.node_opt).description,
-                    ...(task.isStatic && { isStatic: true }) // Conditionally add isStatic
-                }
-                return schedule
-            }
-            return null
         }
 
         function generateScheduleObjectFromNodeOption (node, opt) {
@@ -3103,38 +2818,6 @@ module.exports = function (RED) {
                 updateNextStatus(node)
             }
         }
-        function taskFilterMatch (task, filter) {
-            if (!task) return false
-            // eslint-disable-next-line eqeqeq
-            const isActive = function (task) { return isTaskFinished(task) == false && task.isRunning == true }
-            // eslint-disable-next-line eqeqeq
-            const isInactive = function (task) { return isTaskFinished(task) || task.isRunning == false }
-            // eslint-disable-next-line eqeqeq
-            const isStatic = function (task) { return (task.isStatic == true || task.isDynamic == false) }
-            // eslint-disable-next-line eqeqeq
-            const isDynamic = function (task) { return (task.isDynamic == true || task.isStatic == false) }
-            switch (filter) {
-            case 'all':
-                return true
-            case 'static':
-                return isStatic(task)
-            case 'dynamic':
-                return isDynamic(task)
-            case 'active':
-                return isActive(task)
-            case 'inactive':
-                return isInactive(task)
-            case 'active-dynamic':
-                return isActive(task) && isDynamic(task)
-            case 'active-static':
-                return isActive(task) && isStatic(task)
-            case 'inactive-dynamic':
-                return isInactive(task) && isDynamic(task)
-            case 'inactive-static':
-                return isInactive(task) && isStatic(task)
-            }
-            return false
-        }
 
         /**
              * Determines if a given schedule matches a specified filter criteria.
@@ -3179,58 +2862,6 @@ module.exports = function (RED) {
             return false
         }
 
-        function stopTask (node, name, resetCounter) {
-            const task = getTask(node, name)
-            if (task) {
-                task.stop()
-                if (resetCounter) { task.node_count = 0 }
-            }
-            return task
-        }
-
-        function stopAllTasks (node, resetCounter, filter) {
-            if (node.tasks) {
-                for (let index = 0; index < node.tasks.length; index++) {
-                    const task = node.tasks[index]
-                    if (task) {
-                        let skip = false
-                        if (filter) skip = (taskFilterMatch(task, filter) === false)
-                        if (!skip) {
-                            task.stop()
-                            if (resetCounter) { task.node_count = 0 }
-                        }
-                    }
-                }
-            }
-        }
-
-        function stopAllSchedules (node, resetCounter, filter) {
-            if (node.schedules) {
-                node.schedules.forEach(schedule => {
-                    let skip = false
-                    if (filter) skip = (scheduleFilterMatch(schedule, filter) === false)
-                    if (!skip && schedule) {
-                        // if (isTaskFinished(schedule)) {
-                        //     schedule.node_count = 0
-                        // }
-                        stopSchedule(node, schedule.id, resetCounter)
-                    }
-                })
-            }
-        }
-
-        function startTask (node, name) {
-            const task = getTask(node, name)
-            if (task) {
-                if (isTaskFinished(task)) {
-                    task.node_count = 0
-                }
-                task.stop()// prevent bug where calling start without first calling stop causes events to bunch up
-                task.start()
-            }
-            return task
-        }
-
         function startSchedule (node, id) {
             const schedule = getSchedule(node, id)
 
@@ -3262,6 +2893,21 @@ module.exports = function (RED) {
             }
         }
 
+        function startAllSchedules (node, filter) {
+            if (node.schedules) {
+                node.schedules.forEach(schedule => {
+                    let skip = false
+                    if (filter) skip = (scheduleFilterMatch(schedule, filter) === false)
+                    if (!skip && schedule) {
+                        // if (isTaskFinished(schedule)) {
+                        //     schedule.node_count = 0
+                        // }
+                        startSchedule(node, schedule.id)
+                    }
+                })
+            }
+        }
+
         function stopSchedule (node, id, resetCounter = true) {
             const schedule = getSchedule(node, id)
 
@@ -3284,7 +2930,7 @@ module.exports = function (RED) {
             }
         }
 
-        function startAllSchedules (node, filter) {
+        function stopAllSchedules (node, resetCounter, filter) {
             if (node.schedules) {
                 node.schedules.forEach(schedule => {
                     let skip = false
@@ -3293,7 +2939,7 @@ module.exports = function (RED) {
                         // if (isTaskFinished(schedule)) {
                         //     schedule.node_count = 0
                         // }
-                        startSchedule(node, schedule.id)
+                        stopSchedule(node, schedule.id, resetCounter)
                     }
                 })
             }
@@ -3312,29 +2958,6 @@ module.exports = function (RED) {
                 }, [])
             }
             return []
-        }
-
-        function deleteAllTasks (node, filter) {
-            if (node.tasks) {
-                for (let index = 0; index < node.tasks.length; index++) {
-                    try {
-                        const task = node.tasks[index]
-                        if (task) {
-                            let skip = false
-                            if (filter) skip = (taskFilterMatch(task, filter) === false)
-                            if (!skip) {
-                                _deleteTask(task)
-                                node.tasks[index] = null
-                                node.tasks.splice(index, 1)
-                                index--
-                            }
-                        }
-                        // eslint-disable-next-line no-empty
-                    } catch (error) {
-                        console.log('deleteAllTasks', error)
-                    }
-                }
-            }
         }
 
         function deleteAllTasksFromSchedules (node, filter) {
@@ -3431,24 +3054,6 @@ module.exports = function (RED) {
             } catch (error) { }
         }
 
-        function updateSchedules (node, schedules = null) {
-            if (schedules) {
-                node.schedules = schedules
-            }
-            updateUISchedules(node)
-        }
-
-        function updateUISchedules (node, emitEvent = true) {
-            const schedules = node.schedules || []
-            const uiSchedules = schedules.map(schedule => generateUiSchedule(schedule))
-            base.stores.state.set(base, node, null, 'schedules', uiSchedules)
-            if (emitEvent) {
-                const m = { ui_update: { schedules: uiSchedules } }
-                base.emit('msg-input:' + node.id, m, node)
-            }
-            return uiSchedules
-        }
-
         function generateUiSchedule (schedule) {
             // Create a shallow copy of the schedule object with deep clones for nested objects
             const uiSchedule = {
@@ -3479,6 +3084,25 @@ module.exports = function (RED) {
             }
             return schedule
         }
+
+        function updateSchedules (node, schedules = null) {
+            if (schedules) {
+                node.schedules = schedules
+            }
+            updateUISchedules(node)
+        }
+
+        function updateUISchedules (node, emitEvent = true) {
+            const schedules = node.schedules || []
+            const uiSchedules = schedules.map(schedule => generateUiSchedule(schedule))
+            base.stores.state.set(base, node, null, 'schedules', uiSchedules)
+            if (emitEvent) {
+                const m = { ui_update: { schedules: uiSchedules } }
+                base.emit('msg-input:' + node.id, m, node)
+            }
+            return uiSchedules
+        }
+
         function updateSchedule (node, schedule, emitEvent = true, eventName = 'update') {
             const { id } = schedule
             if (!id) {
@@ -3606,14 +3230,6 @@ module.exports = function (RED) {
             // task.node_index = index
             task.node_opt = opt
             task.node_limit = opt.limit || 0
-
-            // // generate schedule object for UI if it doesn't exist
-            // if (!task.node_opt.schedule && !task.node_opt.endSchedule && !task.node_opt.solarTimespanSchedule) {
-            //     const props = generateScheduleObject(task)
-            //     if (props) {
-            //         updateSchedule(node, task.name, task, props, true, 'add')
-            //     }
-            // }
 
             task.stop()
             task.on('run', (timestamp) => {
@@ -3974,6 +3590,7 @@ module.exports = function (RED) {
 
             return task
         }
+
         function requestSerialisation () {
             if (node.serialisationRequestBusy || node.postponeSerialisation) {
                 return
@@ -3981,6 +3598,7 @@ module.exports = function (RED) {
 
             node.queuedSerialisationRequest = Date.now()
         }
+
         async function serialise () {
             let filePath = ''
             try {
@@ -4030,6 +3648,7 @@ module.exports = function (RED) {
                 node.queuedSerialisationRequest = null
             }
         }
+
         async function deserialise () {
             let filePath = ''
             const sendSchedules = () => {
@@ -4119,21 +3738,6 @@ module.exports = function (RED) {
                             }
                         }
                     } else {
-                        // if (state.staticSchedules && state.staticSchedules.length) {
-                        //     for (let iOpt = 0; iOpt < state.staticSchedules.length; iOpt++) {
-                        //         const opt = state.staticSchedules[iOpt]
-                        //         const task = node.tasks.find(e => e.name === opt.name)
-                        //         if (task) {
-                        //             task.node_count = opt.count
-                        //         }
-                        //         if (opt.isRunning === false) {
-                        //             stopTask(node, opt.name)
-                        //         } else if (opt.isRunning === true) {
-                        //             startTask(node, opt.name)
-                        //         }
-                        //     }
-                        //     updateNodeNextInfo(node)
-                        // }
                         if (state.dynamicSchedules && state.dynamicSchedules.length) {
                             // eslint-disable-next-line prefer-const
                             const schedules = node.schedules || []
@@ -4282,40 +3886,6 @@ module.exports = function (RED) {
             } else {
                 node.status({})
             }
-        }
-
-        function getNextTask (tasks) {
-            try {
-                const now = new Date()
-                if (!tasks || !tasks.length) { return null }
-                const runningTasks = tasks.filter(function (task) {
-                    const finished = isTaskFinished(task)
-                    return task.isRunning && (task._expression || task._sequence) && !finished
-                })
-                if (!runningTasks || !runningTasks.length) {
-                    return null
-                }
-
-                let nextToRunTask
-                if (runningTasks.length === 1) {
-                    // let x = (runningTasks[0]._expression || runningTasks[0]._sequence)
-                    nextToRunTask = runningTasks[0]
-                    // d = x.nextDate(now);
-                } else {
-                    nextToRunTask = runningTasks.reduce(function (prev, current) {
-                        // let p, c;
-                        if (!prev) return current
-                        if (!current) return prev
-                        const px = (prev._expression || prev._sequence)
-                        const cx = (current._expression || current._sequence)
-                        return (px.nextDate(now) < cx.nextDate(now)) ? prev : current
-                    })
-                }
-                return nextToRunTask
-            } catch (error) {
-                node.debug(error)
-            }
-            return null
         }
 
         /**
@@ -5228,7 +4798,7 @@ module.exports = function (RED) {
             }
         }
         /**
-             * Asynchronously describes a cron expression from the message payload.
+             * Describes a cron expression from the message payload.
              *
              * @param {Object} msg - The message object containing the payload with the cron expression.
              * @returns {void} Emits a message with the detailed description of the cron expression.
@@ -5239,7 +4809,7 @@ module.exports = function (RED) {
              * with localized versions. The results are emitted back with the original expression included.
              * Logs a warning if no cron expression is found and handles any errors during processing.
              */
-        async function describeExpression (msg) {
+        function describeExpression (msg) {
             if (!msg?.payload?.cronExpression) {
                 console.warn('No cronExpression found in the payload.')
                 return
@@ -5255,7 +4825,7 @@ module.exports = function (RED) {
                 applyOptionDefaults(node, cmd)
 
                 // Get the detailed cron expression description
-                const cronExpression = await _asyncDescribeExpression(
+                const cronExpression = describeExpression(
                     cmd.expression,
                     cmd.expressionType,
                     cmd.timeZone || node.timeZone,
