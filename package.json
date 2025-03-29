@@ -1,6 +1,6 @@
 {
   "name": "@cgjgh/node-red-dashboard-2-ui-scheduler",
-  "version": "3.3.2",
+  "version": "3.3.3",
   "description": "A UI scheduler node that integrates with Node-RED Dashboard 2.0",
   "keywords": [
     "node-red",
@@ -25,7 +25,7 @@
     "examples/*"
   ],
   "scripts": {
-    "build": "npm run replace-import-paths && vite build && npm run add-package-info",
+    "build": "vite build && npm run add-package-info",
     "build:dev": " cross-env NODE_ENV=development vite build --mode development",
     "dev": "cross-env NODE_ENV=development vite build --mode development --watch",
     "dev:prod": "vite build --watch",
@@ -33,7 +33,6 @@
     "cy:run": "cypress run",
     "cy:server": "node-red -u ./cypress/fixtures/user-dir/ -p 1881",
     "add-package-info": "node ./scripts/addPackageInfo.js ./package.json ./nodes/ui-scheduler.js",
-    "replace-import-paths": "node ./scripts/replaceImportPaths.js ./ui/components/UIScheduler.vue",
     "lint": "npm run lint:js && npm run lint:package",
     "lint:fix": "npm run lint:js:fix && npm run lint:package:fix",
     "lint:js": "eslint --ext .js,.vue,.cjs,.mjs .",
@@ -51,7 +50,7 @@
     "cronosjs-extended": "^2.1.0",
     "cronstrue": "^2.52.0",
     "date-fns": "^4.1.0",
-    "enhanced-ms": "https://github.com/cgjgh/enhanced-ms/releases/download/4.1.0/enhanced-ms-4.1.0.tgz",
+    "enhanced-ms": "^4.1.0",
     "node-debug-analytics": "^1.0.4",
     "semver": "^7.7.1",
     "suncalc2": "^1.8.1",
