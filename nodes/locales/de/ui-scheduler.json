@@ -61,7 +61,8 @@
       "done": "Fertig",
       "future": "in {time}",
       "past": "vor {time}",
-      "never": "nie"
+      "never": "nie",
+      "lessThanASecond": "Weniger als eine Sekunde"
     },
     "days": {
       "sunday": "Sonntag",

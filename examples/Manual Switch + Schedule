@@ -1,0 +1,400 @@
+[
+    {
+        "id": "bdf27679b4fc80b7",
+        "type": "ui-gauge",
+        "z": "7c91d61021d761a6",
+        "name": "",
+        "group": "5c9d11d2de1993f9",
+        "order": 1,
+        "width": "3",
+        "height": "1",
+        "gtype": "gauge-tile",
+        "gstyle": "needle",
+        "title": "Device Status",
+        "units": "units",
+        "icon": "",
+        "prefix": "",
+        "suffix": "",
+        "segments": [
+            {
+                "from": "0",
+                "color": "#ea5353"
+            },
+            {
+                "from": "1",
+                "color": "#5cd65c"
+            }
+        ],
+        "min": 0,
+        "max": 10,
+        "sizeThickness": 16,
+        "sizeGap": 4,
+        "sizeKeyThickness": 8,
+        "styleRounded": true,
+        "styleGlow": false,
+        "className": "",
+        "x": 1240,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "c9d8980b968d0f84",
+        "type": "function",
+        "z": "7c91d61021d761a6",
+        "name": "Set Payload",
+        "func": "// Retrieve the switchSetting from the context store (flow variable)\nlet switchSetting = flow.get('switchSetting','file');\n\n// Initialize msg.payload based on the switchSetting value\nif (switchSetting === 'off') {\n    msg.payload = 0;\n} else if (switchSetting === 'on') {\n    msg.payload = 1;\n} else if (switchSetting === 'auto') {\n    // Retrieve lastScheduleSetting from the context store\n    let lastScheduleSetting = flow.get('lastScheduleSetting') || 0;\n    msg.payload = lastScheduleSetting;\n}\n// Return the modified message object\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1070,
+        "y": 340,
+        "wires": [
+            [
+                "bdf27679b4fc80b7"
+            ]
+        ]
+    },
+    {
+        "id": "dc35cae0e322a542",
+        "type": "change",
+        "z": "7c91d61021d761a6",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "#:(file)::switchSetting",
+                "pt": "flow",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 860,
+        "y": 380,
+        "wires": [
+            [
+                "c9d8980b968d0f84"
+            ]
+        ]
+    },
+    {
+        "id": "c1f6c6a76b2fe092",
+        "type": "change",
+        "z": "7c91d61021d761a6",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "lastScheduleSetting",
+                "pt": "flow",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 840,
+        "y": 340,
+        "wires": [
+            [
+                "c9d8980b968d0f84"
+            ]
+        ]
+    },
+    {
+        "id": "f970b300c00f7521",
+        "type": "function",
+        "z": "7c91d61021d761a6",
+        "name": "Reset On Disable",
+        "func": "\n// Node-RED Function Node code\nif (msg &&\n    msg.action === 'setEnabled' &&\n    msg.topic === 'Topic 1' &&\n    msg.payload &&\n    msg.payload.enabled === false &&\n    msg.payload.all === true) {\n\n    // Set flow.lastScheduleSetting to false in context store\n    flow.set('lastScheduleSetting', false);\n}\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 870,
+        "y": 300,
+        "wires": [
+            [
+                "c9d8980b968d0f84"
+            ]
+        ]
+    },
+    {
+        "id": "83e4ee1b517e9def",
+        "type": "ui-button-group",
+        "z": "7c91d61021d761a6",
+        "name": "",
+        "group": "5c9d11d2de1993f9",
+        "order": 2,
+        "width": "3",
+        "height": 1,
+        "label": "",
+        "className": "px-auto",
+        "rounded": true,
+        "useThemeColors": false,
+        "passthru": true,
+        "options": [
+            {
+                "label": "Off",
+                "icon": "power-off",
+                "value": "off",
+                "valueType": "str",
+                "color": "#ff4242"
+            },
+            {
+                "label": "On",
+                "icon": "power-on",
+                "value": "on",
+                "valueType": "str",
+                "color": "#419f41"
+            },
+            {
+                "label": "Auto",
+                "icon": "auto-mode",
+                "value": "auto",
+                "valueType": "str",
+                "color": "#2090f8"
+            }
+        ],
+        "topic": "switch",
+        "topicType": "str",
+        "x": 630,
+        "y": 380,
+        "wires": [
+            [
+                "dc35cae0e322a542"
+            ]
+        ]
+    },
+    {
+        "id": "bd6c0bb6f04c7db1",
+        "type": "ui-scheduler",
+        "z": "7c91d61021d761a6",
+        "name": "scheduler",
+        "group": "5c9d11d2de1993f9",
+        "order": 3,
+        "label": "Scheduler",
+        "width": 6,
+        "height": 1,
+        "outputField": "payload",
+        "locale": "en",
+        "timeZone": "America/Chicago",
+        "use24HourFormat": false,
+        "storeName": "local_file_system",
+        "commandResponseMsgOutput": "fanOut",
+        "defaultLocation": "",
+        "defaultLocationType": "env",
+        "sendStateInterval": "10",
+        "sendActiveState": true,
+        "sendInactiveState": true,
+        "topics": [
+            "Topic 1"
+        ],
+        "customPayloads": [
+            {
+                "label": "Custom 1",
+                "value": "1",
+                "type": "str",
+                "id": "fy8jjccmpneugdtf"
+            }
+        ],
+        "outputs": 2,
+        "options": [],
+        "uiOptionTime": true,
+        "uiOptionSolar": true,
+        "uiOptionCron": true,
+        "uiOptionMinute": true,
+        "uiOptionHour": true,
+        "uiOptionDay": true,
+        "uiOptionWeek": true,
+        "uiOptionMonth": true,
+        "uiOptionYear": true,
+        "uiOptionTopic": true,
+        "uiOptionTimespan": true,
+        "uiOptionCustomOutput": true,
+        "uiOptionNewTimePicker": false,
+        "x": 640,
+        "y": 300,
+        "wires": [
+            [
+                "f970b300c00f7521"
+            ],
+            [
+                "c1f6c6a76b2fe092"
+            ]
+        ]
+    },
+    {
+        "id": "ade4f97b558756d5",
+        "type": "inject",
+        "z": "7c91d61021d761a6",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "switchSetting",
+        "payloadType": "flow",
+        "x": 170,
+        "y": 380,
+        "wires": [
+            [
+                "a588cdeda892bcdc"
+            ]
+        ]
+    },
+    {
+        "id": "a588cdeda892bcdc",
+        "type": "switch",
+        "z": "7c91d61021d761a6",
+        "name": "Is null?",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "nnull"
+            },
+            {
+                "t": "else"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 2,
+        "x": 340,
+        "y": 380,
+        "wires": [
+            [
+                "83e4ee1b517e9def"
+            ],
+            [
+                "75e2264471d4ee86"
+            ]
+        ]
+    },
+    {
+        "id": "75e2264471d4ee86",
+        "type": "change",
+        "z": "7c91d61021d761a6",
+        "name": "off",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "off",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 470,
+        "y": 420,
+        "wires": [
+            [
+                "83e4ee1b517e9def"
+            ]
+        ]
+    },
+    {
+        "id": "5c9d11d2de1993f9",
+        "type": "ui-group",
+        "name": "Example",
+        "page": "033b20ac04037c1c",
+        "width": "6",
+        "height": "1",
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "033b20ac04037c1c",
+        "type": "ui-page",
+        "name": "Switch + Scheduler",
+        "ui": "dashboard-ui-base",
+        "path": "/page6",
+        "icon": "",
+        "layout": "grid",
+        "theme": "dashboard-ui-theme",
+        "breakpoints": [
+            {
+                "name": "Default",
+                "px": "0",
+                "cols": "3"
+            },
+            {
+                "name": "Tablet",
+                "px": "576",
+                "cols": "6"
+            },
+            {
+                "name": "Small Desktop",
+                "px": "768",
+                "cols": "9"
+            },
+            {
+                "name": "Desktop",
+                "px": "1024",
+                "cols": "12"
+            }
+        ],
+        "order": 2,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    },
+    {
+        "id": "dashboard-ui-base",
+        "type": "ui-base",
+        "name": "UI Name",
+        "path": "/dashboard",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification",
+            "ui-control"
+        ]
+    },
+    {
+        "id": "dashboard-ui-theme",
+        "type": "ui-theme",
+        "name": "Default Theme",
+        "colors": {
+            "surface": "#000000",
+            "primary": "#0094ce",
+            "bgPage": "#212121",
+            "groupBg": "#363636",
+            "groupOutline": "#cccccc"
+        },
+        "sizes": {
+            "density": "default",
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "4px",
+            "widgetGap": "12px"
+        }
+    }
+]

@@ -61,7 +61,8 @@
       "done": "Done",
       "future": "in {time}",
       "past": "{time} ago",
-      "never": "Never"
+      "never": "Never",
+      "lessThanASecond": "Less than a second"
     },
 
     "days": {

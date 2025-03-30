@@ -27,6 +27,7 @@ dist-ssr
 # No need to include lock file
 # package-lock.json
 
+# exclude include.tgz
 *.tgz
 # exclude cypress files
 cypress/fixtures/user-dir/.config.runtime.json
@@ -40,3 +41,8 @@ cypress/fixtures/user-dir/flows.json
 .qodo
 cypress/fixtures/user-dir/.config.users.json.backup
 cypress/fixtures/user-dir/.flows.json.backup
+
+# exclude include vitepress dist
+docs/.vitepress/cache
+docs/.vitepress/dist
+/.vitepress/cache
