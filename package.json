@@ -1,6 +1,6 @@
 {
   "name": "@cgjgh/node-red-dashboard-2-ui-scheduler",
-  "version": "3.3.3",
+  "version": "3.3.4",
   "description": "A UI scheduler node that integrates with Node-RED Dashboard 2.0",
   "keywords": [
     "node-red",
@@ -25,7 +25,7 @@
     "examples/*"
   ],
   "scripts": {
-    "build": "vite build && npm run add-package-info",
+    "build": "npm run add-package-info && vite build",
     "build:dev": " cross-env NODE_ENV=development vite build --mode development",
     "dev": "cross-env NODE_ENV=development vite build --mode development --watch",
     "dev:prod": "vite build --watch",

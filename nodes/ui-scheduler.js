@@ -1,4 +1,4 @@
-const version = '3.3.3'
+const version = '3.3.4'
 const packageName = '@cgjgh/node-red-dashboard-2-ui-scheduler'
 
 /* eslint-disable no-unused-vars */
@@ -243,6 +243,7 @@ addExtendedControlTopics('debug')
 /**
  * Checks for updates of a specified npm package by comparing the current version
  * with the latest version available on the npm registry.
+ * The reason for this is to push updates to the user ASAP while were still in beta.
  *
  * @param {string} currentVersion - The current version of the package.
  * @param {string} packageName - The name of the package to check for updates.
@@ -4825,7 +4826,7 @@ module.exports = function (RED) {
                 applyOptionDefaults(node, cmd)
 
                 // Get the detailed cron expression description
-                const cronExpression = describeExpression(
+                const cronExpression = _describeExpression(
                     cmd.expression,
                     cmd.expressionType,
                     cmd.timeZone || node.timeZone,
